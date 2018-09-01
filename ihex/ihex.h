@@ -8,8 +8,11 @@ typedef struct _hex_info {
     ihex_address_t addr_to;
     ihex_count_t total_size;
     ihex_count_t actual_size;
+
+    //data buffer
     unsigned char *data;
     int len;
+    int offset;
 }hex_info_t;
 
 int get_hex_info(const char *file, hex_info_t *info);

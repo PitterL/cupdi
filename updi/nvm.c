@@ -100,7 +100,7 @@ int nvm_leave_progmode(void *nvm_ptr)
     _loginfo_i("<NVM> Leaving NVM programming mode");
 
     result = app_leave_progmode(APP(nvm));
-    if (!result) {
+    if (result) {
         _loginfo_i("app_leave_progmode failed %d", result);
         return -2;
     }

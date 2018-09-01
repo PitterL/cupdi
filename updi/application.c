@@ -15,6 +15,8 @@ typedef struct _upd_application {
 #define LINK(_app) ((_app)->link)
 #define APP_REG(_app, _name) ((_app)->dev->mmap->reg._name)
 
+#define TIMEOUT_WAIT_FLASH_READY 1000
+
 void *updi_application_init(const char *port, int baud, void *dev)
 {
     upd_application_t *app = NULL;
@@ -330,7 +332,7 @@ int app_toggle_reset(void *app_ptr, int delay)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Toggle Reset %d");
+    _loginfo_i("<APP> Toggle Reset");
 
     //Toggle reset
     result = app_reset(app, true);
@@ -423,7 +425,7 @@ int app_chip_erase(void *app_ptr)
     _loginfo_i("<APP> Chip erase using NVM CTRL");
 
     //Wait until NVM CTRL is ready to erase
-    result = app_wait_flash_ready(app, 1000);
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
         _loginfo_i("app_wait_flash_ready timeout before erase failed %d", result);
         return -2;
@@ -437,7 +439,7 @@ int app_chip_erase(void *app_ptr)
     }
 
     // And wait for it
-    result = app_wait_flash_ready(app, 1000);
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
         _loginfo_i("app_wait_flash_ready timeout after erase failed %d", result);
         return -2;
@@ -567,7 +569,7 @@ int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command
     _loginfo_i("<APP> Chip write nvm");
 
     // Check that NVM controller is ready
-    result = app_wait_flash_ready(app, 1000);
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
         _loginfo_i("app_wait_flash_ready timeout before page buffer clear failed %d", result);
         return -2;
@@ -582,7 +584,7 @@ int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command
     }
 
     // Waif for NVM controller to be ready
-    result = app_wait_flash_ready(app, 1000);
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
         _loginfo_i("app_wait_flash_ready timeout after page buffer clear failed %d", result);
         return -4;
@@ -607,7 +609,7 @@ int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command
     }
 
     // Waif for NVM controller to be ready again
-    result = app_wait_flash_ready(app, 1000);
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
         _loginfo_i("app_wait_flash_ready timeout after page write failed %d", result);
         return -7;

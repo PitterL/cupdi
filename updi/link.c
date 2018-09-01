@@ -191,14 +191,14 @@ u8 link_ld(void *link_ptr, u16 address)
     return resp;
 }
 
-u16 link_ld16(void *link_ptr, u16 address)
+int _link_ld16(void *link_ptr, u16 address, u16 *val)
 {
     /*
     Load a 2 byte direct from a 16 - bit address
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
     const u8 cmd[] = { UPDI_PHY_SYNC , UPDI_LDS | UPDI_ADDRESS_16 | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF};
-    u8 resp[2] = {0xff, 0xff};
+    u8 resp[2];
     int result;
 
     if (!VALID_LINK(link))
@@ -209,9 +209,24 @@ u16 link_ld16(void *link_ptr, u16 address)
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), resp, sizeof(resp));
     if (result != sizeof(resp)) {
         _loginfo_i("phy_transfer failed %d", result);
+        return -2;
     }
 
-    return resp[0] | (resp[1] << 8);
+    *val = resp[0] | (resp[1] << 8);
+    return 0;
+}
+
+u16 link_ld16(void *link_ptr, u16 address)
+{
+    u16 val = 0;
+    int result;
+
+    result = _link_ld16(link_ptr, address, &val);
+    if (result){
+        _loginfo_i("_link_ld16 failed %d", result);
+    }
+
+    return val;
 }
 
 int link_st(void *link_ptr, u16 address, u8 value)

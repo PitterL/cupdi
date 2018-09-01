@@ -6,11 +6,13 @@
 #include "win32/time.h"
 #include "win32/logging.h"
 #include "win32/error.h"
-#include <stdbool.h>
 
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
+typedef int bool;
+#define false 0
+#define true 1
 
 #define VALID_PTR(_ptr) (!!(_ptr))
 #define ARRAY_SIZE(_) (sizeof (_) / sizeof (*_))

@@ -19,7 +19,7 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
         if (info->data) {
             if (start >= info->addr_from && end < info->addr_from + info->len) {
                 off = start - info->addr_from;
-                memcpy(info->data + off, ihex->data, ihex->length);
+                memcpy(info->data + info->offset + off, ihex->data, ihex->length);
             }
         }
         else {

@@ -81,7 +81,7 @@ int phy_send_double_break(void *ptr_phy)
     */
     upd_physical_t * phy = (upd_physical_t *)ptr_phy;
     SER_PORT_STATE_T stat;
-    u8 data[2];
+    u8 data[] = { UPDI_BREAK, UPDI_BREAK };
     int result;
 
     if (!VALID_PHY(phy))
@@ -104,8 +104,6 @@ int phy_send_double_break(void *ptr_phy)
     }
 
     /*Send two break characters, with 1 stop bit in between */
-    data[0] = UPDI_BREAK;
-    data[1] = UPDI_BREAK;
     result = phy_send(phy, data, 2);
     if (result) {
         _loginfo_i("phy_send failed %d", result);
@@ -261,7 +259,7 @@ int phy_sib(void *ptr_phy, u8 *data, int len)
     */
 
     upd_physical_t * phy = (upd_physical_t *)ptr_phy;
-    const u8 val[2] = { UPDI_PHY_SYNC, UPDI_KEY | UPDI_KEY_SIB | UPDI_SIB_16BYTES};
+    const u8 val[] = { UPDI_PHY_SYNC, UPDI_KEY | UPDI_KEY_SIB | UPDI_SIB_16BYTES};
     const int sib_size = 16;
     int result;
 
@@ -273,7 +271,7 @@ int phy_sib(void *ptr_phy, u8 *data, int len)
     if (len > sib_size)
         len = sib_size;
 
-    result = phy_transfer(phy, val, 2, data, len);
+    result = phy_transfer(phy, val, sizeof(val), data, len);
     if (result != len) {
         _loginfo_i("phy_transfer failed %d", result);
         return -3;
