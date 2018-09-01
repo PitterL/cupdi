@@ -76,7 +76,7 @@ int nvm_enter_progmode(void *nvm_ptr)
     _loginfo_i("<NVM> Entering NVM programming mode");
     
     result = app_enter_progmode(APP(nvm));
-    if (!result) {
+    if (result) {
         _loginfo_i("app_enter_progmode failed %d", result);
         return -2;
     }
@@ -160,7 +160,7 @@ int nvm_chip_erase(void *nvm_ptr)
     }
 
     result = app_chip_erase(APP(nvm));
-    if (!result) {
+    if (result) {
         _loginfo_i("app_chip_erase failed %d", result);
         return -3;
     }
@@ -197,16 +197,16 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     for (i = 0, off = 0; i < pages; i++) {
         _loginfo_i("Reading Page(%d) at 0x%x", i, address);
         
-        result = app_read_data_words(APP(nvm), address + off, data + off, page_size >> 1);
+        result = app_read_nvm(APP(nvm), address + off, data + off, page_size);
         if (result) {
-            _loginfo_i("app_read_data_words failed %d", result);
+            _loginfo_i("app_read_nvm failed %d", result);
             break;
         }
         
         off += page_size;
     }
 
-    if (i <= pages || result) {
+    if (i < pages || result) {
         _loginfo_i("Read flash failed %d", i, result);
         return -4;
     }
@@ -252,7 +252,7 @@ int nvm_write_flash(void *nvm_ptr, u16 address, u8 *data, int len)
         off += page_size;
     }
 
-    if (i <= pages || result) {
+    if (i < pages || result) {
         _loginfo_i("Write flash failed %d", i, result);
         return -4;
     }

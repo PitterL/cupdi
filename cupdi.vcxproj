@@ -72,9 +72,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -84,12 +86,13 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -98,12 +101,13 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,17 +151,46 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="argparse\argparse.h" />
+    <ClInclude Include="cupdi.h" />
+    <ClInclude Include="device\device.h" />
+    <ClInclude Include="ihex\ihex.h" />
+    <ClInclude Include="ihex\kk_ihex.h" />
+    <ClInclude Include="ihex\kk_ihex_read.h" />
+    <ClInclude Include="os\platform.h" />
+    <ClInclude Include="os\win32\error.h" />
+    <ClInclude Include="os\win32\logging.h" />
+    <ClInclude Include="os\win32\serial.h" />
+    <ClInclude Include="os\win32\time.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="string\split.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="updi\application.h" />
+    <ClInclude Include="updi\constants.h" />
+    <ClInclude Include="updi\link.h" />
+    <ClInclude Include="updi\nvm.h" />
+    <ClInclude Include="updi\physical.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cupdi.cpp" />
+    <ClCompile Include="argparse\argparse.c" />
+    <ClCompile Include="cupdi.c" />
+    <ClCompile Include="device\device.c" />
+    <ClCompile Include="ihex\ihex.c" />
+    <ClCompile Include="ihex\kk_ihex_read.c" />
+    <ClCompile Include="os\win32\logging.c" />
+    <ClCompile Include="os\win32\serial.c" />
+    <ClCompile Include="os\win32\time.c" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="string\split.c" />
+    <ClCompile Include="updi\application.c" />
+    <ClCompile Include="updi\link.c" />
+    <ClCompile Include="updi\nvm.c" />
+    <ClCompile Include="updi\physical.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

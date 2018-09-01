@@ -38,7 +38,7 @@ HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *st) {
 
     /* Create the file descriptor handle */
     if ((fd = CreateFileA(port, GENERIC_READ | GENERIC_WRITE, 0, NULL,
-                    OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL))
+                    OPEN_EXISTING, 0/*FILE_FLAG_OVERLAPPED*/, NULL))
         == INVALID_HANDLE_VALUE) {
         return NULL;
     }
@@ -75,6 +75,13 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
     COMMPROP cprops;
     DCB dcb;
     COMMCONFIG config;
+    COMMTIMEOUTS timeouts = { 
+        100, //interval timeout. 0 = not used, The maximum time allowed to elapse before the arrival of the next byte on the communications line, in milliseconds
+        0, // read multiplier .For each read operation, this value is multiplied by the requested number of bytes to be read.
+        1000, // read constant (milliseconds)
+        0, // Write multiplier
+        0  // Write Constant
+    };
 
     if (!VALID_SER(ser))
         return ERROR_PTR;
@@ -94,7 +101,7 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
     }
 
     dcb.BaudRate = st->baudRate;
-    dcb.BaudRate = st->byteSize;
+    dcb.ByteSize = st->byteSize;
     dcb.StopBits = st->stopBits;
     dcb.Parity = st->parity;
 
@@ -113,6 +120,10 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
     /* Specify events to receive */
     if (!SetCommMask(FD(ser), EV_RXCHAR /*| EV_TXEMPTY*/)) {
         return -6;
+    }
+
+    if (!SetCommTimeouts(FD(ser), &timeouts)) {
+        return -7;
     }
 
     return 0;
@@ -144,36 +155,19 @@ int FlushPort(void *ptr_ser)
  */
 int SendData(void *ptr_ser, const LPVOID tx, DWORD len) {
     upd_sercom_t *ser = (upd_sercom_t *)ptr_ser;
-    DWORD dwEvtMask = 0;
-    DWORD dwWait = 0;
     DWORD written = 0;
-    OVERLAPPED ov;
-
+    
     if (!VALID_SER(ser))
         return ERROR_PTR;
 
-    /* Initialise OVERLAPPED structure with defaults */
-    ov.Internal = 0;
-    ov.InternalHigh = 0;
-    ov.Offset = 0;
-    ov.OffsetHigh = 0;
-    ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-    if (!ov.hEvent) {
+    /* Write to the port handle */
+    if (!WriteFile(FD(ser), tx, len, &written, NULL)) {
         return -2;
     }
 
-    /* Write to the port handle */
-    if (!WriteFile(FD(ser), tx, len, &written, &ov)) {
-        /* Wait for the write to finish */
-        if (GetLastError() != ERROR_IO_PENDING) {
-            return -2;
-        }
-        
-        WaitForSingleObject(ov.hEvent, INFINITE);
-    }
+    if (written != len)
+        return -3;
 
-    CloseHandle(ov.hEvent);
     return 0;
 }
 
@@ -187,69 +181,21 @@ int SendData(void *ptr_ser, const LPVOID tx, DWORD len) {
  */
 int ReadData(void *ptr_ser, LPVOID rx, DWORD len) {
     upd_sercom_t *ser = (upd_sercom_t *)ptr_ser;
-    DWORD dwEvtMask = 0;
-    DWORD dwWait = 0;
     DWORD read = 0;
-    DWORD bytes = 0;
-    BYTE* chars = (BYTE*)rx;
-    OVERLAPPED ov;
-    COMSTAT cstat;
+    //DWORD dwEvtMask;
 
-    /* Initialise OVERLAPPED structure with defaults */
-    ov.Internal = 0;
-    ov.InternalHigh = 0;
-    ov.Offset = 0;
-    ov.OffsetHigh = 0;
-    ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    /*
+    if (!WaitCommEvent(FD(ser), &dwEvtMask, NULL)) {
+    
+    }
+    */
 
-    if (!ov.hEvent) {
-        return -1;
+    if (!ReadFile(FD(ser), rx, 1, &read, NULL)) {
+        return -2;
     }
 
-    GetCommMask(FD(ser), &dwEvtMask);
-    printf("dwEvtMask 0x%x #1\n", dwEvtMask);
+    return read;
 
-    /* Wait for an event (characters to read) */
-    if (!WaitCommEvent(FD(ser), &dwEvtMask, &ov)) {
-        if (GetLastError() != ERROR_IO_PENDING) {
-            return -2;
-        }
-    }
-
-    GetOverlappedResult(FD(ser),
-        &ov,
-        &dwEvtMask,
-        TRUE);
-
-    printf("dwEvtMask 0x%x #2\n", dwEvtMask);
-
-
-    /* Wait for the characters to become available */
-    dwWait = WaitForSingleObject(ov.hEvent, INFINITE);
-    switch (dwWait) {
-        case WAIT_OBJECT_0:
-            if (dwEvtMask & EV_RXCHAR) {
-
-                /* Get the stats (including number of available characters) */
-                ClearCommError(FD(ser), NULL, &cstat);
-
-                if (cstat.cbInQue > 0) {
-                    //cstat.cbInQue: Current data len in queue
-                    for (DWORD i = 0; i < len; i++) {
-                        chars[i] = 0;
-                        /* Read each character individually */
-                        if (!ReadFile(FD(ser), (LPVOID)(chars + i), 1, &read, &ov)) {
-                            break;
-                        }
-                        bytes += 1;
-                    }
-                }
-                ResetEvent(ov.hEvent);
-            }
-            break;
-    }
-
-    return bytes;
 }
 
 /**

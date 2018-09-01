@@ -14,10 +14,10 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 
     if (type == IHEX_DATA_RECORD) {
         start = (unsigned long)IHEX_LINEAR_ADDRESS(ihex);
-        end = start + ihex->length;
+        end = start + ihex->length - 1;
 
         if (info->data) {
-            if (start >= info->addr_from && end <= info->addr_from + info->len) {
+            if (start >= info->addr_from && end < info->addr_from + info->len) {
                 off = start - info->addr_from;
                 memcpy(info->data + off, ihex->data, ihex->length);
             }

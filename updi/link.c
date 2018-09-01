@@ -69,21 +69,26 @@ int link_check(void *link_ptr)
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
     u8 resp;
+    int result;
 
     if (!VALID_LINK(link))
         return ERROR_PTR;
     
     _loginfo_i("<LINK> link check");
 
-    resp = link_ldcs(link_ptr, UPDI_CS_STATUSA);
-    if (resp != 0) {
-        _loginfo_i("UPDI init OK (%02x)", resp);
-        return 0;
+    result = _link_ldcs(link_ptr, UPDI_CS_STATUSA, &resp);
+    if (result) {
+        _loginfo_i("UPDI not ready");
+        return -2;
     }
     
-    _loginfo_i("UPDI not OK - reinitialisation required");
+    if (resp == 0) {
+        _loginfo_i("UPDI not OK - reinitialisation required");
+        return -3;
+    }
     
-    return -1;
+    _loginfo_i("UPDI init OK (%02x)", resp);
+    return 0;
 }
 
 int _link_ldcs(void *link_ptr, u8 address, u8 *data)
@@ -115,9 +120,14 @@ int _link_ldcs(void *link_ptr, u8 address, u8 *data)
 
 u8 link_ldcs(void *link_ptr, u8 address)
 {
-    u8 resp = 0;
-    
-    _link_ldcs(link_ptr, address, &resp);
+    u8 resp;
+    int result;
+
+    result = _link_ldcs(link_ptr, address, &resp);
+    if (result) {
+        _loginfo_i("_link_ldcs failed %d", result);
+        return 0;
+    }
 
     return resp;
 }
@@ -343,7 +353,7 @@ int link_st_ptr_inc(void *link_ptr, u8 *data, int len)
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
     const u8 cmd[] = { UPDI_PHY_SYNC, UPDI_ST | UPDI_PTR_INC | UPDI_DATA_8, data[0] };
-    u8 resp = 0xFF;
+    u8 resp;
     int i;
     int result;
 
@@ -395,7 +405,7 @@ int link_st_ptr_inc16(void *link_ptr, u8 *data, int len)
         result = phy_transfer(PHY(link), &data[i], 2, &resp, sizeof(resp));
         if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
             _loginfo_i("phy_transfer failed %d i %d resp 0x%02x", result, i, resp);
-            return -2;
+            return -3;
         }
     }
 
@@ -443,7 +453,7 @@ int link_read_sib(void *link_ptr, u8 *data, int len)
 int link_key(void *link_ptr, u8 size_k, const char *key)
 {
     /*
-        Read the SIB
+        Write a key
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
     const u8 cmd[] = { UPDI_PHY_SYNC, UPDI_KEY | UPDI_KEY_KEY | size_k };
@@ -456,7 +466,7 @@ int link_key(void *link_ptr, u8 size_k, const char *key)
 
     _loginfo_i("<LINK> Key %x", size_k);
 
-    result = phy_send(PHY(link), key, len);
+    result = phy_send(PHY(link), cmd, sizeof(cmd));
     if (result) {
         _loginfo_i("phy_send failed %d", result);
         return -2;

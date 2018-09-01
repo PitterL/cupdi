@@ -42,13 +42,16 @@ void *updi_physical_init(const char *port, int baud)
         phy->ibdly = 1;
         memcpy(&phy->stat, &stat, sizeof(stat));
         
-        // send an initial break as handshake
-        result = phy_send_byte(phy, UPDI_BREAK);
+        // send an initial double break as handshake
+        result = phy_send_double_break(phy);
         if (result) {
-            _loginfo_i("phy_send_byte failed %d", result);
+            _loginfo_i("phy_send_double_break failed %d", result);
             updi_physical_deinit(phy);
-            phy = NULL;
+            return NULL;
         }
+    }
+    else {
+        _loginfo_i("OpenPort %s failed ", port);
     }
     
     return phy;
@@ -103,16 +106,10 @@ int phy_send_double_break(void *ptr_phy)
     /*Send two break characters, with 1 stop bit in between */
     data[0] = UPDI_BREAK;
     data[1] = UPDI_BREAK;
-    result = SendData(SER(phy), data, 2);
+    result = phy_send(phy, data, 2);
     if (result) {
-        _loginfo_i("SendData failed %d", result);
+        _loginfo_i("phy_send failed %d", result);
         return -3;
-    }
-    /*Wait for the double break end*/
-    result = ReadData(SER(phy), data, 2);
-    if (result != 2) {
-        _loginfo_i("ReadData failed %d", result);
-        return -4;
     }
 
     /*Re - init at the real baud*/
@@ -138,7 +135,7 @@ int phy_send(void *ptr_phy, const u8 *data, int len)
     if (!VALID_PHY(phy))
         return ERROR_PTR;
 
-    _loginfo("<PHY> Send", data, len);
+    _loginfo("<PHY> Send:", data, len, "0x%02x ");
 
     result = FlushPort(SER(phy));
     if (result) {
@@ -184,7 +181,7 @@ int phy_receive(void *ptr_phy, u8 *data, int len)
     upd_physical_t * phy = (upd_physical_t *)ptr_phy;
     int result;
     int i = 0;
-    int retry = 1;
+    int retry = 0;
 
     if (!VALID_PHY(phy))
         return ERROR_PTR;
@@ -206,7 +203,8 @@ int phy_receive(void *ptr_phy, u8 *data, int len)
         }
     }
 
-    _loginfo("<PHY> Receive", data, len);
+    if (i)
+        _loginfo("<PHY> Received(%d/%d):", data, i, "0x%02x ", i, len);
 
     return i;
 }
@@ -218,7 +216,7 @@ u8 phy_receive_byte(void *ptr_phy)
 
     result = phy_receive(ptr_phy, &resp, 1);
     if (result != 1) {
-        _loginfo_i("phy_send failed", result);
+        _loginfo_i("phy_receive failed, Got %d bytes", result);
     }
 
     return resp;
@@ -227,22 +225,33 @@ u8 phy_receive_byte(void *ptr_phy)
 int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
 {
     int result;
+    int retry = 1;
 
-    _loginfo_i("<PHY> Transfer w %d, r %d", wlen, rlen);
+    _loginfo_i("<PHY> Transfer: Write %d bytes, Read %d bytes", wlen, rlen);
 
-    result = phy_send(ptr_phy, wdata, wlen);
-    if (result) {
-        _loginfo_i("phy_send failed %d", result);
-        return -2;
-    }
+    do {
+        result = phy_send(ptr_phy, wdata, wlen);
+        if (result) {
+            _loginfo_i("phy_send failed %d", result);
+            result = -2;
+        }
+        else {
+            result = phy_receive(ptr_phy, rdata, rlen);
+            if (result != rlen) {
+                _loginfo_i("phy_receive failed, Got %d bytes", result);
+                result = -3;
+            }
+            else {
+                break;
+            }
+        }
 
-    result = phy_receive(ptr_phy, rdata, rlen);
-    if (result != rlen) {
-        _loginfo_i("phy_receive failed %d", result);
-        return -3;
-    }
+        if (result < 0)
+            retry--;
 
-    return rlen;
+    } while (retry >= 0);
+
+    return result;
 }
 
 int phy_sib(void *ptr_phy, u8 *data, int len) 

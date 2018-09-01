@@ -34,6 +34,12 @@ HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *state);
 int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *state);
 
 /**
+* clear the serial port
+* @implementation serial.c
+*/
+int FlushPort(void *ptr_ser);
+
+/**
  * Sends data out the serial port pointed to by the handle fd.
  * @implementation serial.c
  */
