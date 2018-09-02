@@ -18,7 +18,7 @@ void *updi_datalink_init(const char *port, int baud)
     void *phy;
     int result;
 
-    _loginfo_i("<LINK> init link");
+    DBG_INFO(LINK_DEBUG, "<LINK> init link");
     
     phy = updi_physical_init(port, baud);
     if (phy) {
@@ -29,20 +29,20 @@ void *updi_datalink_init(const char *port, int baud)
         // Set the inter-byte delay bit and disable collision detection
         result = link_stcs(link, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT);
         if (result) {
-            _loginfo_i("link_stcs UPDI_CS_CTRLB failed %d", result);
+            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
             updi_datalink_deinit(link);
             return NULL;
         }
 
         result = link_stcs(link, UPDI_CS_CTRLA, 1 << UPDI_CTRLA_IBDLY_BIT);
         if (result) {
-            _loginfo_i("link_stcs UPDI_CS_CTRLA failed %d", result);
+            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
             return NULL;
         }
 
         result = link_check(link);
         if (result) {
-            _loginfo_i("link_check failed %d", result);
+            DBG_INFO(LINK_DEBUG, "link_check failed %d", result);
             updi_datalink_deinit(link);
             return NULL;
         }
@@ -55,7 +55,7 @@ void updi_datalink_deinit(void *link_ptr)
 {
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
     if (VALID_LINK(link)) {
-        _loginfo_i("<LINK> deinit link");
+        DBG_INFO(LINK_DEBUG, "<LINK> deinit link");
 
         updi_physical_deinit(PHY(link));
         free(link);
@@ -74,20 +74,20 @@ int link_check(void *link_ptr)
     if (!VALID_LINK(link))
         return ERROR_PTR;
     
-    _loginfo_i("<LINK> link check");
+    DBG_INFO(LINK_DEBUG, "<LINK> link check");
 
     result = _link_ldcs(link_ptr, UPDI_CS_STATUSA, &resp);
     if (result) {
-        _loginfo_i("UPDI not ready");
+        DBG_INFO(LINK_DEBUG, "UPDI not ready");
         return -2;
     }
     
     if (resp == 0) {
-        _loginfo_i("UPDI not OK - reinitialisation required");
+        DBG_INFO(LINK_DEBUG, "UPDI not OK - reinitialisation required");
         return -3;
     }
     
-    _loginfo_i("UPDI init OK (%02x)", resp);
+    DBG_INFO(LINK_DEBUG, "UPDI init OK (%02x)", resp);
     return 0;
 }
 
@@ -105,10 +105,10 @@ int _link_ldcs(void *link_ptr, u8 address, u8 *data)
     if (!VALID_LINK(link) || !data)
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> LDCS from 0x02X", address);
+    DBG_INFO(LINK_DEBUG, "<LINK> LDCS from 0x02X", address);
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp)) {
-        _loginfo_i("phy_transfer failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
         return -2;
     }
 
@@ -125,7 +125,7 @@ u8 link_ldcs(void *link_ptr, u8 address)
 
     result = _link_ldcs(link_ptr, address, &resp);
     if (result) {
-        _loginfo_i("_link_ldcs failed %d", result);
+        DBG_INFO(LINK_DEBUG, "_link_ldcs failed %d", result);
         return 0;
     }
 
@@ -144,11 +144,11 @@ int link_stcs(void *link_ptr, u8 address, u8 value)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> STCS to 0x02x", address);
+    DBG_INFO(LINK_DEBUG, "<LINK> STCS to 0x02x", address);
 
     result = phy_send(PHY(link), cmd, sizeof(cmd));
     if (result) {
-        _loginfo_i("phy_send failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_send failed %d", result);
         return -2;
     }
 
@@ -169,11 +169,11 @@ int _link_ld(void *link_ptr, u16 address, u8 *data)
     if (!VALID_LINK(link) || !data)
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> LD from %04X}", address);
+    DBG_INFO(LINK_DEBUG, "<LINK> LD from %04X}", address);
   
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp)) {
-        _loginfo_i("phy_transfer failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
         return -2;
     }
 
@@ -204,11 +204,11 @@ int _link_ld16(void *link_ptr, u16 address, u16 *val)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> LD from %04X}", address);
+    DBG_INFO(LINK_DEBUG, "<LINK> LD from %04X}", address);
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), resp, sizeof(resp));
     if (result != sizeof(resp)) {
-        _loginfo_i("phy_transfer failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
         return -2;
     }
 
@@ -223,7 +223,7 @@ u16 link_ld16(void *link_ptr, u16 address)
 
     result = _link_ld16(link_ptr, address, &val);
     if (result){
-        _loginfo_i("_link_ld16 failed %d", result);
+        DBG_INFO(LINK_DEBUG, "_link_ld16 failed %d", result);
     }
 
     return val;
@@ -243,17 +243,17 @@ int link_st(void *link_ptr, u16 address, u8 value)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> ST to 0x04X: %02x", address, value);
+    DBG_INFO(LINK_DEBUG, "<LINK> ST to 0x04X: %02x", address, value);
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-        _loginfo_i("phy_transfer failed %d ack %02x", result, resp);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d ack %02x", result, resp);
         return -2;
     }
 
     result = phy_transfer(PHY(link), val, sizeof(val), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-        _loginfo_i("phy_transfer #2 failed %d ack %02x", result, resp);
+        DBG_INFO(LINK_DEBUG, "phy_transfer #2 failed %d ack %02x", result, resp);
         return -2;
     }
 
@@ -274,17 +274,17 @@ int link_st16(void *link_ptr, u16 address, u16 value)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> ST16 to 0x04X: %04x", address, value);
+    DBG_INFO(LINK_DEBUG, "<LINK> ST16 to 0x04X: %04x", address, value);
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-        _loginfo_i("phy_transfer failed %d ack %02x", result, resp);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d ack %02x", result, resp);
         return -2;
     }
 
     result = phy_transfer(PHY(link), val, sizeof(val), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-        _loginfo_i("phy_transfer #2 failed %d ack %02x", result, resp);
+        DBG_INFO(LINK_DEBUG, "phy_transfer #2 failed %d ack %02x", result, resp);
         return -2;
     }
 
@@ -303,11 +303,11 @@ int link_ld_ptr_inc(void *link_ptr, u8 *data, int len)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> LD8 from ptr++");
+    DBG_INFO(LINK_DEBUG, "<LINK> LD8 from ptr++");
  
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), data, len);
     if (result != len) {
-        _loginfo_i("phy_transfer failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
         return -2;
     }
 
@@ -326,11 +326,11 @@ int link_ld_ptr_inc16(void *link_ptr, u8 *data, int len)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> LD16 from ptr++");
+    DBG_INFO(LINK_DEBUG, "<LINK> LD16 from ptr++");
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), data, len);
     if (result != len) {
-        _loginfo_i("phy_transfer failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
         return -2;
     }
 
@@ -350,11 +350,11 @@ int link_st_ptr(void *link_ptr, u16 address)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> ST to ptr");
+    DBG_INFO(LINK_DEBUG, "<LINK> ST to ptr");
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-        _loginfo_i("phy_transfer failed %d resp = 0x%02x", result, resp);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d resp = 0x%02x", result, resp);
         return -2;
     }
 
@@ -375,18 +375,18 @@ int link_st_ptr_inc(void *link_ptr, u8 *data, int len)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> ST8 to *ptr++");
+    DBG_INFO(LINK_DEBUG, "<LINK> ST8 to *ptr++");
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-        _loginfo_i("phy_transfer failed %d resp 0x%02x", result, resp);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d resp 0x%02x", result, resp);
         return -2;
     }
 
     for (i = 1; i < len; i++) {
         result = phy_transfer(PHY(link), &data[i], 1, &resp, sizeof(resp));
         if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-            _loginfo_i("phy_transfer failed %d i %d resp 0x%02x", result, i, resp);
+            DBG_INFO(LINK_DEBUG, "phy_transfer failed %d i %d resp 0x%02x", result, i, resp);
             return -2;
         }
     }
@@ -408,18 +408,18 @@ int link_st_ptr_inc16(void *link_ptr, u8 *data, int len)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> ST16 to *ptr++");
+    DBG_INFO(LINK_DEBUG, "<LINK> ST16 to *ptr++");
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-        _loginfo_i("phy_transfer failed %d resp 0x%02x", result, resp);
+        DBG_INFO(LINK_DEBUG, "phy_transfer failed %d resp 0x%02x", result, resp);
         return -2;
     }
 
     for (i = 2; i < len; i += 2) {
         result = phy_transfer(PHY(link), &data[i], 2, &resp, sizeof(resp));
         if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-            _loginfo_i("phy_transfer failed %d i %d resp 0x%02x", result, i, resp);
+            DBG_INFO(LINK_DEBUG, "phy_transfer failed %d i %d resp 0x%02x", result, i, resp);
             return -3;
         }
     }
@@ -439,11 +439,11 @@ int link_repeat(void *link_ptr, u8 repeats)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> Repeat %d", repeats);
+    DBG_INFO(LINK_DEBUG, "<LINK> Repeat %d", repeats);
 
     result = phy_send(PHY(link), cmd, sizeof(cmd));
     if (result) {
-        _loginfo_i("phy_send failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_send failed %d", result);
         return -2;
     }
 
@@ -460,7 +460,7 @@ int link_read_sib(void *link_ptr, u8 *data, int len)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> Read SIB len %d", len);
+    DBG_INFO(LINK_DEBUG, "<LINK> Read SIB len %d", len);
 
     return phy_sib(PHY(link), data, len);
 }
@@ -479,18 +479,18 @@ int link_key(void *link_ptr, u8 size_k, const char *key)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    _loginfo_i("<LINK> Key %x", size_k);
+    DBG_INFO(LINK_DEBUG, "<LINK> Key %x", size_k);
 
     result = phy_send(PHY(link), cmd, sizeof(cmd));
     if (result) {
-        _loginfo_i("phy_send failed %d", result);
+        DBG_INFO(LINK_DEBUG, "phy_send failed %d", result);
         return -2;
     }
 
     for (i = 0; i < len; i++) {
         result = phy_send_byte(PHY(link), (u8)key[len - i - 1]); //Reserse the string
         if (result) {
-            _loginfo_i("phy_send byte %d failed %d", i, result);
+            DBG_INFO(LINK_DEBUG, "phy_send byte %d failed %d", i, result);
             return -3;
         }
     }

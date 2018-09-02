@@ -22,7 +22,7 @@ void *updi_nvm_init(const char *port, int baud, void *dev)
     upd_nvm_t *nvm = NULL;
     void *app;
 
-    _loginfo_i("<NVM> init nvm");
+    DBG_INFO(NVM_DEBUG, "<NVM> init nvm");
 
     app = updi_application_init(port, baud, dev);
     if (app) {
@@ -40,7 +40,7 @@ void updi_nvm_deinit(void *nvm_ptr)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     if (VALID_NVM(nvm)) {
-        _loginfo_i("<NVM> deinit nvm");
+        DBG_INFO(NVM_DEBUG, "<NVM> deinit nvm");
 
         updi_application_deinit(APP(nvm));
         free(nvm);
@@ -57,7 +57,7 @@ int nvm_get_device_info(void *nvm_ptr)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Reading device info");
+    DBG_INFO(NVM_DEBUG, "<NVM> Reading device info");
 
     return app_device_info(APP(nvm));
 }
@@ -73,11 +73,11 @@ int nvm_enter_progmode(void *nvm_ptr)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Entering NVM programming mode");
+    DBG_INFO(NVM_DEBUG, "<NVM> Entering NVM programming mode");
     
     result = app_enter_progmode(APP(nvm));
     if (result) {
-        _loginfo_i("app_enter_progmode failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_enter_progmode failed %d", result);
         return -2;
     }
 
@@ -97,11 +97,14 @@ int nvm_leave_progmode(void *nvm_ptr)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Leaving NVM programming mode");
+    if (!nvm->progmode)
+        return 0;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Leaving NVM programming mode");
 
     result = app_leave_progmode(APP(nvm));
     if (result) {
-        _loginfo_i("app_leave_progmode failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_leave_progmode failed %d", result);
         return -2;
     }
 
@@ -121,17 +124,17 @@ int nvm_unlock_device(void *nvm_ptr)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Unlock and erase a device");
+    DBG_INFO(NVM_DEBUG, "<NVM> Unlock and erase a device");
 
     if (nvm->progmode) {
-        _loginfo_i("Device already unlocked");
+        DBG_INFO(NVM_DEBUG, "Device already unlocked");
         return 0;
     }
 
     // Unlock
     result = app_unlock(APP(nvm));
     if (!result) {
-        _loginfo_i("app_unlock failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_unlock failed %d", result);
         return -2;
     }
 
@@ -152,16 +155,16 @@ int nvm_chip_erase(void *nvm_ptr)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Erase (unlocked) device");
+    DBG_INFO(NVM_DEBUG, "<NVM> Erase device");
 
     if (!nvm->progmode) {
-        _loginfo_i("Enter progmode first!");
+        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
         return -2;
     }
 
     result = app_chip_erase(APP(nvm));
     if (result) {
-        _loginfo_i("app_chip_erase failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_chip_erase failed %d", result);
         return -3;
     }
 
@@ -180,26 +183,25 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     if (!VALID_NVM(nvm) || !data)
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Reads from flash");
+    DBG_INFO(NVM_DEBUG, "<NVM> Read from flash");
 
     if (!nvm->progmode) {
-        _loginfo_i("Enter progmode first!");
-        return -2;
+        DBG_INFO(NVM_DEBUG, "Flash is locked");
     }
 
     page_size = NVM_FLASH(nvm, flash_pagesize);
     if (len & (page_size - 1)) {
-        _loginfo_i("Only full page aligned flash supported, len %x.", len);
+        DBG_INFO(NVM_DEBUG, "Only full page aligned flash supported, len %x.", len);
         return -3;
     }
     
     pages = len / page_size;
     for (i = 0, off = 0; i < pages; i++) {
-        _loginfo_i("Reading Page(%d) at 0x%x", i, address);
+        DBG_INFO(NVM_DEBUG, "Reading Page(%d/%d) at 0x%x", i, pages, address + off);
         
         result = app_read_nvm(APP(nvm), address + off, data + off, page_size);
         if (result) {
-            _loginfo_i("app_read_nvm failed %d", result);
+            DBG_INFO(NVM_DEBUG, "app_read_nvm failed %d", result);
             break;
         }
         
@@ -207,7 +209,7 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     }
 
     if (i < pages || result) {
-        _loginfo_i("Read flash failed %d", i, result);
+        DBG_INFO(NVM_DEBUG, "Read flash failed %d", i, result);
         return -4;
     }
 
@@ -226,26 +228,26 @@ int nvm_write_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     if (!VALID_NVM(nvm) || !data)
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Writes to flash");
+    DBG_INFO(NVM_DEBUG, "<NVM> Writes to flash");
 
     if (!nvm->progmode) {
-        _loginfo_i("Enter progmode first!");
+        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
         return -2;
     }
 
     page_size = NVM_FLASH(nvm,flash_pagesize);
     if (len & (page_size - 1)) {
-        _loginfo_i("Only full page aligned flash supported, len %x.", len);
+        DBG_INFO(NVM_DEBUG, "Only full page aligned flash supported, len %x.", len);
         return -3;
     }
 
     pages = len / page_size;
     for (i = 0, off = 0; i < pages; i++) {
-        _loginfo_i("Writing Page(%d) at 0x%x", i, address);
+        DBG_INFO(NVM_DEBUG, "Writing Page(%d/%d) at 0x%x", i, pages, address + off);
 
         result = app_write_nvm(APP(nvm), address + off, data + off, page_size);
         if (result) {
-            _loginfo_i("app_write_nvm failed %d", result);
+            DBG_INFO(NVM_DEBUG, "app_write_nvm failed %d", result);
             break;
         }
 
@@ -253,7 +255,7 @@ int nvm_write_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     }
 
     if (i < pages || result) {
-        _loginfo_i("Write flash failed %d", i, result);
+        DBG_INFO(NVM_DEBUG, "Write flash page %d failed %d", i, result);
         return -4;
     }
 
@@ -263,7 +265,7 @@ int nvm_write_flash(void *nvm_ptr, u16 address, u8 *data, int len)
 int nvm_read_fuse(void *nvm_ptr, int fusenum, u8 *data)
 {
     /*
-    Reads one fuse value
+    Read one fuse value
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     int result;
@@ -271,16 +273,18 @@ int nvm_read_fuse(void *nvm_ptr, int fusenum, u8 *data)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Erase (unlocked) device");
+    DBG_INFO(NVM_DEBUG, "<NVM> Read Fuse");
 
+    /*  
     if (!nvm->progmode) {
-        _loginfo_i("Enter progmode first!");
+        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
         return -2;
     }
+    */
 
     result = app_ld(APP(nvm), NVM_REG(nvm, fuses_address) + fusenum, data);
     if (!result) {
-        _loginfo_i("app_ld failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_ld failed %d", result);
         return -3;
     }
 
@@ -300,10 +304,10 @@ int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Erase (unlocked) device");
+    DBG_INFO(NVM_DEBUG, "<NVM> Write Fuse");
 
     if (!nvm->progmode) {
-        _loginfo_i("Enter progmode first!");
+        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
         return -2;
     }
 
@@ -312,7 +316,7 @@ int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
     val = fuse_address & 0xff;
     result = app_write_data(APP(nvm), address, &val, 1);
     if (!result) {
-        _loginfo_i("app_write_data fuse addrL failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_write_data fuse addrL failed %d", result);
         return -3;
     }
 
@@ -320,7 +324,7 @@ int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
     val = fuse_address >> 8;
     result = app_write_data(APP(nvm), address, &val, 1);
     if (!result) {
-        _loginfo_i("app_write_data fuse addrH failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_write_data fuse addrH failed %d", result);
         return -4;
     }
 
@@ -328,7 +332,7 @@ int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
     val = fuseval;
     result = app_write_data(APP(nvm), address, &val, 1);
     if (!result) {
-        _loginfo_i("app_write_data fuse value failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_write_data fuse value failed %d", result);
         return -5;
     }
 
@@ -336,7 +340,7 @@ int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
     val = UPDI_NVMCTRL_CTRLA_WRITE_FUSE;
     result = app_write_data(APP(nvm), address, &val, 1);
     if (!result) {
-        _loginfo_i("app_write_data fuse cmd failed %d", result);
+        DBG_INFO(NVM_DEBUG, "app_write_data fuse cmd failed %d", result);
         return -6;
     }
 
@@ -353,7 +357,7 @@ int nvm_get_flash_info(void *nvm_ptr, flash_info_t *info)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    _loginfo_i("<NVM> Get chip info");
+    DBG_INFO(NVM_DEBUG, "<NVM> Get chip flash info");
 
     memcpy(info, &nvm->dev->mmap->flash, sizeof(*info));
 

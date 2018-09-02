@@ -26,7 +26,7 @@ static char ihex_write_buffer[IHEX_WRITE_BUFFER_LENGTH];
 #endif
 
 void
-ihex_init (struct ihex_state * const ihex) {
+ihex_init (struct ihex_state * ihex, cb_ihex_flush_buffer_t cb_flush, void *args) {
     ihex->address = 0;
 #ifndef IHEX_DISABLE_SEGMENTS
     ihex->segment = 0;
@@ -34,6 +34,8 @@ ihex_init (struct ihex_state * const ihex) {
     ihex->flags = 0;
     ihex->line_length = IHEX_DEFAULT_OUTPUT_LINE_LENGTH;
     ihex->length = 0;
+    ihex->cb_func = (void *)cb_flush;
+    ihex->args = args;
 }
 
 static char *
@@ -67,6 +69,7 @@ ihex_buffer_newline (char * restrict w) {
 
 static void
 ihex_write_end_of_file (struct ihex_state * const ihex) {
+    cb_ihex_flush_buffer_t cb_flush = (cb_ihex_flush_buffer_t)ihex->cb_func;
     char * restrict w = ihex_write_buffer;
     *w++ = IHEX_START; // :
 #if 1
@@ -82,13 +85,14 @@ ihex_write_end_of_file (struct ihex_state * const ihex) {
     w = ihex_buffer_byte(w, (uint8_t)~IHEX_END_OF_FILE_RECORD + 1U); // checksum
 #endif
     w = ihex_buffer_newline(w);
-    ihex_flush_buffer(ihex, ihex_write_buffer, w);
+    cb_flush(ihex, ihex_write_buffer, w);
 }
 
 static void
 ihex_write_extended_address (struct ihex_state * const ihex,
                              const ihex_segment_t address,
                              const uint8_t type) {
+    cb_ihex_flush_buffer_t cb_flush = (cb_ihex_flush_buffer_t)ihex->cb_func;
     char * restrict w = ihex_write_buffer;
     uint8_t sum = type + 2U;
 
@@ -100,13 +104,14 @@ ihex_write_extended_address (struct ihex_state * const ihex,
     w = ihex_buffer_word(w, address, &sum); // high bytes of address
     w = ihex_buffer_byte(w, (uint8_t)~sum + 1U); // checksum
     w = ihex_buffer_newline(w);
-    ihex_flush_buffer(ihex, ihex_write_buffer, w);
+    cb_flush(ihex, ihex_write_buffer, w);
 }
 
 // Write out `ihex->data`
 //
 static void
 ihex_write_data (struct ihex_state * const ihex) {
+    cb_ihex_flush_buffer_t cb_flush = (cb_ihex_flush_buffer_t)ihex->cb_func;
     uint_fast8_t len = ihex->length;
     uint8_t sum = len;
     char * restrict w = ihex_write_buffer;
@@ -157,11 +162,11 @@ ihex_write_data (struct ihex_state * const ihex) {
     w = ihex_buffer_byte(w, ~sum + 1U);
 
     w = ihex_buffer_newline(w);
-    ihex_flush_buffer(ihex, ihex_write_buffer, w);
+    cb_flush(ihex, ihex_write_buffer, w);
 }
 
 void
-ihex_write_at_address (struct ihex_state * const ihex, ihex_address_t address) {
+ihex_write_at_address (struct ihex_state * ihex, ihex_address_t address) {
     if (ihex->length) {
         // flush any existing data
         ihex_write_data(ihex);
@@ -180,7 +185,7 @@ ihex_write_at_address (struct ihex_state * const ihex, ihex_address_t address) {
 }
 
 void
-ihex_set_output_line_length (struct ihex_state * const ihex,
+ihex_set_output_line_length (struct ihex_state * ihex,
                              uint8_t line_length) {
 #if IHEX_MAX_OUTPUT_LINE_LENGTH < 255
     if (line_length > IHEX_MAX_OUTPUT_LINE_LENGTH) {
@@ -195,7 +200,7 @@ ihex_set_output_line_length (struct ihex_state * const ihex,
 
 #ifndef IHEX_DISABLE_SEGMENTS
 void
-ihex_write_at_segment (struct ihex_state * const ihex,
+ihex_write_at_segment (struct ihex_state * ihex,
                        ihex_segment_t segment,
                        ihex_address_t address) {
     ihex_write_at_address(ihex, address);
@@ -208,7 +213,7 @@ ihex_write_at_segment (struct ihex_state * const ihex,
 #endif
 
 void
-ihex_write_byte (struct ihex_state * const ihex, const int byte) {
+ihex_write_byte (struct ihex_state * ihex, int byte) {
     if (ihex->line_length <= ihex->length) {
         ihex_write_data(ihex);
     }
@@ -216,7 +221,7 @@ ihex_write_byte (struct ihex_state * const ihex, const int byte) {
 }
 
 void
-ihex_write_bytes (struct ihex_state * restrict const ihex,
+ihex_write_bytes (struct ihex_state * restrict ihex,
                   const void * restrict buf,
                   ihex_count_t count) {
     const uint8_t *r = buf;
@@ -237,7 +242,7 @@ ihex_write_bytes (struct ihex_state * restrict const ihex,
 }
 
 void
-ihex_end_write (struct ihex_state * const ihex) {
+ihex_end_write (struct ihex_state * ihex) {
     ihex_write_data(ihex); // flush any remaining data
     ihex_write_end_of_file(ihex);
 }

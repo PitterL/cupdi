@@ -72,6 +72,9 @@
     <ClInclude Include="os\win32\serial.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ihex\kk_ihex_write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -114,6 +117,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="os\win32\serial.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ihex\kk_ihex_write.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

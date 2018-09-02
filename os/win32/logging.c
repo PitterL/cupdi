@@ -4,14 +4,23 @@
 
 #include "logging.h"
 
-void _loginfo(char *format, const unsigned char *data, int len, const unsigned char * dformat, ...)
+verbose_t g_verbose_level = DEFAULT_DEBUG;
+
+void set_verbose_level(verbose_t level)
 {
-    va_list args;
+    g_verbose_level = level;
+}
+
+void _logv(verbose_t level, char *format, const unsigned char *data, int len, const unsigned char * dformat, int rowsize, va_list args)
+{
     int     size;
     char    *buffer;
 
-    // retrieve the variable arguments  
-    va_start(args, dformat);
+    if (level > g_verbose_level)
+        return;
+
+    if (rowsize <= 0)
+        rowsize = DEFAULT_ROWDATA_SIZE;
 
     size = _vscprintf(format, args) // _vscprintf doesn't count  
         + 1; // terminating '\0'  
@@ -19,42 +28,59 @@ void _loginfo(char *format, const unsigned char *data, int len, const unsigned c
     buffer = (char*)malloc(size * sizeof(char));
 
     vsnprintf(buffer, size, format, args); // C4996  
-                                          // Note: vsprintf is deprecated; consider using vsprintf_s instead  
+                                           // Note: vsprintf is deprecated; consider using vsprintf_s instead  
     puts(buffer);
 
     free(buffer);
 
-    va_end(args);
-
     if (data && len) {
         for (int i = 0; i < len; i++) {
+            if (len > rowsize) {
+                if (!(i % rowsize)) {
+                    if (i)
+                        puts("");
+                    printf("%04x:\t", i);
+                }
+            }
+
             printf(dformat, data[i]);
         }
+        puts("");
     }
+}
 
-    printf("\r\n");
+void _loginfo(char *format, const unsigned char *data, int len, const unsigned char * dformat, ...)
+{
+    va_list args;
+
+    va_start(args, dformat);
+    _logv(DEFAULT_DEBUG, format, data, len, dformat, DEFAULT_ROWDATA_SIZE, args);
+    va_end(args);
 }
 
 void _loginfo_i(char* format, ...)
 {
     va_list args;
-    int     len;
-    char    *buffer;
 
-    // retrieve the variable arguments  
     va_start(args, format);
+    _logv(DEFAULT_DEBUG, format, NULL, 0, NULL, 0, args);
+    va_end(args);
+}
 
-    len = _vscprintf(format, args) // _vscprintf doesn't count  
-        + 1; // terminating '\0'  
+void DBG(verbose_t level, char *format, const unsigned char *data, int len, const unsigned char * dformat, ...)
+{
+    va_list args;
 
-    buffer = (char*)malloc(len * sizeof(char));
+    va_start(args, dformat);
+    _logv(level, format, data, len, dformat, DEFAULT_ROWDATA_SIZE, args);
+    va_end(args);
+}
 
-    vsnprintf(buffer, len, format, args); // C4996  
-                                          // Note: vsprintf is deprecated; consider using vsprintf_s instead  
+void DBG_INFO(verbose_t level, char* format, ...)
+{
+    va_list args;
 
-    puts(buffer);
-    
-    free(buffer);
-
+    va_start(args, format);
+    _logv(level, format, NULL, 0, NULL, DEFAULT_ROWDATA_SIZE, args);
     va_end(args);
 }

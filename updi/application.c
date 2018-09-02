@@ -22,7 +22,7 @@ void *updi_application_init(const char *port, int baud, void *dev)
     upd_application_t *app = NULL;
     void *link;
 
-    _loginfo_i("<APP> init application");
+    DBG_INFO(APP_DEBUG, "<APP> init application");
 
     link = updi_datalink_init(port, baud);
     if (link) {
@@ -39,7 +39,7 @@ void updi_application_deinit(void *app_ptr)
 {
     upd_application_t *app = (upd_application_t *)app_ptr;
     if (VALID_APP(app)) {
-        _loginfo_i("<APP> deinit application");
+        DBG_INFO(APP_DEBUG, "<APP> deinit application");
 
         updi_datalink_deinit(LINK(app));
         free(app);
@@ -61,38 +61,38 @@ int app_device_info(void *app_ptr)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Device info");
+    DBG_INFO(APP_DEBUG, "<APP> Device info");
 
     result = link_read_sib(LINK(app), sib, sizeof(sib));
     if (result) {
-        _loginfo_i("link_read_sib failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_read_sib failed %d", result);
         return -2;
     }
 
-    _loginfo("SIB read out as: ", sib, sizeof(sib), "0x%02x ");
-    _loginfo("Family ID = ", sib, 8, "%c ");
-    _loginfo_i("NVM revision = %c", sib[10]);
-    _loginfo_i("OCD revision = %c", sib[13]);
-    _loginfo_i("PDI OSC = %cMHz ", sib[15]);
+    DBG(APP_DEBUG, "SIB read out as: ", sib, sizeof(sib), "0x%02x ");
+    DBG(APP_DEBUG, "Family ID = ", sib, 8, "%c ");
+    DBG_INFO(APP_DEBUG, "NVM revision = %c", sib[10]);
+    DBG_INFO(APP_DEBUG, "OCD revision = %c", sib[13]);
+    DBG_INFO(APP_DEBUG, "PDI OSC = %cMHz ", sib[15]);
 
     pdi = link_ldcs(LINK(app), UPDI_CS_STATUSA);
-    _loginfo_i("PDI OSC = %hhdMHz ", (pdi >> 4));
+    DBG_INFO(APP_DEBUG, "PDI OSC = %hhdMHz ", (pdi >> 4));
 
     if (app_in_prog_mode(app)) {
         if (app->dev) {
             result = app_read_data(app, APP_REG(app, sigrow_address), dev_id, sizeof(dev_id));
             if (result) {
-                _loginfo_i("app_read_data failed %d", result);
+                DBG_INFO(APP_DEBUG, "app_read_data failed %d", result);
                 return -3;
             }
 
             result = app_read_data(app, APP_REG(app, syscfg_address) + 1, dev_rev, sizeof(dev_rev));
             if (result) {
-                _loginfo_i("app_read_data failed %d", result);
+                DBG_INFO(APP_DEBUG, "app_read_data failed %d", result);
                 return -4;
             }
 
-            _loginfo_i("Device ID = %02x %02x %02x rev %c", dev_id[0], dev_id[1], dev_id[2], dev_rev[0] + 'A');
+            DBG_INFO(APP_DEBUG, "Device ID = %02x %02x %02x rev %c", dev_id[0], dev_id[1], dev_id[2], dev_rev[0] + 'A');
         }
     }
 
@@ -112,13 +112,13 @@ bool app_in_prog_mode(void *app_ptr)
     if (!VALID_APP(app))
         return ret;
 
-    _loginfo_i("<APP> Prog mode");
+    DBG_INFO(APP_DEBUG, "<APP> Prog mode");
 
     result = _link_ldcs(LINK(app), UPDI_ASI_SYS_STATUS, &status);
     if (!result && status & (1 << UPDI_ASI_SYS_STATUS_NVMPROG))
         ret = true;
 
-    _loginfo_i("<APP> Prog mode %d", ret);
+    DBG_INFO(APP_DEBUG, "<APP> Prog mode %d", ret);
 
     return ret;
 }
@@ -136,12 +136,12 @@ int app_wait_unlocked(void *app_ptr, int timeout)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Wait Unlock");
+    DBG_INFO(APP_DEBUG, "<APP> Wait Unlock");
 
     do {
         result = _link_ldcs(LINK(app), UPDI_ASI_SYS_STATUS, &status);
         if (result) {
-            _loginfo_i("_link_ldcs failed %d", result);
+            DBG_INFO(APP_DEBUG, "_link_ldcs failed %d", result);
         }
         else {
             if (!(status & (1 << UPDI_ASI_SYS_STATUS_LOCKSTATUS)))
@@ -152,7 +152,7 @@ int app_wait_unlocked(void *app_ptr, int timeout)
     } while (--timeout > 0);
 
     if (timeout <= 0 || result) {
-        _loginfo_i("Timeout waiting for device to unlock status %02x result %d", status, result);
+        DBG_INFO(APP_DEBUG, "Timeout waiting for device to unlock status %02x result %d", status, result);
         return -2;
     }
 
@@ -171,33 +171,33 @@ int app_unlock(void *app_ptr)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> unlock");
+    DBG_INFO(APP_DEBUG, "<APP> unlock");
 
     // Put in the key
     result = link_key(LINK(app), UPDI_KEY_64, UPDI_KEY_CHIPERASE);
     if (result) {
-        _loginfo_i("link_key failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_key failed %d", result);
         return -2;
     }
 
     // Check key status
     result = _link_ldcs(LINK(app), UPDI_ASI_KEY_STATUS, &status);
     if (result || !(status & (1 << UPDI_ASI_KEY_STATUS_CHIPERASE))) {
-        _loginfo_i("_link_ldcs Chiperase Key not accepted(%d), status 0x%02x", result, status);
+        DBG_INFO(APP_DEBUG, "_link_ldcs Chiperase Key not accepted(%d), status 0x%02x", result, status);
         return -3;
     }
 
     //Toggle reset
     result = app_toggle_reset(app_ptr, 1);
     if (result) {
-        _loginfo_i("app_toggle_reset failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -4;
     }
 
     //And wait for unlock
     result = app_wait_unlocked(app, 100);
     if (result) {
-        _loginfo_i("Failed to chip erase using key result %d", result);
+        DBG_INFO(APP_DEBUG, "Failed to chip erase using key result %d", result);
         return -5;
     }
     
@@ -216,49 +216,49 @@ int app_enter_progmode(void *app_ptr)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Enter Progmode");
+    DBG_INFO(APP_DEBUG, "<APP> Enter Progmode");
 
     // First check if NVM is already enabled
     if (app_in_prog_mode(app_ptr)) {
-        _loginfo_i("Already in NVM programming mode");
+        DBG_INFO(APP_DEBUG, "Already in NVM programming mode");
         return 0;
     }
 
-    _loginfo_i("Entering NVM programming mode");
+    DBG_INFO(APP_DEBUG, "Entering NVM programming mode");
 
     // Put in the key
     result = link_key(LINK(app), UPDI_KEY_64, UPDI_KEY_NVM);
     if (result) {
-        _loginfo_i("link_key failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_key failed %d", result);
         return -2;
     }
 
     // Check key status
     result = _link_ldcs(LINK(app), UPDI_ASI_KEY_STATUS, &status);
     if (result || !(status & (1 << UPDI_ASI_KEY_STATUS_NVMPROG))) {
-        _loginfo_i("_link_ldcs Nvm Key not accepted(%d), status 0x%02x", result, status);
+        DBG_INFO(APP_DEBUG, "_link_ldcs Nvm Key not accepted(%d), status 0x%02x", result, status);
         return -3;
     }
 
     //Toggle reset
     result = app_toggle_reset(app_ptr, 1);
     if (result) {
-        _loginfo_i("app_toggle_reset failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -4;
     }
 
     //And wait for unlock
     result = app_wait_unlocked(app_ptr, 100);
     if (result) {
-        _loginfo_i("Failed to enter NVM programming mode: device is locked result %d", result);
+        DBG_INFO(APP_DEBUG, "Failed to enter NVM programming mode: device is locked result %d", result);
         return -5;
     }
 
     if (!app_in_prog_mode(app_ptr)) {
-        _loginfo_i("Failed to enter NVM programming mode");
+        DBG_INFO(APP_DEBUG, "Failed to enter NVM programming mode");
         return -6;
     }else {
-        _loginfo_i("Now in NVM programming mode");
+        DBG_INFO(APP_DEBUG, "Now in NVM programming mode");
         return 0;
     }
 }
@@ -274,17 +274,17 @@ int app_leave_progmode(void *app_ptr)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Now in NVM programming mode");
+    DBG_INFO(APP_DEBUG, "<APP> Now in NVM programming mode");
 
     result = app_toggle_reset(app_ptr, 1);
     if (result) {
-        _loginfo_i("app_toggle_reset failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -2;
     }
 
     result = link_stcs(LINK(app), UPDI_CS_CTRLB, (1 << UPDI_CTRLB_UPDIDIS_BIT) | (1 << UPDI_CTRLB_CCDETDIS_BIT));
     if (result) {
-        _loginfo_i("link_stcs failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_stcs failed %d", result);
         return -3;
     }
 
@@ -302,19 +302,19 @@ int app_reset(void *app_ptr, bool apply_reset)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Reset %d", apply_reset);
+    DBG_INFO(APP_DEBUG, "<APP> Reset %d", apply_reset);
 
     if (apply_reset) {
-        _loginfo_i("Apply reset");
+        DBG_INFO(APP_DEBUG, "Apply reset");
         result = link_stcs(LINK(app), UPDI_ASI_RESET_REQ, UPDI_RESET_REQ_VALUE);
     }
     else {
-        _loginfo_i("Release reset");
+        DBG_INFO(APP_DEBUG, "Release reset");
         result = link_stcs(LINK(app), UPDI_ASI_RESET_REQ, 0);
     }
 
     if (result) {
-        _loginfo_i("link_stcs failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_stcs failed %d", result);
         return -2;
     }
 
@@ -332,12 +332,12 @@ int app_toggle_reset(void *app_ptr, int delay)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Toggle Reset");
+    DBG_INFO(APP_DEBUG, "<APP> Toggle Reset");
 
     //Toggle reset
     result = app_reset(app, true);
     if (result) {
-        _loginfo_i("app_reset failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_reset failed %d", result);
         return -2;
     }
 
@@ -345,7 +345,7 @@ int app_toggle_reset(void *app_ptr, int delay)
 
     result = app_reset(app, false);
     if (result) {
-        _loginfo_i("app_reset failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_reset failed %d", result);
         return -3;
     }
 
@@ -364,12 +364,12 @@ int app_wait_flash_ready(void *app_ptr, int timeout)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Wait flash ready");
+    DBG_INFO(APP_DEBUG, "<APP> Wait flash ready");
 
     do {
         result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_STATUS, &status);
         if (result) {
-            _loginfo_i("_link_ld failed %d", result);
+            DBG_INFO(APP_DEBUG, "_link_ld failed %d", result);
             result = -2;
             break;
         }
@@ -387,7 +387,7 @@ int app_wait_flash_ready(void *app_ptr, int timeout)
     } while (--timeout > 0);
 
     if (timeout <= 0 || result) {
-        _loginfo_i("Timeout waiting for wait flash ready status %02x result %d", status, result);
+        DBG_INFO(APP_DEBUG, "Timeout waiting for wait flash ready status %02x result %d", status, result);
         return -3;
     }
 
@@ -404,7 +404,7 @@ int app_execute_nvm_command(void *app_ptr, u8 command)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> NVMCMD %d executing", command);
+    DBG_INFO(APP_DEBUG, "<APP> NVMCMD %d executing", command);
 
     return link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLA, command);
 }
@@ -422,26 +422,26 @@ int app_chip_erase(void *app_ptr)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Chip erase using NVM CTRL");
+    DBG_INFO(APP_DEBUG, "<APP> Chip erase using NVM CTRL");
 
     //Wait until NVM CTRL is ready to erase
     result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
-        _loginfo_i("app_wait_flash_ready timeout before erase failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout before erase failed %d", result);
         return -2;
     }
 
     //Erase
     result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_CHIP_ERASE);
     if (result) {
-        _loginfo_i("app_execute_nvm_command failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", result);
         return -3;
     }
 
     // And wait for it
     result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
-        _loginfo_i("app_wait_flash_ready timeout after erase failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after erase failed %d", result);
         return -2;
     }
 
@@ -459,27 +459,27 @@ int app_write_data_words(void *app_ptr, u16 address, u8 *data, int len)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Write words data(%d) addr: %hX", len, address);
+    DBG_INFO(APP_DEBUG, "<APP> Write words data(%d) addr: %hX", len, address);
     
     // Special-case of 1 word
     if (len == 2) {
         result = link_st16(LINK(app), address, data[0] + (data[1] << 8));
         if (result) {
-            _loginfo_i("link_st16 failed %d", result);
+            DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -3;
         }
     }
 
     // Range check
     if (len > ((UPDI_MAX_REPEAT_SIZE + 1) << 1)) {
-        _loginfo_i("Write words data length out of size %d", len);
+        DBG_INFO(APP_DEBUG, "Write words data length out of size %d", len);
         return -3;
     }
 
     // Store the address
     result = link_st_ptr(LINK(app), address);
     if (result) {
-        _loginfo_i("link_st_ptr failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -4;
     }
 
@@ -487,14 +487,14 @@ int app_write_data_words(void *app_ptr, u16 address, u8 *data, int len)
     if (len > 2) {
         result = link_repeat(LINK(app), len >> 1);
         if (result) {
-            _loginfo_i("link_repeat failed %d", result);
+            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
             return -5;
         }
     }
 
     result = link_st_ptr_inc16(LINK(app), data, len);
     if (result) {
-        _loginfo_i("link_st_ptr_inc16 failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_st_ptr_inc16 failed %d", result);
         return -6;
     }
 
@@ -512,27 +512,27 @@ int app_write_data(void *app_ptr, u16 address, u8 *data, int len)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Write data(%d) addr: %hX", len, address);
+    DBG_INFO(APP_DEBUG, "<APP> Write data(%d) addr: %hX", len, address);
 
     // Special-case of 1 byte
     if (len == 1) {
         result = link_st(LINK(app), address, data[0]);
         if (result) {
-            _loginfo_i("link_st16 failed %d", result);
+            DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -2;
         }
     }
 
     // Range check
     if (len > UPDI_MAX_REPEAT_SIZE + 1) {
-        _loginfo_i("Write data length out of size %d", len);
+        DBG_INFO(APP_DEBUG, "Write data length out of size %d", len);
         return -3;
     }
 
     // Store the address
     result = link_st_ptr(LINK(app), address);
     if (result) {
-        _loginfo_i("link_st_ptr failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -4;
     }
 
@@ -540,14 +540,14 @@ int app_write_data(void *app_ptr, u16 address, u8 *data, int len)
     if (len > 1) {
         result = link_repeat(LINK(app), len);
         if (result) {
-            _loginfo_i("link_repeat failed %d", result);
+            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
             return -5;
         }
     }
 
     result = link_st_ptr_inc(LINK(app), data, len);
     if (result) {
-        _loginfo_i("link_st_ptr_inc16 failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_st_ptr_inc16 failed %d", result);
         return -6;
     }
 
@@ -566,27 +566,27 @@ int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Chip write nvm");
+    DBG_INFO(APP_DEBUG, "<APP> Chip write nvm");
 
     // Check that NVM controller is ready
     result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
-        _loginfo_i("app_wait_flash_ready timeout before page buffer clear failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout before page buffer clear failed %d", result);
         return -2;
     }
 
     //Clear the page buffer
-    _loginfo_i("Clear page buffer");
+    DBG_INFO(APP_DEBUG, "Clear page buffer");
     result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR);
     if (result) {
-        _loginfo_i("app_execute_nvm_command failed %d", UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR, result);
+        DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR, result);
         return -3;
     }
 
     // Waif for NVM controller to be ready
     result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
-        _loginfo_i("app_wait_flash_ready timeout after page buffer clear failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after page buffer clear failed %d", result);
         return -4;
     }
 
@@ -596,22 +596,22 @@ int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command
     else
         result = app_write_data(app, address, data, len);
     if (result) {
-        _loginfo_i("app_write_data(%d) failed %d", use_word_access, result);
+        DBG_INFO(APP_DEBUG, "app_write_data(%d) failed %d", use_word_access, result);
         return -5;
     }
 
     // Write the page to NVM, maybe erase first
-    _loginfo_i("Committing page");
+    DBG_INFO(APP_DEBUG, "Committing page");
     result = app_execute_nvm_command(app, nvm_command);
     if (result) {
-        _loginfo_i("app_execute_nvm_command(%d) failed %d", nvm_command, result);
+        DBG_INFO(APP_DEBUG, "app_execute_nvm_command(%d) failed %d", nvm_command, result);
         return -6;
     }
 
     // Waif for NVM controller to be ready again
     result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
     if (result) {
-        _loginfo_i("app_wait_flash_ready timeout after page write failed %d", result);
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after page write failed %d", result);
         return -7;
     }
 
@@ -640,18 +640,18 @@ int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Read data(%d) addr: %hX", len, address);
+    DBG_INFO(APP_DEBUG, "<APP> Read data(%d) addr: %hX", len, address);
 
     // Range check
     if (len > UPDI_MAX_REPEAT_SIZE + 1) {
-        _loginfo_i("Read data length out of size %d", len);
+        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
         return -2;
     }
 
     // Store the address
     result = link_st_ptr(LINK(app), address);
     if (result) {
-        _loginfo_i("link_st_ptr failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -3;
     }
 
@@ -659,7 +659,7 @@ int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
     if (len > 1) {
         result = link_repeat(LINK(app), len);
         if (result) {
-            _loginfo_i("link_repeat failed %d", result);
+            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
             return -4;
         }
     }
@@ -667,7 +667,7 @@ int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
     //Do the read(s)
     result = link_ld_ptr_inc(LINK(app), data, len);
     if (result) {
-        _loginfo_i("link_ld_ptr_inc failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc failed %d", result);
         return -5;
     }
 
@@ -685,18 +685,18 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Read words data(%d) addr: %hX", len, address);
+    DBG_INFO(APP_DEBUG, "<APP> Read words data(%d) addr: %hX", len, address);
 
     // Range check
     if (len > (UPDI_MAX_REPEAT_SIZE >> 1) + 1) {
-        _loginfo_i("Read data length out of size %d", len);
+        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
         return -2;
     }
 
     // Store the address
     result = link_st_ptr(LINK(app), address);
     if (result) {
-        _loginfo_i("link_st_ptr failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -3;
     }
 
@@ -704,7 +704,7 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     if (len > 2) {
         result = link_repeat(LINK(app), len >> 1);
         if (result) {
-            _loginfo_i("link_repeat failed %d", result);
+            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
             return -4;
         }
     }
@@ -712,7 +712,7 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     //Do the read(s)
     result = link_ld_ptr_inc16(LINK(app), data, len);
     if (result) {
-        _loginfo_i("link_ld_ptr_inc16 failed %d", result);
+        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc16 failed %d", result);
         return -5;
     }
 
@@ -730,7 +730,7 @@ int _app_read_nvm(void *app_ptr, u16 address, u8 *data, int len, bool use_word_a
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    _loginfo_i("<APP> Chip read nvm");
+    DBG_INFO(APP_DEBUG, "<APP> Chip read nvm");
 
     // Load to buffer by reading directly to location
     if (use_word_access)
@@ -738,7 +738,7 @@ int _app_read_nvm(void *app_ptr, u16 address, u8 *data, int len, bool use_word_a
     else
         result = app_read_data(app, address, data, len);
     if (result) {
-        _loginfo_i("app_read_data(%d) failed %d", use_word_access, result);
+        DBG_INFO(APP_DEBUG, "app_read_data(%d) failed %d", use_word_access, result);
         return -5;
     }
 

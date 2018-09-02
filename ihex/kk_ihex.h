@@ -143,7 +143,7 @@ typedef struct ihex_state {
     uint8_t         line_length;
     uint8_t         length;
     uint8_t         data[IHEX_LINE_MAX_LENGTH + 1];
-    void *cb_read;
+    void *cb_func;
     void *args;
 } kk_ihex_t;
 
@@ -188,10 +188,15 @@ typedef uint8_t ihex_record_type_t;
 #define IHEX_NEWLINE_STRING "\n"
 #endif
 
-// See kk_ihex_read.h and kk_ihex_write.h for function declarations!
+// See kk_ihex_read.h and kk_ihex_read.h for function declarations!
 
 typedef ihex_bool_t(*cb_ihex_data_read_t)(struct ihex_state *ihex,
     ihex_record_type_t type,
     ihex_bool_t checksum_mismatch);
+
+// See kk_ihex_read.h and kk_ihex_write.h for function declarations!
+
+typedef void (*cb_ihex_flush_buffer_t)(struct ihex_state *ihex,
+    char *buffer, char *eptr);
 
 #endif // !KK_IHEX_H

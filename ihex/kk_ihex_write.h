@@ -74,17 +74,18 @@
 #define KK_IHEX_WRITE_H
 
 #ifdef __cplusplus
-#ifndef restrict
-#define restrict
-#endif
 extern "C" {
+#endif
+
+    #ifndef restrict
+#define restrict
 #endif
 
 #include "kk_ihex.h"
 
 // Default number of data bytes written per line
 #if IHEX_LINE_MAX_LENGTH >= 32
-#define IHEX_DEFAULT_OUTPUT_LINE_LENGTH 32
+#define IHEX_DEFAULT_OUTPUT_LINE_LENGTH 16
 #else
 #define IHEX_DEFAULT_OUTPUT_LINE_LENGTH IHEX_LINE_MAX_LENGTH
 #endif
@@ -105,7 +106,7 @@ extern char *ihex_write_buffer;
 #endif
 
 // Initialise the structure `ihex` for writing
-void ihex_init(struct ihex_state *ihex);
+void ihex_init(struct ihex_state *ihex, cb_ihex_flush_buffer_t cb_flush, void *args);
 
 // Begin writing at the given 32-bit `address` after writing any
 // pending data at the current address.

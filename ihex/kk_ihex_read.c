@@ -33,7 +33,7 @@ enum ihex_read_state {
 #define IHEX_READ_STATE_OFFSET 3
 
 void
-ihex_begin_read (struct ihex_state * ihex, cb_ihex_data_read_t cb_read, void *args) {
+ihex_begin_read (struct ihex_state * ihex, cb_ihex_data_read_t cb_func, void *args) {
     ihex->address = 0;
 #ifndef IHEX_DISABLE_SEGMENTS
     ihex->segment = 0;
@@ -41,7 +41,7 @@ ihex_begin_read (struct ihex_state * ihex, cb_ihex_data_read_t cb_read, void *ar
     ihex->flags = 0;
     ihex->line_length = 0;
     ihex->length = 0;
-    ihex->cb_read = (void *)cb_read;
+    ihex->cb_func = (void *)cb_func;
     ihex->args = args;
 }
 
@@ -61,7 +61,7 @@ ihex_read_at_segment (struct ihex_state * ihex, ihex_segment_t segment, cb_ihex_
 
 void
 ihex_end_read (struct ihex_state * ihex) {
-    cb_ihex_data_read_t cb_read = (cb_ihex_data_read_t)ihex->cb_read;
+    cb_ihex_data_read_t cb_read = (cb_ihex_data_read_t)ihex->cb_func;
     uint_fast8_t type = ihex->flags & IHEX_READ_RECORD_TYPE_MASK;
     uint_fast8_t sum;
     if ((sum = ihex->length) == 0 && type == IHEX_DATA_RECORD) {

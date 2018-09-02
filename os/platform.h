@@ -17,7 +17,16 @@ typedef int bool;
 #define VALID_PTR(_ptr) (!!(_ptr))
 #define ARRAY_SIZE(_) (sizeof (_) / sizeof (*_))
 
-//typedef enum {false, true} bool;
+#if defined(UTILS_COMPILER_H_INCLUDED)
+#define SET_BIT(_x, _bit) Set_bits((_x), (1 << (_bit)))
+#define CLR_BIT(_x, _bit) Clr_bits((_x), (1 << (_bit)))
+#define TEST_BIT(_x, _bit) Tst_bits((_x), (1 << (_bit)))
+#else
+#define SET_BIT(_x, _bit) ((_x) |= (1 << (_bit)))
+#define CLR_BIT(_x, _bit) ((_x) &= ~(1 << (_bit)))
+#define TEST_BIT(_x, _bit) ((_x) & (1 << (_bit)))
+#endif
+#define SET_AND_CLR_BIT(_x, _sbit, _cbit) (SET_BIT((_x), (_sbit)), CLR_BIT((_x), (_cbit)))
 
 #else
 typedef void * HANDLE;
