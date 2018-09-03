@@ -35,9 +35,11 @@ typedef struct _upd_sercom {
 HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *st) {
     upd_sercom_t *ser;
     HANDLE fd = NULL;
+    char comport[16] = "\\\\.\\";
 
     /* Create the file descriptor handle */
-    if ((fd = CreateFileA(port, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+    strncat(comport, port, sizeof(comport) - 1);
+    if ((fd = CreateFileA(comport, GENERIC_READ | GENERIC_WRITE, 0, NULL,
                     OPEN_EXISTING, 0/*FILE_FLAG_OVERLAPPED*/, NULL))
         == INVALID_HANDLE_VALUE) {
         return NULL;
