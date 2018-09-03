@@ -350,7 +350,7 @@ int link_st_ptr(void *link_ptr, u16 address)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    DBG_INFO(LINK_DEBUG, "<LINK> ST to ptr");
+    DBG_INFO(LINK_DEBUG, "<LINK> ST ptr %x", address);
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
@@ -361,7 +361,7 @@ int link_st_ptr(void *link_ptr, u16 address)
     return 0;
 }
 
-int link_st_ptr_inc(void *link_ptr, u8 *data, int len)
+int link_st_ptr_inc(void *link_ptr, const u8 *data, int len)
 {
     /*
         Store data to the pointer location with pointer post - increment
@@ -394,7 +394,7 @@ int link_st_ptr_inc(void *link_ptr, u8 *data, int len)
     return 0;
 }
 
-int link_st_ptr_inc16(void *link_ptr, u8 *data, int len)
+int link_st_ptr_inc16(void *link_ptr, const u8 *data, int len)
 {
     /*
         Store a 16 - bit word value to the pointer location with pointer post - increment
@@ -430,16 +430,39 @@ int link_st_ptr_inc16(void *link_ptr, u8 *data, int len)
 int link_repeat(void *link_ptr, u8 repeats)
 {
     /*
-        Store a value to the repeat counter
+        Store a value to the 8bit repeat counter
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
-    u8 cmd[] = { UPDI_PHY_SYNC, UPDI_REPEAT | UPDI_REPEAT_WORD, (repeats - 1) & 0xFF, ((repeats - 1) >> 8) & 0xFF };
+    u8 cmd[] = { UPDI_PHY_SYNC, UPDI_REPEAT | UPDI_REPEAT_BYTE, repeats};
+    int result;
+    
+    if (!VALID_LINK(link))
+        return ERROR_PTR;
+
+    DBG_INFO(LINK_DEBUG, "<LINK> Repeat %d", repeats);
+
+    result = phy_send(PHY(link), cmd, sizeof(cmd));
+    if (result) {
+        DBG_INFO(LINK_DEBUG, "phy_send failed %d", result);
+        return -2;
+    }
+
+    return 0;
+}
+
+int link_repeat16(void *link_ptr, u16 repeats)
+{
+    /*
+    Store a value to the 16bit repeat counter
+    */
+    upd_datalink_t *link = (upd_datalink_t *)link_ptr;
+    u8 cmd[] = { UPDI_PHY_SYNC, UPDI_REPEAT | UPDI_REPEAT_WORD, repeats & 0xFF, (repeats >> 8) & 0xFF };
     int result;
 
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    DBG_INFO(LINK_DEBUG, "<LINK> Repeat %d", repeats);
+    DBG_INFO(LINK_DEBUG, "<LINK> Repeat16 %d", repeats);
 
     result = phy_send(PHY(link), cmd, sizeof(cmd));
     if (result) {

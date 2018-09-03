@@ -22,16 +22,18 @@ void _logv(verbose_t level, char *format, const unsigned char *data, int len, co
     if (rowsize <= 0)
         rowsize = DEFAULT_ROWDATA_SIZE;
 
-    size = _vscprintf(format, args) // _vscprintf doesn't count  
-        + 1; // terminating '\0'  
+    if (format && format[0]) {
+        size = _vscprintf(format, args) // _vscprintf doesn't count  
+            + 1; // terminating '\0'  
 
-    buffer = (char*)malloc(size * sizeof(char));
+        buffer = (char*)malloc(size * sizeof(char));
 
-    vsnprintf(buffer, size, format, args); // C4996  
-                                           // Note: vsprintf is deprecated; consider using vsprintf_s instead  
-    puts(buffer);
+        vsnprintf(buffer, size, format, args); // C4996  
+                                               // Note: vsprintf is deprecated; consider using vsprintf_s instead  
+        puts(buffer);
 
-    free(buffer);
+        free(buffer);
+    }
 
     if (data && len) {
         for (int i = 0; i < len; i++) {

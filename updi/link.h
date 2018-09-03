@@ -16,9 +16,10 @@ int link_st16(void *link_ptr, u16 address, u16 value);
 int link_ld_ptr_inc(void *link_ptr, u8 *data, int len);
 int link_ld_ptr_inc16(void *link_ptr, u8 *data, int len);
 int link_st_ptr(void *link_ptr, u16 address);
-int link_st_ptr_inc(void *link_ptr, u8 *data, int len);
-int link_st_ptr_inc16(void *link_ptr, u8 *data, int len);
+int link_st_ptr_inc(void *link_ptr, const u8 *data, int len);
+int link_st_ptr_inc16(void *link_ptr, const u8 *data, int len);
 int link_repeat(void *link_ptr, u8 repeats);
+int link_repeat16(void *link_ptr, u16 repeats);
 int link_read_sib(void *link_ptr, u8 *data, int len);
 int link_key(void *link_ptr, u8 size_k, const char *key);
 

@@ -186,7 +186,7 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     DBG_INFO(NVM_DEBUG, "<NVM> Read from flash");
 
     if (!nvm->progmode) {
-        DBG_INFO(NVM_DEBUG, "Flash is locked");
+        DBG_INFO(NVM_DEBUG, "Flash read at locked mode");
     }
 
     page_size = NVM_FLASH(nvm, flash_pagesize);
@@ -216,7 +216,7 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     return 0;
 }
 
-int nvm_write_flash(void *nvm_ptr, u16 address, u8 *data, int len)
+int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
     /*
     Writes to flash
@@ -345,6 +345,44 @@ int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
     }
 
     return 0;
+}
+
+int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
+{
+    /*
+        Read Memory
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Read memory");
+
+    if (!nvm->progmode) {
+        DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
+    }
+
+    return app_read_data(APP(nvm), address, data, len);
+}
+
+int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
+{
+    /*
+        Write Memory
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Write Memory");
+
+    if (!nvm->progmode) {
+        DBG_INFO(NVM_DEBUG, "Memory write at locked mode");
+    }
+
+    return app_write_data(APP(nvm), address, data, len);
 }
 
 int nvm_get_flash_info(void *nvm_ptr, flash_info_t *info)

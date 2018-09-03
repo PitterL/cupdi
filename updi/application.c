@@ -54,8 +54,8 @@ int app_device_info(void *app_ptr)
     upd_application_t *app = (upd_application_t *)app_ptr;
     u8 sib[16];
     u8 pdi;
-    u8 dev_id[3];
-    u8 dev_rev[1];
+    u8 sigrow[13];
+    u8 revid[1];
     int result;
 
     if (!VALID_APP(app))
@@ -69,31 +69,30 @@ int app_device_info(void *app_ptr)
         return -2;
     }
 
-    DBG(APP_DEBUG, "SIB read out as: ", sib, sizeof(sib), "0x%02x ");
-    DBG(APP_DEBUG, "Family ID = ", sib, 8, "%c ");
-    DBG_INFO(APP_DEBUG, "NVM revision = %c", sib[10]);
-    DBG_INFO(APP_DEBUG, "OCD revision = %c", sib[13]);
-    DBG_INFO(APP_DEBUG, "PDI OSC = %cMHz ", sib[15]);
+    DBG(APP_DEBUG, "[SIB]", sib, sizeof(sib), "%02x ");
+    DBG(APP_DEBUG, "[Family ID]", sib, 7, "%c");
+    DBG(APP_DEBUG, "[NVM revision]", sib + 8, 3, "%c");
+    DBG(APP_DEBUG, "[OCD revision]", sib + 11, 3, "%c");
+    DBG_INFO(APP_DEBUG, "[PDI OSC] is %cMHz", sib[15]);
 
     pdi = link_ldcs(LINK(app), UPDI_CS_STATUSA);
-    DBG_INFO(APP_DEBUG, "PDI OSC = %hhdMHz ", (pdi >> 4));
+    DBG_INFO(APP_DEBUG, "[PDI Rev] is %d", (pdi >> 4));
 
     if (app_in_prog_mode(app)) {
-        if (app->dev) {
-            result = app_read_data(app, APP_REG(app, sigrow_address), dev_id, sizeof(dev_id));
-            if (result) {
-                DBG_INFO(APP_DEBUG, "app_read_data failed %d", result);
-                return -3;
-            }
-
-            result = app_read_data(app, APP_REG(app, syscfg_address) + 1, dev_rev, sizeof(dev_rev));
-            if (result) {
-                DBG_INFO(APP_DEBUG, "app_read_data failed %d", result);
-                return -4;
-            }
-
-            DBG_INFO(APP_DEBUG, "Device ID = %02x %02x %02x rev %c", dev_id[0], dev_id[1], dev_id[2], dev_rev[0] + 'A');
+        result = app_read_data(app, APP_REG(app, sigrow_address), sigrow, sizeof(sigrow));
+        if (result) {
+            DBG_INFO(APP_DEBUG, "app_read_data sigrow failed %d", result);
+            return -3;
         }
+
+        result = app_read_data(app, APP_REG(app, syscfg_address) + 1, revid, sizeof(revid));
+        if (result) {
+            DBG_INFO(APP_DEBUG, "app_read_data revid failed %d", result);
+            return -4;
+        }
+        DBG(APP_DEBUG, "[Device ID]", sigrow, 3, "%02x ");
+        DBG(APP_DEBUG, "[Sernum ID]", sigrow + 3, 10, "%02x ");
+        DBG_INFO(APP_DEBUG, "[Device Rev] is %c", revid[0] + 'A');
     }
 
     return 0;
@@ -112,13 +111,11 @@ bool app_in_prog_mode(void *app_ptr)
     if (!VALID_APP(app))
         return ret;
 
-    DBG_INFO(APP_DEBUG, "<APP> Prog mode");
-
     result = _link_ldcs(LINK(app), UPDI_ASI_SYS_STATUS, &status);
     if (!result && status & (1 << UPDI_ASI_SYS_STATUS_NVMPROG))
         ret = true;
 
-    DBG_INFO(APP_DEBUG, "<APP> Prog mode %d", ret);
+    DBG_INFO(APP_DEBUG, "<APP> In PROG mode: %d", ret);
 
     return ret;
 }
@@ -274,7 +271,7 @@ int app_leave_progmode(void *app_ptr)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    DBG_INFO(APP_DEBUG, "<APP> Now in NVM programming mode");
+    DBG_INFO(APP_DEBUG, "<APP> Leaving program mode");
 
     result = app_toggle_reset(app_ptr, 1);
     if (result) {
@@ -448,7 +445,7 @@ int app_chip_erase(void *app_ptr)
     return 0;
 }
 
-int app_write_data_words(void *app_ptr, u16 address, u8 *data, int len)
+int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
         Writes a number of words to memory
@@ -468,6 +465,8 @@ int app_write_data_words(void *app_ptr, u16 address, u8 *data, int len)
             DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -3;
         }
+
+        return 0;
     }
 
     // Range check
@@ -484,12 +483,10 @@ int app_write_data_words(void *app_ptr, u16 address, u8 *data, int len)
     }
 
     //Fire up the repeat
-    if (len > 2) {
-        result = link_repeat(LINK(app), len >> 1);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
-            return -5;
-        }
+    result = link_repeat16(LINK(app), (len >> 1) - 1);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_repeat16 failed %d", result);
+        return -5;
     }
 
     result = link_st_ptr_inc16(LINK(app), data, len);
@@ -501,7 +498,7 @@ int app_write_data_words(void *app_ptr, u16 address, u8 *data, int len)
     return 0;
 }
 
-int app_write_data(void *app_ptr, u16 address, u8 *data, int len)
+int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
     Writes a number of bytes to memory
@@ -512,7 +509,7 @@ int app_write_data(void *app_ptr, u16 address, u8 *data, int len)
     if (!VALID_APP(app))
         return ERROR_PTR;
 
-    DBG_INFO(APP_DEBUG, "<APP> Write data(%d) addr: %hX", len, address);
+    DBG_INFO(APP_DEBUG, "<APP> Write bytes data(%d) addr: %hX", len, address);
 
     // Special-case of 1 byte
     if (len == 1) {
@@ -537,14 +534,12 @@ int app_write_data(void *app_ptr, u16 address, u8 *data, int len)
     }
 
     //Fire up the repeat
-    if (len > 1) {
-        result = link_repeat(LINK(app), len);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
-            return -5;
-        }
+    result = link_repeat(LINK(app), len - 1);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
+        return -5;
     }
-
+ 
     result = link_st_ptr_inc(LINK(app), data, len);
     if (result) {
         DBG_INFO(APP_DEBUG, "link_st_ptr_inc16 failed %d", result);
@@ -554,7 +549,28 @@ int app_write_data(void *app_ptr, u16 address, u8 *data, int len)
     return 0;
 }
 
-int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command, bool use_word_access)
+int app_write_data(void *app_ptr, u16 address, const u8 *data, int len)
+{
+    /*
+    Writes a number of data to memory
+    */
+    bool use_word_access = !(len & 0x1);
+    int result;
+
+    DBG_INFO(APP_DEBUG, "<APP> Write data(%d)", len);
+
+    if (!VALID_PTR(data) || len <= 0)
+        return ERROR_PTR;
+
+    if (use_word_access)
+        result = app_write_data_words(app_ptr, address, data, len);
+    else
+        result = app_write_data_bytes(app_ptr, address, data, len);
+    
+    return result;
+}
+
+int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_command)
 {
     /*
         Writes a page of data to NVM.
@@ -591,12 +607,9 @@ int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command
     }
 
     // Load the page buffer by writing directly to location
-    if (use_word_access)
-        result = app_write_data_words(app, address, data, len);
-    else
-        result = app_write_data(app, address, data, len);
+    result = app_write_data(app, address, data, len);
     if (result) {
-        DBG_INFO(APP_DEBUG, "app_write_data(%d) failed %d", use_word_access, result);
+        DBG_INFO(APP_DEBUG, "app_write_data failed %d", result);
         return -5;
     }
 
@@ -619,59 +632,9 @@ int _app_write_nvm(void *app_ptr, u16 address, u8 *data, int len, u8 nvm_command
 }
 
 
-int app_write_nvm(void *app_ptr, u16 address, u8 *data, int len)
+int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
-    bool word_mode = true;
-
-    if (len & 0x1)
-        word_mode = false;
-
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE, word_mode);
-}
-
-int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
-{
-    /*
-    Reads a number of bytes of data from UPDI
-    */
-    upd_application_t *app = (upd_application_t *)app_ptr;
-    int result;
-
-    if (!VALID_APP(app))
-        return ERROR_PTR;
-
-    DBG_INFO(APP_DEBUG, "<APP> Read data(%d) addr: %hX", len, address);
-
-    // Range check
-    if (len > UPDI_MAX_REPEAT_SIZE + 1) {
-        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
-        return -2;
-    }
-
-    // Store the address
-    result = link_st_ptr(LINK(app), address);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
-        return -3;
-    }
-
-    //Fire up the repeat
-    if (len > 1) {
-        result = link_repeat(LINK(app), len);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
-            return -4;
-        }
-    }
-
-    //Do the read(s)
-    result = link_ld_ptr_inc(LINK(app), data, len);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc failed %d", result);
-        return -5;
-    }
-
-    return 0;
+    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE);
 }
 
 int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
@@ -687,39 +650,122 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
 
     DBG_INFO(APP_DEBUG, "<APP> Read words data(%d) addr: %hX", len, address);
 
+    // Special-case of 1 word
+    if (len == 2) {
+        result = _link_ld16(LINK(app), address,(u16 *)data);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "_link_ld16 failed %d", result);
+            return -2;
+        }
+
+        return 0;
+    }
+
     // Range check
     if (len > (UPDI_MAX_REPEAT_SIZE >> 1) + 1) {
         DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
-        return -2;
+        return -3;
     }
 
     // Store the address
     result = link_st_ptr(LINK(app), address);
     if (result) {
         DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
-        return -3;
+        return -4;
     }
 
     //Fire up the repeat
-    if (len > 2) {
-        result = link_repeat(LINK(app), len >> 1);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
-            return -4;
-        }
+    result = link_repeat16(LINK(app), (len >> 1) - 1);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_repeat16 failed %d", result);
+        return -5;
     }
-
+ 
     //Do the read(s)
     result = link_ld_ptr_inc16(LINK(app), data, len);
     if (result) {
         DBG_INFO(APP_DEBUG, "link_ld_ptr_inc16 failed %d", result);
-        return -5;
+        return -6;
     }
 
     return 0;
 }
 
-int _app_read_nvm(void *app_ptr, u16 address, u8 *data, int len, bool use_word_access)
+int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
+{
+    /*
+    Reads a number of bytes of data from UPDI
+    */
+    upd_application_t *app = (upd_application_t *)app_ptr;
+    int result;
+
+    if (!VALID_APP(app))
+        return ERROR_PTR;
+
+    DBG_INFO(APP_DEBUG, "<APP> Read bytes data(%d) addr: %hX", len, address);
+
+    // Special-case of 1 byte
+    if (len == 1) {
+        result = _link_ld(LINK(app), address, data);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "_link_ld failed %d", result);
+            return -2;
+        }
+
+        return 0;
+    }
+    // Range check
+    if (len > UPDI_MAX_REPEAT_SIZE + 1) {
+        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
+        return -3;
+    }
+
+    // Store the address
+    result = link_st_ptr(LINK(app), address);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
+        return -4;
+    }
+
+    //Fire up the repeat
+    result = link_repeat(LINK(app), len - 1);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
+        return -5;
+    }
+ 
+    //Do the read(s)
+    result = link_ld_ptr_inc(LINK(app), data, len);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc failed %d", result);
+        return -6;
+    }
+
+    return 0;
+}
+
+int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
+{
+    /*
+    Reads a number of bytes of data from UPDI
+    */
+    bool use_word_access = !(len & 0x1);
+    int result;
+
+    DBG_INFO(APP_DEBUG, "<APP> Read data(%d)", len);
+
+    if (!VALID_PTR(data) || len <= 0)
+        return ERROR_PTR;
+
+    if (use_word_access)
+        result = app_read_data_words(app_ptr, address, data, len);
+    else
+        result = app_read_data_bytes(app_ptr, address, data, len);
+    
+    return result;
+}
+
+int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len)
 {
     /*
        Read data from NVM.
@@ -733,26 +779,13 @@ int _app_read_nvm(void *app_ptr, u16 address, u8 *data, int len, bool use_word_a
     DBG_INFO(APP_DEBUG, "<APP> Chip read nvm");
 
     // Load to buffer by reading directly to location
-    if (use_word_access)
-        result = app_read_data_words(app, address, data, len);
-    else
-        result = app_read_data(app, address, data, len);
+    result = app_read_data(app, address, data, len);
     if (result) {
-        DBG_INFO(APP_DEBUG, "app_read_data(%d) failed %d", use_word_access, result);
-        return -5;
+        DBG_INFO(APP_DEBUG, "app_read_data failed %d", result);
+        return -2;
     }
 
     return 0;
-}
-
-int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len)
-{
-    bool word_mode = true;
-
-    if (len & 0x1)
-        word_mode = false;
-
-    return _app_read_nvm(app_ptr, address, data, len, word_mode);
 }
 
 int app_ld(void *app_ptr, u16 address, u8* data)
@@ -763,4 +796,14 @@ int app_ld(void *app_ptr, u16 address, u8* data)
     upd_application_t *app = (upd_application_t *)app_ptr;
   
     return _link_ld(LINK(app), address, data);
+}
+
+int app_st(void *app_ptr, u16 address, u8 val)
+{
+    /*
+    Pack the link_st
+    */
+    upd_application_t *app = (upd_application_t *)app_ptr;
+
+    return link_st(LINK(app), address, val);
 }
