@@ -1,15 +1,17 @@
 # cupdi
 
-This is C version of UPDI interface achievement, referred to the Python version here:
-
+This is C version of UPDI interface achievement, you could refer to the Python version:
 
     https://github.com/mraardvark/pyupdi.git
-    My purpose is you could use UPDI to flash the new TinyAVR at any enviroment like Computer / MCU Embedded system, just transplant the code the there.
+
+My purpose is you could use UPDI to flash the new TinyAVR at any enviroment like Computer / MCU Embedded system, just transplant the code the there.
+
     I used other vendor library, thanks:
         argparse: https://github.com/cofyc/argparse.git
         ihex:       https://github.com/arkku/ihex.git
         sercom:     https://github.com/dpogue/Terminal-Emulator.git
-    If you have any question, please query Pater to mailbox atpboy444@hotmail.com, if you like it please help to mark STAR at https://github.com/PitterL/cupdi.git
+    If you have any question, please query Pater to mailbox atpboy444@hotmail.com
+    If you like it please help to mark STAR at https://github.com/PitterL/cupdi.git
 
 
 
