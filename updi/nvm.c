@@ -363,7 +363,7 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
         DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
     }
 
-    return app_read_data(APP(nvm), address, data, len);
+    return app_read_data_bytes(APP(nvm), address, data, len);
 }
 
 int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
@@ -382,7 +382,7 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
         DBG_INFO(NVM_DEBUG, "Memory write at locked mode");
     }
 
-    return app_write_data(APP(nvm), address, data, len);
+    return app_write_data_bytes(APP(nvm), address, data, len);
 }
 
 int nvm_get_flash_info(void *nvm_ptr, flash_info_t *info)

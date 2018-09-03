@@ -54,7 +54,7 @@ int app_device_info(void *app_ptr)
     upd_application_t *app = (upd_application_t *)app_ptr;
     u8 sib[16];
     u8 pdi;
-    u8 sigrow[13];
+    u8 sigrow[14];
     u8 revid[1];
     int result;
 
@@ -453,7 +453,7 @@ int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
 
-    if (!VALID_APP(app))
+    if (!VALID_APP(app) || !VALID_PTR(data) || len < 2)
         return ERROR_PTR;
 
     DBG_INFO(APP_DEBUG, "<APP> Write words data(%d) addr: %hX", len, address);
@@ -506,7 +506,7 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
 
-    if (!VALID_APP(app))
+    if (!VALID_APP(app) || !VALID_PTR(data) || len < 1)
         return ERROR_PTR;
 
     DBG_INFO(APP_DEBUG, "<APP> Write bytes data(%d) addr: %hX", len, address);
@@ -645,7 +645,7 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
 
-    if (!VALID_APP(app))
+    if (!VALID_APP(app) || !VALID_PTR(data) || len < 2)
         return ERROR_PTR;
 
     DBG_INFO(APP_DEBUG, "<APP> Read words data(%d) addr: %hX", len, address);
@@ -699,7 +699,7 @@ int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
 
-    if (!VALID_APP(app))
+    if (!VALID_APP(app) || !VALID_PTR(data) || len < 1)
         return ERROR_PTR;
 
     DBG_INFO(APP_DEBUG, "<APP> Read bytes data(%d) addr: %hX", len, address);
@@ -714,6 +714,7 @@ int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
 
         return 0;
     }
+
     // Range check
     if (len > UPDI_MAX_REPEAT_SIZE + 1) {
         DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
