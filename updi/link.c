@@ -1,17 +1,50 @@
+/*
+Copyright(c) 2016 Atmel Corporation, a wholly owned subsidiary of Microchip Technology Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http ://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+*/
+
 #include "os/platform.h"
 #include "physical.h"
 #include "link.h"
 #include "constants.h"
 
+/*
+    LINK level memory struct
+    @mgwd: magicword
+    @phy: pointer to phy object
+*/
 typedef struct _upd_datalink {
 #define UPD_DATALINK_MAGIC_WORD 'ulin'
     unsigned int mgwd;  //magic word
     void *phy;
 }upd_datalink_t;
 
+/*
+    Macro definition of APP level
+    @VALID_LINK(): check whether valid LINK object
+    @PHY(): get phy object ptr
+*/
 #define VALID_LINK(_link) ((_link) && ((_link)->mgwd == UPD_DATALINK_MAGIC_WORD))
 #define PHY(_link) ((_link)->phy)
 
+/*
+    LINK object init
+    @port: serial port name of Window or Linux
+    @baud: baudrate
+    @return LINK ptr, NULL if failed
+*/
 void *updi_datalink_init(const char *port, int baud)
 {
     upd_datalink_t *link = NULL;
@@ -51,6 +84,11 @@ void *updi_datalink_init(const char *port, int baud)
     return link;
 }
 
+/*
+    LINK object destroy
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @no return
+*/
 void updi_datalink_deinit(void *link_ptr)
 {
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
@@ -62,6 +100,11 @@ void updi_datalink_deinit(void *link_ptr)
     }
 }
 
+/*
+    LINK check whether device is connected 
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @return 0 successful, other value if failed
+*/
 int link_check(void *link_ptr)
 {
     /*
@@ -91,6 +134,13 @@ int link_check(void *link_ptr)
     return 0;
 }
 
+/*
+    LINK read udpi control register
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: reg address
+    @data: output 8bit buffer
+    @return 0 successful, other value if failed
+*/
 int _link_ldcs(void *link_ptr, u8 address, u8 *data)
 {
     /*
@@ -118,6 +168,12 @@ int _link_ldcs(void *link_ptr, u8 address, u8 *data)
     return 0;
 }
 
+/*
+    LINK read udpi control register capsule
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: reg address
+    @return reg value if successful, zero if not accessiable(this will confict with reg value zero)
+*/
 u8 link_ldcs(void *link_ptr, u8 address)
 {
     u8 resp;
@@ -132,6 +188,13 @@ u8 link_ldcs(void *link_ptr, u8 address)
     return resp;
 }
 
+/*
+    LINK write udpi control register
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: reg address
+    @value: reg value
+    @return 0 successful, other value if failed
+*/
 int link_stcs(void *link_ptr, u8 address, u8 value)
 {
     /*
@@ -155,7 +218,14 @@ int link_stcs(void *link_ptr, u8 address, u8 value)
     return 0;
 }
 
-int _link_ld(void *link_ptr, u16 address, u8 *data)
+/*
+    LINK read 8bit target register by direct mode
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: target address
+    @val: output buffer
+    @return 0 successful, other value if failed
+*/
+int _link_ld(void *link_ptr, u16 address, u8 *val)
 {
     /*
         Load a single byte direct from a 16 - bit address
@@ -166,7 +236,7 @@ int _link_ld(void *link_ptr, u16 address, u8 *data)
     u8 resp;
     int result;
 
-    if (!VALID_LINK(link) || !data)
+    if (!VALID_LINK(link) || !val)
         return ERROR_PTR;
 
     DBG_INFO(LINK_DEBUG, "<LINK> LD from %04X}", address);
@@ -177,11 +247,17 @@ int _link_ld(void *link_ptr, u16 address, u8 *data)
         return -2;
     }
 
-    *data = resp;
+    *val = resp;
 
     return 0;
 }
 
+/*
+    LINK read 8bit data register by direct mode, capsule
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: target address
+    @return target data if successful, zero if not accessiable(this will confict with target data zero)
+*/
 u8 link_ld(void *link_ptr, u16 address)
 {
     u8 resp = 0;
@@ -191,6 +267,13 @@ u8 link_ld(void *link_ptr, u16 address)
     return resp;
 }
 
+/*
+    LINK read 16bit data by direct mode
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: target address
+    @val: output buffer
+    @return 0 successful, other value if failed
+*/
 int _link_ld16(void *link_ptr, u16 address, u16 *val)
 {
     /*
@@ -216,6 +299,13 @@ int _link_ld16(void *link_ptr, u16 address, u16 *val)
     return 0;
 }
 
+/*
+    LINK read 16bit data by direct mode, capsule
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: reg address
+    @val: output buffer
+    @return 0 successful, other value if failed
+*/
 u16 link_ld16(void *link_ptr, u16 address)
 {
     u16 val = 0;
@@ -229,6 +319,13 @@ u16 link_ld16(void *link_ptr, u16 address)
     return val;
 }
 
+/*
+    LINK write 8bit data by direct mode
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: target address
+    @value: target value
+    @return 0 successful, other value if failed
+*/
 int link_st(void *link_ptr, u16 address, u8 value)
 {
     /*
@@ -260,6 +357,13 @@ int link_st(void *link_ptr, u16 address, u8 value)
     return 0;
 }
 
+/*
+    LINK write 16bit data by direct mode
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: target address
+    @value: target value
+    @return 0 successful, other value if failed
+*/
 int link_st16(void *link_ptr, u16 address, u16 value)
 {
     /*
@@ -291,6 +395,14 @@ int link_st16(void *link_ptr, u16 address, u16 value)
     return 0;
 }
 
+/*
+    LINK read 8bit data by indirect mode, 
+        the address is set by link_st_ptr() first. After the operation, the ptr in increase 1
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @data: data output buffer
+    @len: data length to be read
+    @return 0 successful, other value if failed
+*/
 int link_ld_ptr_inc(void *link_ptr, u8 *data, int len)
 {
     /*
@@ -314,6 +426,14 @@ int link_ld_ptr_inc(void *link_ptr, u8 *data, int len)
     return 0;
 }
 
+/*
+    LINK read 16bit data by indirect mode,
+    the address is set by link_st_ptr() first. After the operation, the ptr in increase 2
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @data: data output buffer
+    @len: data length to be read
+    @return 0 successful, other value if failed
+*/
 int link_ld_ptr_inc16(void *link_ptr, u8 *data, int len)
 {
     /*
@@ -337,6 +457,12 @@ int link_ld_ptr_inc16(void *link_ptr, u8 *data, int len)
     return 0;
 }
 
+/*
+    LINK set st/ld command address
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @address: the address to be set
+    @return 0 successful, other value if failed
+*/
 int link_st_ptr(void *link_ptr, u16 address)
 {
     /*
@@ -361,6 +487,14 @@ int link_st_ptr(void *link_ptr, u16 address)
     return 0;
 }
 
+/*
+    LINK set 8bit data by indirect mode,
+        the address is set by link_st_ptr() first. After the operation, the ptr in increase 1
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @data: data input buffer
+    @len: data length
+    @return 0 successful, other value if failed
+*/
 int link_st_ptr_inc(void *link_ptr, const u8 *data, int len)
 {
     /*
@@ -394,6 +528,14 @@ int link_st_ptr_inc(void *link_ptr, const u8 *data, int len)
     return 0;
 }
 
+/*
+    LINK set 16bit data by indirect mode,
+    the address is set by link_st_ptr() first. After the operation, the ptr in increase 2
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @data: data input buffer
+    @len: data length
+    @return 0 successful, other value if failed
+*/
 int link_st_ptr_inc16(void *link_ptr, const u8 *data, int len)
 {
     /*
@@ -427,6 +569,13 @@ int link_st_ptr_inc16(void *link_ptr, const u8 *data, int len)
     return 0;
 }
 
+/*
+    LINK repeat ST/LD operation by indirect mode,
+        the address is set by link_st_ptr() first. After the operation, the ptr will increase by st/ld command dedicated
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @repeats: repeats count
+    @return 0 successful, other value if failed
+*/
 int link_repeat(void *link_ptr, u8 repeats)
 {
     /*
@@ -450,6 +599,13 @@ int link_repeat(void *link_ptr, u8 repeats)
     return 0;
 }
 
+/*
+    LINK repeat ST/LD operation by indirect mode, repeats is 16bit width
+    the address is set by link_st_ptr() first. After the operation, the ptr will increase by st/ld command dedicated
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @repeats: repeats count(16bit width)
+    @return 0 successful, other value if failed
+*/
 int link_repeat16(void *link_ptr, u16 repeats)
 {
     /*
@@ -473,6 +629,12 @@ int link_repeat16(void *link_ptr, u16 repeats)
     return 0;
 }
 
+/*
+    LINK read SIB content
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @data: output data
+    @return 0 successful, other value if failed
+*/
 int link_read_sib(void *link_ptr, u8 *data, int len)
 {
     /*
@@ -488,6 +650,13 @@ int link_read_sib(void *link_ptr, u8 *data, int len)
     return phy_sib(PHY(link), data, len);
 }
 
+/*
+    LINK key access operation
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @size_k: key size in 8-bit unit mode, (2 ^ size_k) * 8
+    @key: key data
+    @return 0 successful, other value if failed
+*/
 int link_key(void *link_ptr, u8 size_k, const char *key)
 {
     /*

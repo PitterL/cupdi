@@ -7,7 +7,7 @@ int link_check(void *link_ptr);
 int _link_ldcs(void *link_ptr, u8 address, u8 *val);
 u8 link_ldcs(void *link_ptr, u8 address);
 int link_stcs(void *link_ptr, u8 address, u8 value);
-int _link_ld(void *link_ptr, u16 address, u8 *data);
+int _link_ld(void *link_ptr, u16 address, u8 *val);
 u8 link_ld(void *link_ptr, u16 address);
 int _link_ld16(void *link_ptr, u16 address, u16 *val);
 u16 link_ld16(void *link_ptr, u16 address);

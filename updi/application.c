@@ -1,9 +1,32 @@
+/*
+Copyright(c) 2016 Atmel Corporation, a wholly owned subsidiary of Microchip Technology Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http ://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+*/
+
 #include "os/platform.h"
 #include "device/device.h"
 #include "link.h"
 #include "application.h"
 #include "constants.h"
 
+/*
+    APP level memory struct
+    @mgwd: magicword
+    @link: pointer to link object
+    @dev: point chip dev object
+*/
 typedef struct _upd_application {
 #define UPD_APPLICATION_MAGIC_WORD 'uapp'
     unsigned int mgwd;  //magic word
@@ -11,12 +34,28 @@ typedef struct _upd_application {
     device_info_t *dev;
 }upd_application_t;
 
+/*
+    Macro definition of APP level
+    @VALID_APP(): check whether valid APP object
+    @LINK(): get link object ptr
+    @APP_REG(): chip reg address
+*/
 #define VALID_APP(_app) ((_app) && ((_app)->mgwd == UPD_APPLICATION_MAGIC_WORD))
 #define LINK(_app) ((_app)->link)
 #define APP_REG(_app, _name) ((_app)->dev->mmap->reg._name)
 
+/*
+    Max waiting time at flash programming
+*/
 #define TIMEOUT_WAIT_FLASH_READY 1000
 
+/*
+    APP object init
+    @port: serial port name of Window or Linux
+    @baud: baudrate
+    @dev: point chip dev object
+    @return APP ptr, NULL if failed
+*/
 void *updi_application_init(const char *port, int baud, void *dev)
 {
     upd_application_t *app = NULL;
@@ -35,6 +74,11 @@ void *updi_application_init(const char *port, int baud, void *dev)
     return app;
 }
 
+/*
+    APP object destroy
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @no return
+*/
 void updi_application_deinit(void *app_ptr)
 {
     upd_application_t *app = (upd_application_t *)app_ptr;
@@ -46,6 +90,11 @@ void updi_application_deinit(void *app_ptr)
     }
 }
 
+/*
+    APP get device ID information, in Unlocked Mode, the SIGROW could be readout
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @return 0 successful, other value if failed
+*/
 int app_device_info(void *app_ptr)
 {
     /*
@@ -98,6 +147,11 @@ int app_device_info(void *app_ptr)
     return 0;
 }
 
+/*
+    APP check whether device in Unlocked Mode
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @return true if Unlocked, other value if Locked
+*/
 bool app_in_prog_mode(void *app_ptr)
 {
     /*
@@ -120,6 +174,12 @@ bool app_in_prog_mode(void *app_ptr)
     return ret;
 }
 
+/*
+    APP waiting Unlocked completed
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @timeout: max waiting time
+    @return 0 successful, other value if failed
+*/
 int app_wait_unlocked(void *app_ptr, int timeout)
 {
     /*   
@@ -156,6 +216,11 @@ int app_wait_unlocked(void *app_ptr, int timeout)
     return 0;
 }
 
+/*
+    APP Unlocked chip by command UPDI_KEY_CHIPERASE, this will fully erase whole chip
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @return 0 successful, other value if failed
+*/
 int app_unlock(void *app_ptr)
 {
     /*
@@ -201,6 +266,11 @@ int app_unlock(void *app_ptr)
     return 0;
 }
 
+/*
+    APP Unlocked chip by command UPDI_KEY_NVM
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @return 0 successful, other value if failed
+*/
 int app_enter_progmode(void *app_ptr)
 {
     /*
@@ -260,6 +330,11 @@ int app_enter_progmode(void *app_ptr)
     }
 }
 
+/*
+    APP Leave Unlocked mode and re-lock it
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @return 0 successful, other value if failed
+*/
 int app_leave_progmode(void *app_ptr)
 {
     /*
@@ -288,6 +363,12 @@ int app_leave_progmode(void *app_ptr)
     return 0;
 }
 
+/*
+    APP send chip reset
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @apply_reset: true - set, false - clear
+    @return 0 successful, other value if failed
+*/
 int app_reset(void *app_ptr, bool apply_reset)
 {
     /*
@@ -318,6 +399,12 @@ int app_reset(void *app_ptr, bool apply_reset)
     return 0;
 }
 
+/*
+    APP toggle a chip reset
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @delay: Reset keep time before clear
+    @return 0 successful, other value if failed
+*/
 int app_toggle_reset(void *app_ptr, int delay)
 {
     /*
@@ -349,6 +436,12 @@ int app_toggle_reset(void *app_ptr, int delay)
     return 0;
 }
 
+/*
+    APP wait flash ready
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @timeout: max flash programing time
+    @return 0 successful, other value if failed
+*/
 int app_wait_flash_ready(void *app_ptr, int timeout)
 {
     /*
@@ -391,6 +484,12 @@ int app_wait_flash_ready(void *app_ptr, int timeout)
     return 0;
 }
 
+/*
+    APP send a nvm command
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @command: command content
+    @return 0 successful, other value if failed
+*/
 int app_execute_nvm_command(void *app_ptr, u8 command)
 {
     /*
@@ -406,6 +505,11 @@ int app_execute_nvm_command(void *app_ptr, u8 command)
     return link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLA, command);
 }
 
+/*
+    APP erase chip
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @return 0 successful, other value if failed
+*/
 int app_chip_erase(void *app_ptr)
 {
     /*
@@ -445,6 +549,198 @@ int app_chip_erase(void *app_ptr)
     return 0;
 }
 
+/*
+    APP read data in 16bit mode
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
+int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
+{
+    /*
+    Reads a number of words of data from UPDI
+    */
+    upd_application_t *app = (upd_application_t *)app_ptr;
+    int result;
+
+    if (!VALID_APP(app) || !VALID_PTR(data) || len < 2)
+        return ERROR_PTR;
+
+    DBG_INFO(APP_DEBUG, "<APP> Read words data(%d) addr: %hX", len, address);
+
+    // Special-case of 1 word
+    if (len == 2) {
+        result = _link_ld16(LINK(app), address, (u16 *)data);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "_link_ld16 failed %d", result);
+            return -2;
+        }
+
+        return 0;
+    }
+
+    // Range check
+    if (len > (UPDI_MAX_REPEAT_SIZE >> 1) + 1) {
+        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
+        return -3;
+    }
+
+    // Store the address
+    result = link_st_ptr(LINK(app), address);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
+        return -4;
+    }
+
+    //Fire up the repeat
+    result = link_repeat16(LINK(app), (len >> 1) - 1);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_repeat16 failed %d", result);
+        return -5;
+    }
+
+    //Do the read(s)
+    result = link_ld_ptr_inc16(LINK(app), data, len);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc16 failed %d", result);
+        return -6;
+    }
+
+    return 0;
+}
+
+/*
+    APP read data in 8bit mode
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
+int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
+{
+    /*
+    Reads a number of bytes of data from UPDI
+    */
+    upd_application_t *app = (upd_application_t *)app_ptr;
+    int result;
+
+    if (!VALID_APP(app) || !VALID_PTR(data) || len < 1)
+        return ERROR_PTR;
+
+    DBG_INFO(APP_DEBUG, "<APP> Read bytes data(%d) addr: %hX", len, address);
+
+    // Special-case of 1 byte
+    if (len == 1) {
+        result = _link_ld(LINK(app), address, data);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "_link_ld failed %d", result);
+            return -2;
+        }
+
+        return 0;
+    }
+
+    // Range check
+    if (len > UPDI_MAX_REPEAT_SIZE + 1) {
+        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
+        return -3;
+    }
+
+    // Store the address
+    result = link_st_ptr(LINK(app), address);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
+        return -4;
+    }
+
+    //Fire up the repeat
+    result = link_repeat(LINK(app), len - 1);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
+        return -5;
+    }
+
+    //Do the read(s)
+    result = link_ld_ptr_inc(LINK(app), data, len);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc failed %d", result);
+        return -6;
+    }
+
+    return 0;
+}
+
+/*
+    APP read data with 8/16 bit auto select by len
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
+int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
+{
+    /*
+    Reads a number of bytes of data from UPDI
+    */
+    bool use_word_access = !(len & 0x1);
+    int result;
+
+    DBG_INFO(APP_DEBUG, "<APP> Read data(%d)", len);
+
+    if (!VALID_PTR(data) || len <= 0)
+        return ERROR_PTR;
+
+    if (use_word_access)
+        result = app_read_data_words(app_ptr, address, data, len);
+    else
+        result = app_read_data_bytes(app_ptr, address, data, len);
+
+    return result;
+}
+
+/*
+    APP read flash
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
+int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len)
+{
+    /*
+    Read data from NVM.
+    */
+    upd_application_t *app = (upd_application_t *)app_ptr;
+    int result;
+
+    if (!VALID_APP(app))
+        return ERROR_PTR;
+
+    DBG_INFO(APP_DEBUG, "<APP> Chip read nvm");
+
+    // Load to buffer by reading directly to location
+    result = app_read_data(app, address, data, len);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_read_data failed %d", result);
+        return -2;
+    }
+
+    return 0;
+}
+
+/*
+    APP write data in 16bit mode
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
 int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
@@ -498,6 +794,14 @@ int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
     return 0;
 }
 
+/*
+    APP write data in 8bit mode
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
 int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
@@ -549,6 +853,14 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
     return 0;
 }
 
+/*
+    APP write data with 8/16 bit auto select by len
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
 int app_write_data(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
@@ -570,6 +882,15 @@ int app_write_data(void *app_ptr, u16 address, const u8 *data, int len)
     return result;
 }
 
+/*
+    APP write flash
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @nvm_command: programming command
+    @return 0 successful, other value if failed
+*/
 int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_command)
 {
     /*
@@ -631,162 +952,17 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
     return 0;
 }
 
-
+/*
+    APP write flash capsule with UPDI_NVMCTRL_CTRLA_WRITE_PAGE command
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
 int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
     return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE);
-}
-
-int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
-{
-    /*
-    Reads a number of words of data from UPDI
-    */
-    upd_application_t *app = (upd_application_t *)app_ptr;
-    int result;
-
-    if (!VALID_APP(app) || !VALID_PTR(data) || len < 2)
-        return ERROR_PTR;
-
-    DBG_INFO(APP_DEBUG, "<APP> Read words data(%d) addr: %hX", len, address);
-
-    // Special-case of 1 word
-    if (len == 2) {
-        result = _link_ld16(LINK(app), address,(u16 *)data);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "_link_ld16 failed %d", result);
-            return -2;
-        }
-
-        return 0;
-    }
-
-    // Range check
-    if (len > (UPDI_MAX_REPEAT_SIZE >> 1) + 1) {
-        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
-        return -3;
-    }
-
-    // Store the address
-    result = link_st_ptr(LINK(app), address);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
-        return -4;
-    }
-
-    //Fire up the repeat
-    result = link_repeat16(LINK(app), (len >> 1) - 1);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_repeat16 failed %d", result);
-        return -5;
-    }
- 
-    //Do the read(s)
-    result = link_ld_ptr_inc16(LINK(app), data, len);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc16 failed %d", result);
-        return -6;
-    }
-
-    return 0;
-}
-
-int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
-{
-    /*
-    Reads a number of bytes of data from UPDI
-    */
-    upd_application_t *app = (upd_application_t *)app_ptr;
-    int result;
-
-    if (!VALID_APP(app) || !VALID_PTR(data) || len < 1)
-        return ERROR_PTR;
-
-    DBG_INFO(APP_DEBUG, "<APP> Read bytes data(%d) addr: %hX", len, address);
-
-    // Special-case of 1 byte
-    if (len == 1) {
-        result = _link_ld(LINK(app), address, data);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "_link_ld failed %d", result);
-            return -2;
-        }
-
-        return 0;
-    }
-
-    // Range check
-    if (len > UPDI_MAX_REPEAT_SIZE + 1) {
-        DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
-        return -3;
-    }
-
-    // Store the address
-    result = link_st_ptr(LINK(app), address);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
-        return -4;
-    }
-
-    //Fire up the repeat
-    result = link_repeat(LINK(app), len - 1);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
-        return -5;
-    }
- 
-    //Do the read(s)
-    result = link_ld_ptr_inc(LINK(app), data, len);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_ld_ptr_inc failed %d", result);
-        return -6;
-    }
-
-    return 0;
-}
-
-int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
-{
-    /*
-    Reads a number of bytes of data from UPDI
-    */
-    bool use_word_access = !(len & 0x1);
-    int result;
-
-    DBG_INFO(APP_DEBUG, "<APP> Read data(%d)", len);
-
-    if (!VALID_PTR(data) || len <= 0)
-        return ERROR_PTR;
-
-    if (use_word_access)
-        result = app_read_data_words(app_ptr, address, data, len);
-    else
-        result = app_read_data_bytes(app_ptr, address, data, len);
-    
-    return result;
-}
-
-int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len)
-{
-    /*
-       Read data from NVM.
-    */
-    upd_application_t *app = (upd_application_t *)app_ptr;
-    int result;
-
-    if (!VALID_APP(app))
-        return ERROR_PTR;
-
-    DBG_INFO(APP_DEBUG, "<APP> Chip read nvm");
-
-    // Load to buffer by reading directly to location
-    result = app_read_data(app, address, data, len);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_read_data failed %d", result);
-        return -2;
-    }
-
-    return 0;
 }
 
 int app_ld(void *app_ptr, u16 address, u8* data)

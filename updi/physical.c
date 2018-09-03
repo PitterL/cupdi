@@ -1,7 +1,31 @@
+/*
+Copyright(c) 2016 Atmel Corporation, a wholly owned subsidiary of Microchip Technology Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http ://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+*/
+
 #include "os/platform.h"
 #include "physical.h"
 #include "constants.h"
 
+/*
+    PHY level memory struct
+    @mgwd: magicword
+    @ser: pointer to sercom object
+    @stat: store sercom parameter
+    @ibdly: interval between each transfer action
+*/
 typedef struct _upd_physical{
 #define UPD_PHYSICAL_MAGIC_WORD 'uphy'
     unsigned int mgwd;  //magic word
@@ -13,13 +37,11 @@ typedef struct _upd_physical{
 #define VALID_PHY(_phy) ((_phy) && ((_phy)->mgwd == UPD_PHYSICAL_MAGIC_WORD))
 #define SER(_phy) ((HANDLE)_phy->ser)
 
-/**
-* Initialises a serial port handle for reading and writing
-*
-* @param const char * The name of the serial port to open.
-* @param int baud the baudrate of the port
-* @returns void *fd  The upd_physical_t pointer to the handle which will be initialised to the open
-*   serial port connection.
+/*
+    PHY object init
+    @port: serial port name of Window or Linux
+    @baud: baudrate
+    @return LINK ptr, NULL if failed
 */
 void *updi_physical_init(const char *port, int baud)
 {
@@ -57,6 +79,11 @@ void *updi_physical_init(const char *port, int baud)
     return phy;
 }
 
+/*
+    PHY object destroy
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @no return
+*/
 void updi_physical_deinit(void *ptr_phy)
 {
     upd_physical_t *phy = (upd_physical_t *)ptr_phy;
@@ -71,6 +98,11 @@ void updi_physical_deinit(void *ptr_phy)
     free(phy);
 }
 
+/*
+    PHY send doule break
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @return 0 successful, other value if failed
+*/
 int phy_send_double_break(void *ptr_phy)
 {
     /*
@@ -120,6 +152,13 @@ int phy_send_double_break(void *ptr_phy)
     return 0;
 }
 
+/*
+    PHY send data
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @data: data to be sent
+    @len: data lenght
+    @return 0 successful, other value if failed
+*/
 int phy_send(void *ptr_phy, const u8 *data, int len)
 {
     /*
@@ -166,11 +205,25 @@ int phy_send(void *ptr_phy, const u8 *data, int len)
     return 0;
 }
 
+/*
+    PHY send data
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @data: data to be sent
+    @len: data lenght
+    @return 0 successful, other value if failed
+*/
 int phy_send_byte(void *ptr_phy, u8 val)
 {
     return phy_send(ptr_phy, &val, 1);
 }
 
+/*
+    PHY receive data
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @data: data buffer to receive
+    @len: data lenght
+    @return 0 successful, other value if failed
+*/
 int phy_receive(void *ptr_phy, u8 *data, int len)
 {
     /*
@@ -207,6 +260,11 @@ int phy_receive(void *ptr_phy, u8 *data, int len)
     return i;
 }
 
+/*
+    PHY receive one byte data
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @return data received, oxff if failed(conflicted with the data content original 0xFF)
+*/
 u8 phy_receive_byte(void *ptr_phy)
 {
     u8 resp = 0xFF;    //default resp
@@ -220,6 +278,15 @@ u8 phy_receive_byte(void *ptr_phy)
     return resp;
 }
 
+/*
+    PHY transfer data
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @wdata: data buffer to send
+    @wlen: send length
+    @rdata: data buffer to receive
+    @len: receiving lenght
+    @return 0 successful, other value if failed
+*/
 int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
 {
     int result;
@@ -252,6 +319,13 @@ int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
     return result;
 }
 
+/*
+    PHY transfer data
+    @ptr_phy: APP object pointer, acquired from updi_physical_init()
+    @data: data buffer to store SIB
+    @len: SIB lenght
+    @return 0 successful, other value if failed
+*/
 int phy_sib(void *ptr_phy, u8 *data, int len) 
 {
     /*

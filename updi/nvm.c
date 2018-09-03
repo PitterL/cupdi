@@ -1,9 +1,33 @@
+/*
+Copyright(c) 2016 Atmel Corporation, a wholly owned subsidiary of Microchip Technology Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http ://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+*/
+
 #include "os/platform.h"
 #include "device/device.h"
 #include "application.h"
 #include "nvm.h"
 #include "constants.h"
 
+/*
+    NVM level memory struct
+    @mgwd: magicword
+    @progmode: Unlock mode flag
+    @app: pointer to app object
+    @dev: point chip dev object
+*/
 typedef struct _upd_nvm {
 #define UPD_NVM_MAGIC_WORD 'unvm'
     unsigned int mgwd;  //magic word
@@ -12,11 +36,25 @@ typedef struct _upd_nvm {
     device_info_t *dev;
 }upd_nvm_t;
 
+/*
+    Macro definition of NVM level
+    @VALID_NVM(): check whether valid NVM object
+    @APP(): get app object ptr
+    @NVM_REG(): chip reg address
+    @NVM_FLASH: chip flash address
+*/
 #define VALID_NVM(_nvm) ((_nvm) && ((_nvm)->mgwd == UPD_NVM_MAGIC_WORD))
 #define APP(_nvm) ((_nvm)->app)
 #define NVM_REG(_nvm, _name) ((_nvm)->dev->mmap->reg._name)
 #define NVM_FLASH(_nvm, _name) ((_nvm)->dev->mmap->flash._name)
 
+/*
+    NVM object init
+    @port: serial port name of Window or Linux
+    @baud: baudrate
+    @dev: point chip dev object
+    @return NVM ptr, NULL if failed
+*/
 void *updi_nvm_init(const char *port, int baud, void *dev)
 {
     upd_nvm_t *nvm = NULL;
@@ -36,6 +74,10 @@ void *updi_nvm_init(const char *port, int baud, void *dev)
     return nvm;
 }
 
+/*
+    NVM object destroy
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+*/
 void updi_nvm_deinit(void *nvm_ptr)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
@@ -47,6 +89,11 @@ void updi_nvm_deinit(void *nvm_ptr)
     }
 }
 
+/*
+    NVM get device ID information
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
 int nvm_get_device_info(void *nvm_ptr)
 {
     /*
@@ -62,6 +109,11 @@ int nvm_get_device_info(void *nvm_ptr)
     return app_device_info(APP(nvm));
 }
 
+/*
+    NVM set chip into Unlocked Mode with UPDI_KEY_NVM command
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
 int nvm_enter_progmode(void *nvm_ptr)
 {
     /*
@@ -86,6 +138,11 @@ int nvm_enter_progmode(void *nvm_ptr)
     return 0;
 }
 
+/*
+    NVM chip leave Locked Mode
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
 int nvm_leave_progmode(void *nvm_ptr)
 {
     /*
@@ -113,6 +170,11 @@ int nvm_leave_progmode(void *nvm_ptr)
     return 0;
 }
 
+/*
+    NVM set chip into Locked Mode with UPDI_KEY_CHIPERASE command
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
 int nvm_unlock_device(void *nvm_ptr)
 {
     /*
@@ -144,6 +206,11 @@ int nvm_unlock_device(void *nvm_ptr)
     return 0;
 }
 
+/*
+    NVM erase flash with UPDI_NVMCTRL_CTRLA_CHIP_ERASE command
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
 int nvm_chip_erase(void *nvm_ptr)
 {
     /*
@@ -171,6 +238,14 @@ int nvm_chip_erase(void *nvm_ptr)
     return 0;
 }
 
+/*
+    NVM read flash
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
 int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
 {
     /*
@@ -216,6 +291,14 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     return 0;
 }
 
+/*
+    NVM write flash
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
 int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
     /*
@@ -262,6 +345,14 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
     return 0;
 }
 
+/*
+    NVM read fuse
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
 int nvm_read_fuse(void *nvm_ptr, int fusenum, u8 *data)
 {
     /*
@@ -274,13 +365,10 @@ int nvm_read_fuse(void *nvm_ptr, int fusenum, u8 *data)
         return ERROR_PTR;
 
     DBG_INFO(NVM_DEBUG, "<NVM> Read Fuse");
-
-    /*  
+ 
     if (!nvm->progmode) {
-        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
-        return -2;
+        DBG_INFO(NVM_DEBUG, "Fuse read at locked mode");
     }
-    */
 
     result = app_ld(APP(nvm), NVM_REG(nvm, fuses_address) + fusenum, data);
     if (!result) {
@@ -291,6 +379,13 @@ int nvm_read_fuse(void *nvm_ptr, int fusenum, u8 *data)
     return 0;
 }
 
+/*
+    NVM write fuse
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @fusenum: fuse index of the reg
+    @fuseval: fuse value
+    @return 0 successful, other value failed
+*/
 int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
 {
     /*
@@ -347,6 +442,14 @@ int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
     return 0;
 }
 
+/*
+    NVM read memory
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
 int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
 {
     /*
@@ -366,6 +469,14 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
     return app_read_data_bytes(APP(nvm), address, data, len);
 }
 
+/*
+    NVM write memory
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
 int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
     /*
@@ -385,6 +496,12 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
     return app_write_data_bytes(APP(nvm), address, data, len);
 }
 
+/*
+    NVM write memory
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @info: chip flash information
+    @return 0 successful, other value failed
+*/
 int nvm_get_flash_info(void *nvm_ptr, flash_info_t *info)
 {
     /*
