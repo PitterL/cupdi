@@ -11,10 +11,9 @@ My purpose is you could use UPDI to flash the new TinyAVR at any enviroment like
         ihex:       https://github.com/arkku/ihex.git
         sercom:     https://github.com/dpogue/Terminal-Emulator.git
         
-####    If you have any question, please query Pater to:
+####    If you have any question, you could contact me:
         Wechat: 126676275
-        Mailbox: pitter.liao@microchip.com
-    
+ 
 ####    If you like it please help to mark STAR at:
         https://github.com/PitterL/cupdi.git
 
