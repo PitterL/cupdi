@@ -239,6 +239,38 @@ int nvm_chip_erase(void *nvm_ptr)
 }
 
 /*
+NVM erase flash page with UPDI_NVMCTRL_CTRLA_CHIP_ERASE command
+@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+@return 0 successful, other value failed
+*/
+int nvm_page_erase(void *nvm_ptr)
+{
+    /*
+    Erase (unlocked) device
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    int result;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Erase device");
+
+    if (!nvm->progmode) {
+        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
+        return -2;
+    }
+
+    result = app_chip_erase(APP(nvm));
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_chip_erase failed %d", result);
+        return -3;
+    }
+
+    return 0;
+}
+
+/*
     NVM read flash
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @address: target address

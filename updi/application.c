@@ -506,6 +506,51 @@ int app_execute_nvm_command(void *app_ptr, u8 command)
 }
 
 /*
+APP erase page
+@app_ptr: APP object pointer, acquired from updi_application_init()
+@page: page address to be erased
+@return 0 successful, other value if failed
+*/
+int app_page_erase(void *app_ptr, u16 address)
+{
+    /*
+    Does a chip erase using the NVM controller
+    Note that on locked devices this it not possible and the ERASE KEY has to be used instead
+    */
+
+    upd_application_t *app = (upd_application_t *)app_ptr;
+    int result;
+
+    if (!VALID_APP(app))
+        return ERROR_PTR;
+
+    DBG_INFO(APP_DEBUG, "<APP> page erase using NVM CTRL");
+
+    //Wait until NVM CTRL is ready to erase
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout before erase failed %d", result);
+        return -2;
+    }
+
+    //Erase
+    result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_CHIP_ERASE);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", result);
+        return -3;
+    }
+
+    // And wait for it
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after erase failed %d", result);
+        return -2;
+    }
+
+    return 0;
+}
+
+/*
     APP erase chip
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @return 0 successful, other value if failed
