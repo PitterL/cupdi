@@ -7,5 +7,6 @@ int updi_flash(void *nvm_ptr, const char *file, bool prog);
 int updi_save(void *nvm_ptr, const char *file);
 int updi_read(void *nvm_ptr, char *cmd);
 int updi_write(void *nvm_ptr, char *cmd);
+int updi_debugview(void *nvm_ptr, char *cmd);
 
 #endif
