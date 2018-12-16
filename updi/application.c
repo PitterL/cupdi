@@ -957,19 +957,22 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
         return -2;
     }
 
-    //Clear the page buffer
-    DBG_INFO(APP_DEBUG, "Clear page buffer");
-    result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR, result);
-        return -3;
-    }
+    // Erase write command will clear the buffer automantic
+    if (nvm_command != UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE) {
+        //Clear the page buffer
+        DBG_INFO(APP_DEBUG, "Clear page buffer");
+        result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR, result);
+            return -3;
+        }
 
-    // Waif for NVM controller to be ready
-    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after page buffer clear failed %d", result);
-        return -4;
+        // Waif for NVM controller to be ready
+        result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after page buffer clear failed %d", result);
+            return -4;
+        }
     }
 
     // Load the page buffer by writing directly to location
@@ -1008,6 +1011,19 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
 int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
     return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE);
+}
+
+/*
+APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command
+@app_ptr: APP object pointer, acquired from updi_application_init()
+@address: target address
+@data: data buffer
+@len: data len
+@return 0 successful, other value if failed
+*/
+int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
+{
+    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE);
 }
 
 int app_ld(void *app_ptr, u16 address, u8* data)

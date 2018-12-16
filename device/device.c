@@ -9,25 +9,25 @@
 */
 
 
-/* dev_name | {flash_start | flash_size | flash_pagesize} | {syscfg_address | nvmctrl_address | sigrow_address | fuses_address | userrow_address} */
+/* dev_name | {flash_start | flash_size | flash_pagesize} | {syscfg_address | nvmctrl_address | sigrow_address | fuses_address} | {userrow} | {eeprom} */
 const chip_info_t device_tiny_321x = {
     //  tiny1617/tiny1616
-    "tiny321x",{ 0x8000, 32 * 1024, 64 },{ 0x0F00, 0x1000, 0x1100, 0x1280, 0x1300 }
+    "tiny321x",{ 0x8000, 32 * 1024, 64 },{ 0x0F00, 0x1000, 0x1100, 0x1280},{ 0x1300, 32, 32 },{ 0x1400, 128, 32} 
 };
 
 const chip_info_t device_tiny_161x = {
     //  tiny1617/tiny1616
-    "tiny161x",{ 0x8000, 16 * 1024, 64 },{ 0x0F00, 0x1000, 0x1100, 0x1280, 0x1300 }
+    "tiny161x",{ 0x8000, 16 * 1024, 64 },{ 0x0F00, 0x1000, 0x1100, 0x1280 },{ 0x1300, 32, 32 },{ 0x1400, 128, 32 }
 };
 
 const chip_info_t device_tiny_81x = {
     //  tiny817/tiny816/tiny814
-    "tiny81x", {0x8000, 8 * 1024, 64}, {0x0F00, 0x1000, 0x1100, 0x1280, 0x1300}
+    "tiny81x", {0x8000, 8 * 1024, 64}, {0x0F00, 0x1000, 0x1100, 0x1280},{ 0x1300, 32, 32 },{ 0x1400, 128, 32 }
 };
 
 const chip_info_t device_tiny_41x = {
     //  tiny417
-    "tiny41x", {0x8000, 4 * 1024, 64}, {0x0F00, 0x1000, 0x1100, 0x1280, 0x1300}
+    "tiny41x", {0x8000, 4 * 1024, 64}, {0x0F00, 0x1000, 0x1100, 0x1280},{ 0x1300, 32, 32 },{ 0x1400, 128, 32 }
 };
 
 static const device_info_t g_device_list[] = {

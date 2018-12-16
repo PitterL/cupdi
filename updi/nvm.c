@@ -47,6 +47,9 @@ typedef struct _upd_nvm {
 #define APP(_nvm) ((_nvm)->app)
 #define NVM_REG(_nvm, _name) ((_nvm)->dev->mmap->reg._name)
 #define NVM_FLASH(_nvm, _name) ((_nvm)->dev->mmap->flash._name)
+#define NVM_FLASH_INFO(_nvm) (&(_nvm)->dev->mmap->flash)
+#define NVM_EEPROM_INFO(_nvm) (&(_nvm)->dev->mmap->eeprom)
+#define NVM_USERROW_INFO(_nvm) (&(_nvm)->dev->mmap->userrow)
 
 /*
     NVM object init
@@ -239,38 +242,6 @@ int nvm_chip_erase(void *nvm_ptr)
 }
 
 /*
-NVM erase flash page with UPDI_NVMCTRL_CTRLA_CHIP_ERASE command
-@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-@return 0 successful, other value failed
-*/
-int nvm_page_erase(void *nvm_ptr)
-{
-    /*
-    Erase (unlocked) device
-    */
-    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    int result;
-
-    if (!VALID_NVM(nvm))
-        return ERROR_PTR;
-
-    DBG_INFO(NVM_DEBUG, "<NVM> Erase device");
-
-    if (!nvm->progmode) {
-        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
-        return -2;
-    }
-
-    result = app_chip_erase(APP(nvm));
-    if (result) {
-        DBG_INFO(NVM_DEBUG, "app_chip_erase failed %d", result);
-        return -3;
-    }
-
-    return 0;
-}
-
-/*
     NVM read flash
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @address: target address
@@ -296,7 +267,7 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
         DBG_INFO(NVM_DEBUG, "Flash read at locked mode");
     }
 
-    page_size = NVM_FLASH(nvm, flash_pagesize);
+    page_size = NVM_FLASH(nvm, nvm_pagesize);
     if (len & (page_size - 1)) {
         DBG_INFO(NVM_DEBUG, "Only full page aligned flash supported, len %x.", len);
         return -3;
@@ -337,7 +308,7 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
     Writes to flash
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    int i, off, pages, page_size;
+    int i, off, flash_address, flash_size, pages, page_size;
     int result = -5;
 
     if (!VALID_NVM(nvm) || !data)
@@ -350,10 +321,17 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
         return -2;
     }
 
-    page_size = NVM_FLASH(nvm,flash_pagesize);
-    if (len & (page_size - 1)) {
-        DBG_INFO(NVM_DEBUG, "Only full page aligned flash supported, len %x.", len);
+    flash_address = NVM_FLASH(nvm, nvm_start);
+    flash_size = NVM_FLASH(nvm, nvm_size);
+    if (address < flash_address || address + len > flash_address + flash_size) {
+        DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
         return -3;
+    }
+
+    page_size = NVM_FLASH(nvm, nvm_pagesize);
+    if ((address | len) & (page_size - 1)) {
+        DBG_INFO(NVM_DEBUG, "Only full page aligned flash supported, address %hx, len %x.", address, len);
+        return -4;
     }
 
     pages = len / page_size;
@@ -371,10 +349,99 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
 
     if (i < pages || result) {
         DBG_INFO(NVM_DEBUG, "Write flash page %d failed %d", i, result);
-        return -4;
+        return -5;
     }
 
     return 0;
+}
+
+/*
+NVM write eeprom
+@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+@info: EEPROM memory info
+@address: target address
+@data: data buffer
+@len: data len
+@return 0 successful, other value failed
+*/
+int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8 *data, int len)
+{
+    /*
+    Writes to eeprom
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    int i, off, size, pages, page_size;
+    int result = -5;
+
+    if (!VALID_NVM(nvm) || !data)
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Writes to flash");
+
+    if (!nvm->progmode) {
+        DBG_INFO(NVM_DEBUG, "Enter progmode first!");
+        return -2;
+    }
+
+    if (address < info->nvm_start || address + len > info->nvm_start + info->nvm_size) {
+        DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
+        return -3;
+    }
+
+    page_size = info->nvm_pagesize;
+    pages = len / page_size;
+    for (i = 0, off = 0; i < pages; i++) {
+        DBG_INFO(NVM_DEBUG, "Writing Page(%d/%d) at 0x%x", i, pages, address + off);
+
+        size = len - off;
+        if (size > page_size)
+            size = page_size;
+
+        result = app_write_nvm(APP(nvm), address + off, data + off, size);
+        if (result) {
+            DBG_INFO(NVM_DEBUG, "app_write_nvm failed %d", result);
+            break;
+        }
+
+        off += page_size;
+    }
+
+    if (i < pages || result) {
+        DBG_INFO(NVM_DEBUG, "Write flash page %d failed %d", i, result);
+        return -5;
+    }
+
+    return 0;
+}
+
+/*
+NVM write eeprom
+@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+@address: target address
+@data: data buffer
+@len: data len
+@return 0 successful, other value failed
+*/
+int nvm_write_eeprom(void *nvm_ptr, u16 address, const u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+
+    return _nvm_write_eeprom(nvm_ptr, NVM_EEPROM_INFO(nvm), address, data, len);
+}
+
+/*
+NVM write userrow
+@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+@address: target address
+@data: data buffer
+@len: data len
+@return 0 successful, other value failed
+*/
+int nvm_write_userrow(void *nvm_ptr, u16 address, const u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+
+    return _nvm_write_eeprom(nvm_ptr, NVM_USERROW_INFO(nvm), address, data, len);
 }
 
 /*
@@ -529,12 +596,55 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
+NVM write auto selec which part to be operated
+@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+@address: target address
+@data: data buffer
+@len: data len
+@return 0 successful, other value failed
+*/
+int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    const nvm_info_t *info;
+    int(*op)(void *nvm_ptr, u16 address, const u8 *data, int len);
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Write Router");
+
+    op = nvm_write_mem; //default operate memory
+    do {
+        info = NVM_FLASH_INFO(nvm);
+        if (address >= info->nvm_start && address + len <= info->nvm_start + info->nvm_size) {
+            op = nvm_write_flash;
+            break;
+        }
+
+        info = NVM_EEPROM_INFO(nvm);
+        if (address >= info->nvm_start && address + len <= info->nvm_start + info->nvm_size) {
+            op = nvm_write_eeprom;
+            break;
+        }
+
+        info = NVM_USERROW_INFO(nvm);
+        if (address >= info->nvm_start && address + len <= info->nvm_start + info->nvm_size) {
+            op = nvm_write_userrow;
+            break;
+        }
+    } while (0);
+
+    return op(nvm_ptr, address, data, len);
+}
+
+/*
     NVM write memory
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @info: chip flash information
     @return 0 successful, other value failed
 */
-int nvm_get_flash_info(void *nvm_ptr, flash_info_t *info)
+int nvm_get_flash_info(void *nvm_ptr, nvm_info_t *info)
 {
     /*
     get flash size

@@ -1,24 +1,25 @@
 #ifndef __UDPI_DEVICE
 #define __UDPI_DEVICE
 
-typedef struct _flash_info{
-    unsigned short flash_start;
-    unsigned short flash_size;
-    unsigned short flash_pagesize;
-}flash_info_t;
+typedef struct _nvm_info{
+    unsigned short nvm_start;
+    unsigned short nvm_size;
+    unsigned short nvm_pagesize;
+}nvm_info_t;
 
 typedef struct _reg_info {
     unsigned short syscfg_address;
     unsigned short nvmctrl_address;
     unsigned short sigrow_address;
     unsigned short fuses_address;
-    unsigned short userrow_address;
 }reg_info_t;
 
 typedef struct _chip_info {
     const char *dev_name;
-    flash_info_t flash;
+    nvm_info_t flash;
     reg_info_t reg;
+    nvm_info_t userrow;
+    nvm_info_t eeprom;
 }chip_info_t;
 
 typedef struct _device_info {

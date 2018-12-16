@@ -21,8 +21,8 @@ int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len);
 int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len);
 int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len);
 int app_write_data(void *app_ptr, u16 address, const u8 *data, int len);
-int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_command);
 int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len);
+int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len);
 int app_ld(void *app_ptr, u16 address, u8* data);
 int app_st(void *app_ptr, u16 address, u8 val);
 
