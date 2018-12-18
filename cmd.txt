@@ -1,1 +1,0 @@
-export PATH=$PATH:/mnt/d/temp/gcc/G5R2/toolchain/gcc-linaro-5.3-2016.02-x86_64_arm-linux-gnueabihf/bin

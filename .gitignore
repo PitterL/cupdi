@@ -270,8 +270,12 @@ __pycache__/
 *.cache
 *.status
 *.scan
+config.*
+
+# autogen
 missing
 stamp-h1
+compile
 
 # linux file
 *.o
