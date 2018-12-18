@@ -46,11 +46,14 @@ typedef struct _upd_nvm {
 #define VALID_NVM(_nvm) ((_nvm) && ((_nvm)->mgwd == UPD_NVM_MAGIC_WORD))
 #define APP(_nvm) ((_nvm)->app)
 #define NVM_REG(_nvm, _name) ((_nvm)->dev->mmap->reg._name)
-#define NVM_FLASH(_nvm, _name) ((_nvm)->dev->mmap->flash._name)
 #define NVM_FLASH_INFO(_nvm) (&(_nvm)->dev->mmap->flash)
+#define NVM_FLASH(_nvm, _name) (NVM_FLASH_INFO(_nvm)->_name)
 #define NVM_EEPROM_INFO(_nvm) (&(_nvm)->dev->mmap->eeprom)
+#define NVM_EEPROM(_nvm, _name) (NVM_EEPROM_INFO(_nvm)->_name)
 #define NVM_USERROW_INFO(_nvm) (&(_nvm)->dev->mmap->userrow)
-
+#define NVM_USERROW(_nvm, _name) (NVM_USERROW_INFO(_nvm)->_name)
+#define NVM_FUSE_INFO(_nvm) (&(_nvm)->dev->mmap->fuse)
+#define NVM_FUSE(_nvm, _name) (NVM_FUSE_INFO(_nvm)->_name)
 /*
     NVM object init
     @port: serial port name of Window or Linux
@@ -255,8 +258,8 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     Reads from flash
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    int i, off, pages, page_size;
-    int result = -4;
+    int i, off, flash_address, flash_size,  pages, page_size;
+    int result = 0;
 
     if (!VALID_NVM(nvm) || !data)
         return ERROR_PTR;
@@ -265,6 +268,16 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
 
     if (!nvm->progmode) {
         DBG_INFO(NVM_DEBUG, "Flash read at locked mode");
+    }
+
+    flash_address = NVM_FLASH(nvm, nvm_start);
+    flash_size = NVM_FLASH(nvm, nvm_size);
+    if (address < flash_address)
+        address += flash_address;
+
+    if (address + len > flash_address + flash_size) {
+        DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
+        return -2;
     }
 
     page_size = NVM_FLASH(nvm, nvm_pagesize);
@@ -287,7 +300,7 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     }
 
     if (i < pages || result) {
-        DBG_INFO(NVM_DEBUG, "Read flash failed %d", i, result);
+        DBG_INFO(NVM_DEBUG, "Read flash count %d failed %d", i, result);
         return -4;
     }
 
@@ -309,7 +322,7 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     int i, off, flash_address, flash_size, pages, page_size;
-    int result = -5;
+    int result = 0;
 
     if (!VALID_NVM(nvm) || !data)
         return ERROR_PTR;
@@ -323,7 +336,10 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
 
     flash_address = NVM_FLASH(nvm, nvm_start);
     flash_size = NVM_FLASH(nvm, nvm_size);
-    if (address < flash_address || address + len > flash_address + flash_size) {
+    if (address < flash_address)
+        address += flash_address;
+
+    if (address + len > flash_address + flash_size) {
         DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
         return -3;
     }
@@ -336,7 +352,7 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
 
     pages = len / page_size;
     for (i = 0, off = 0; i < pages; i++) {
-        DBG_INFO(NVM_DEBUG, "Writing Page(%d/%d) at 0x%x", i, pages, address + off);
+        DBG_INFO(NVM_DEBUG, "Writing flash page(%d/%d) at 0x%x", i, pages, address + off);
 
         result = app_write_nvm(APP(nvm), address + off, data + off, page_size);
         if (result) {
@@ -356,13 +372,80 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-NVM write eeprom
-@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-@info: EEPROM memory info
-@address: target address
-@data: data buffer
-@len: data len
-@return 0 successful, other value failed
+NVM read common nvm area(flash/eeprom/userrow/fuses)
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @info: NVM memory info
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
+int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u16 address, u8 *data, int len)
+{
+    /*
+    Read from nvm area
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+
+    if (!VALID_NVM(nvm) || !data)
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Read from nvm area");
+
+    if (!nvm->progmode) {
+        DBG_INFO(NVM_DEBUG, "NVM area read at locked mode");
+        return -2;
+    }
+
+    if (address < info->nvm_start)
+        address += info->nvm_start;
+
+    if (address + len > info->nvm_start + info->nvm_size) {
+        DBG_INFO(NVM_DEBUG, "nvm area address overflow, addr %hx, len %x.", address, len);
+        return -3;
+    }
+
+    return nvm_read_mem(nvm_ptr, address, data, len);
+}
+
+/*
+NVM read eeprom
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
+int nvm_read_eeprom(void *nvm_ptr, u16 address, u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+
+    return _nvm_read_common(nvm_ptr, NVM_EEPROM_INFO(nvm), address, data, len);
+}
+
+/*
+NVM read userrow
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
+int nvm_read_userrow(void *nvm_ptr, u16 address, u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+
+    return _nvm_read_common(nvm_ptr, NVM_USERROW_INFO(nvm), address, data, len);
+}
+
+/*
+NVM write eeprom (compatible with userrow)
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @info: EEPROM memory info
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
 */
 int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8 *data, int len)
 {
@@ -371,33 +454,36 @@ int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u16 address, const 
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     int i, off, size, pages, page_size;
-    int result = -5;
+    int result = 0;
 
     if (!VALID_NVM(nvm) || !data)
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Writes to flash");
+    DBG_INFO(NVM_DEBUG, "<NVM> Writes to eeprom");
 
     if (!nvm->progmode) {
         DBG_INFO(NVM_DEBUG, "Enter progmode first!");
         return -2;
     }
 
-    if (address < info->nvm_start || address + len > info->nvm_start + info->nvm_size) {
-        DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
+    if (address < info->nvm_start)
+        address += info->nvm_start;
+
+    if (address + len > info->nvm_start + info->nvm_size) {
+        DBG_INFO(NVM_DEBUG, "eeprom address overflow, addr %hx, len %x.", address, len);
         return -3;
     }
 
     page_size = info->nvm_pagesize;
-    pages = len / page_size;
+    pages = (len + page_size - 1) / page_size;
     for (i = 0, off = 0; i < pages; i++) {
-        DBG_INFO(NVM_DEBUG, "Writing Page(%d/%d) at 0x%x", i, pages, address + off);
+        DBG_INFO(NVM_DEBUG, "Writing eeprom page(%d/%d) at 0x%x", i, pages, address + off);
 
         size = len - off;
         if (size > page_size)
             size = page_size;
 
-        result = app_write_nvm(APP(nvm), address + off, data + off, size);
+        result = _app_erase_write_nvm(APP(nvm), address + off, data + off, size, false);
         if (result) {
             DBG_INFO(NVM_DEBUG, "app_write_nvm failed %d", result);
             break;
@@ -407,7 +493,7 @@ int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u16 address, const 
     }
 
     if (i < pages || result) {
-        DBG_INFO(NVM_DEBUG, "Write flash page %d failed %d", i, result);
+        DBG_INFO(NVM_DEBUG, "Write eeprom page %d failed %d", i, result);
         return -5;
     }
 
@@ -445,97 +531,105 @@ int nvm_write_userrow(void *nvm_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-    NVM read fuse
+NVM read fuse
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @address: target address
     @data: data buffer
     @len: data len
     @return 0 successful, other value failed
 */
-int nvm_read_fuse(void *nvm_ptr, int fusenum, u8 *data)
+int nvm_read_fuse(void *nvm_ptr, u16 address, u8 *data, int len)
 {
-    /*
-    Read one fuse value
-    */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    int result;
 
-    if (!VALID_NVM(nvm))
-        return ERROR_PTR;
-
-    DBG_INFO(NVM_DEBUG, "<NVM> Read Fuse");
- 
-    if (!nvm->progmode) {
-        DBG_INFO(NVM_DEBUG, "Fuse read at locked mode");
-    }
-
-    result = app_ld(APP(nvm), NVM_REG(nvm, fuses_address) + fusenum, data);
-    if (!result) {
-        DBG_INFO(NVM_DEBUG, "app_ld failed %d", result);
-        return -3;
-    }
-
-    return 0;
+    return _nvm_read_common(nvm_ptr, NVM_FUSE_INFO(nvm), address, data, len);
 }
 
 /*
-    NVM write fuse
+NVM write fuse
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-    @fusenum: fuse index of the reg
-    @fuseval: fuse value
+    @info: Fuse memory info
+    @address: target address
+    @value: fuse value
     @return 0 successful, other value failed
 */
-int nvm_write_fuse(void *nvm_ptr, int fusenum, u8 fuseval)
+int _nvm_write_fuse(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8 value)
 {
     /*
-    Writes one fuse value
+    Writes to fuse
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    u16 address, fuse_address;
-    u8 val;
+    u16 nvmctrl_address = NVM_REG(nvm, nvmctrl_address);
+    u16 data;
     int result;
 
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Write Fuse");
+    DBG_INFO(NVM_DEBUG, "<NVM> Writes to fuse");
 
     if (!nvm->progmode) {
         DBG_INFO(NVM_DEBUG, "Enter progmode first!");
         return -2;
     }
 
-    fuse_address = NVM_REG(nvm, fuses_address) + fusenum;
-    address = NVM_REG(nvm, nvmctrl_address) + UPDI_NVMCTRL_ADDRL;
-    val = fuse_address & 0xff;
-    result = app_write_data(APP(nvm), address, &val, 1);
-    if (!result) {
-        DBG_INFO(NVM_DEBUG, "app_write_data fuse addrL failed %d", result);
+    if (address < info->nvm_start)
+        address += info->nvm_start;
+
+    if (address >= info->nvm_start + info->nvm_size) {
+        DBG_INFO(NVM_DEBUG, "fuse address overflow, addr %hx.", address);
         return -3;
     }
 
-    address = NVM_REG(nvm, nvmctrl_address) + UPDI_NVMCTRL_ADDRH;
-    val = fuse_address >> 8;
-    result = app_write_data(APP(nvm), address, &val, 1);
-    if (!result) {
-        DBG_INFO(NVM_DEBUG, "app_write_data fuse addrH failed %d", result);
+    // Check that NVM controller is ready
+    result = app_wait_flash_ready(APP(nvm), TIMEOUT_WAIT_FLASH_READY);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout before page buffer clear failed %d", result);
+        return -2;
+    }
+
+    result = app_write_data_bytes(APP(nvm), nvmctrl_address + UPDI_NVMCTRL_ADDRL, (u8 *)&address, 2);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse address %04x failed %d", address, result);
         return -4;
     }
 
-    address = NVM_REG(nvm, nvmctrl_address) + UPDI_NVMCTRL_DATAL;
-    val = fuseval;
-    result = app_write_data(APP(nvm), address, &val, 1);
-    if (!result) {
-        DBG_INFO(NVM_DEBUG, "app_write_data fuse value failed %d", result);
+    data = value;
+    result = app_write_data_bytes(APP(nvm), nvmctrl_address + UPDI_NVMCTRL_DATAL, (u8 *)&data, 2);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse data %02x failed %d", data, result);
         return -5;
     }
 
-    address = NVM_REG(nvm, nvmctrl_address) + UPDI_NVMCTRL_CTRLA;
-    val = UPDI_NVMCTRL_CTRLA_WRITE_FUSE;
-    result = app_write_data(APP(nvm), address, &val, 1);
-    if (!result) {
-        DBG_INFO(NVM_DEBUG, "app_write_data fuse cmd failed %d", result);
+    result = app_execute_nvm_command(APP(nvm), UPDI_NVMCTRL_CTRLA_WRITE_FUSE);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_execute_nvm_command fuse command failed %d", result);
         return -6;
+    }
+
+    return 0;
+}
+
+/*
+NVM write fuse
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @info: Fuse memory info
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
+int nvm_write_fuse(void *nvm_ptr, u16 address, const u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    int i, result;
+    
+    for (i = 0; i < len; i++) {
+        result = _nvm_write_fuse(nvm_ptr, NVM_FUSE_INFO(nvm), address + i, data[i]);
+        if (result) {
+            DBG_INFO(NVM_DEBUG, "_nvm_write_fuse fuse (%d) failed %d", i, result);
+            return -2;
+        }
     }
 
     return 0;
@@ -607,7 +701,7 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     const nvm_info_t *info;
-    int(*op)(void *nvm_ptr, u16 address, const u8 *data, int len);
+    nvm_op op;
 
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
@@ -631,6 +725,12 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
         info = NVM_USERROW_INFO(nvm);
         if (address >= info->nvm_start && address + len <= info->nvm_start + info->nvm_size) {
             op = nvm_write_userrow;
+            break;
+        }
+
+        info = NVM_FUSE_INFO(nvm);
+        if (address >= info->nvm_start && address + len <= info->nvm_start + info->nvm_size) {
+            op = nvm_write_fuse;
             break;
         }
     } while (0);

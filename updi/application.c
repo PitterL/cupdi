@@ -45,11 +45,6 @@ typedef struct _upd_application {
 #define APP_REG(_app, _name) ((_app)->dev->mmap->reg._name)
 
 /*
-    Max waiting time at flash programming
-*/
-#define TIMEOUT_WAIT_FLASH_READY 1000
-
-/*
     APP object init
     @port: serial port name of Window or Linux
     @baud: baudrate
@@ -904,14 +899,14 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
     @address: target address
     @data: data buffer
     @len: data len
+    @use_word_access: whether use 2 bytes mode for writing
     @return 0 successful, other value if failed
 */
-int app_write_data(void *app_ptr, u16 address, const u8 *data, int len)
+int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access)
 {
     /*
     Writes a number of data to memory
     */
-    bool use_word_access = !(len & 0x1);
     int result;
 
     DBG_INFO(APP_DEBUG, "<APP> Write data(%d)", len);
@@ -928,7 +923,7 @@ int app_write_data(void *app_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-    APP write flash
+    APP write nvm
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
     @data: data buffer
@@ -936,7 +931,7 @@ int app_write_data(void *app_ptr, u16 address, const u8 *data, int len)
     @nvm_command: programming command
     @return 0 successful, other value if failed
 */
-int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_command)
+int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_command, bool use_word_access)
 {
     /*
         Writes a page of data to NVM.
@@ -958,25 +953,24 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
     }
 
     // Erase write command will clear the buffer automantic
-    if (nvm_command != UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE) {
-        //Clear the page buffer
-        DBG_INFO(APP_DEBUG, "Clear page buffer");
-        result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR, result);
-            return -3;
-        }
-
-        // Waif for NVM controller to be ready
-        result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
-        if (result) {
-            DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after page buffer clear failed %d", result);
-            return -4;
-        }
+    
+    //Clear the page buffer
+    DBG_INFO(APP_DEBUG, "Clear page buffer");
+    result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", UPDI_NVMCTRL_CTRLA_PAGE_BUFFER_CLR, result);
+        return -3;
     }
 
+    // Waif for NVM controller to be ready
+    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after page buffer clear failed %d", result);
+        return -4;
+    }
+    
     // Load the page buffer by writing directly to location
-    result = app_write_data(app, address, data, len);
+    result = app_write_data(app, address, data, len, use_word_access);
     if (result) {
         DBG_INFO(APP_DEBUG, "app_write_data failed %d", result);
         return -5;
@@ -1001,7 +995,7 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
 }
 
 /*
-    APP write flash capsule with UPDI_NVMCTRL_CTRLA_WRITE_PAGE command
+    APP write nvm capsule with UPDI_NVMCTRL_CTRLA_WRITE_PAGE command
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
     @data: data buffer
@@ -1010,7 +1004,9 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
 */
 int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE);
+    bool use_word_access = !(len & 0x1);
+
+    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE, use_word_access);
 }
 
 /*
@@ -1019,29 +1015,80 @@ APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command
 @address: target address
 @data: data buffer
 @len: data len
+@use_word_access: 2 bytes mode for writting
+@return 0 successful, other value if failed
+*/
+int _app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access)
+{
+    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, use_word_access);
+}
+
+/*
+APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command, and determine whether use 2 byte for writting
+@app_ptr: APP object pointer, acquired from updi_application_init()
+@address: target address
+@data: data buffer
+@len: data len
 @return 0 successful, other value if failed
 */
 int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE);
+    bool use_word_access = !(len & 0x1);
+
+    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, use_word_access);
 }
 
-int app_ld(void *app_ptr, u16 address, u8* data)
+/*
+APP load register value
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
+int app_ld_reg(void *app_ptr, u16 address, u8* data, int len)
 {
     /*
-        Pack the link_ld
+        Load reg data
     */
     upd_application_t *app = (upd_application_t *)app_ptr;
-  
-    return _link_ld(LINK(app), address, data);
+    int i, result;
+
+    for (i = 0; i < len; i++) {
+        result = _link_ld(LINK(app), address + i, data + i);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "_link_ld(%x) +%d failed %d", address, i, result);
+            return -2;
+        }
+    }
+
+    return 0;
 }
 
-int app_st(void *app_ptr, u16 address, u8 val)
+/*
+APP set register value
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value if failed
+*/
+int app_st_reg(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
-    Pack the link_st
+        Set reg data
     */
-    upd_application_t *app = (upd_application_t *)app_ptr;
 
-    return link_st(LINK(app), address, val);
+    upd_application_t *app = (upd_application_t *)app_ptr;
+    int i, result;
+
+    for (i = 0; i < len; i++) {
+        result = link_st(LINK(app), address + i, data[i]);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "link_st(%x) +%d failed %d", address, i, result);
+            return -2;
+        }
+    }
+
+    return 0;
 }

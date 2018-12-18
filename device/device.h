@@ -11,13 +11,13 @@ typedef struct _reg_info {
     unsigned short syscfg_address;
     unsigned short nvmctrl_address;
     unsigned short sigrow_address;
-    unsigned short fuses_address;
 }reg_info_t;
 
 typedef struct _chip_info {
     const char *dev_name;
     nvm_info_t flash;
     reg_info_t reg;
+    nvm_info_t fuse;
     nvm_info_t userrow;
     nvm_info_t eeprom;
 }chip_info_t;

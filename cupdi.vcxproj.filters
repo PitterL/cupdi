@@ -75,6 +75,18 @@
     <ClInclude Include="ihex\kk_ihex_write.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="file\fop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="regex\re.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="crc\crc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\win32\swap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -120,6 +132,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ihex\kk_ihex_write.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="file\fop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="regex\re.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="crc\crc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="os\win32\swap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

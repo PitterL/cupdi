@@ -20,10 +20,16 @@ int app_read_data(void *app_ptr, u16 address, u8 *data, int len);
 int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len);
 int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len);
 int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len);
-int app_write_data(void *app_ptr, u16 address, const u8 *data, int len);
+int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access);
 int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len);
+int _app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access);
 int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len);
-int app_ld(void *app_ptr, u16 address, u8* data);
-int app_st(void *app_ptr, u16 address, u8 val);
+int app_ld_reg(void *app_ptr, u16 address, u8* data, int len);
+int app_st_reg(void *app_ptr, u16 address, const u8 *data, int len);
+
+/*
+Max waiting time at flash programming
+*/
+#define TIMEOUT_WAIT_FLASH_READY 1000
 
 #endif
