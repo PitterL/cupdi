@@ -28,7 +28,7 @@ limitations under the License.
     @dev: point chip dev object
 */
 typedef struct _upd_application {
-#define UPD_APPLICATION_MAGIC_WORD 'uapp'
+#define UPD_APPLICATION_MAGIC_WORD 0xB4B4 //'uapp'
     unsigned int mgwd;  //magic word
     void *link;
     device_info_t *dev;

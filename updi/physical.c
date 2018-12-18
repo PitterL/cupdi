@@ -27,7 +27,7 @@ limitations under the License.
     @ibdly: interval between each transfer action
 */
 typedef struct _upd_physical{
-#define UPD_PHYSICAL_MAGIC_WORD 'uphy'
+#define UPD_PHYSICAL_MAGIC_WORD 0xE1E1 //'uphy'
     unsigned int mgwd;  //magic word
     void *ser;
     SER_PORT_STATE_T stat;
@@ -48,6 +48,7 @@ void *updi_physical_init(const char *port, int baud)
     void *ser;
     upd_physical_t *phy = NULL;
     SER_PORT_STATE_T stat;
+    u8 data[] = { UPDI_BREAK};
     int result;
 
     DBG_INFO(PHY_DEBUG, "<PHY> Opening port %s, baudrate %d", port, baud);
@@ -64,6 +65,13 @@ void *updi_physical_init(const char *port, int baud)
         phy->ibdly = 1;
         memcpy(&phy->stat, &stat, sizeof(stat));
         
+        //send an initial break as handshake
+        result = phy_send(phy, data, 1);
+        if (result) {
+            DBG_INFO(PHY_DEBUG, "<PHY> Init: phy_send failed %d", result);
+            return NULL;
+        }
+        /*
         // send an initial double break as handshake
         result = phy_send_double_break(phy);
         if (result) {
@@ -71,9 +79,10 @@ void *updi_physical_init(const char *port, int baud)
             updi_physical_deinit(phy);
             return NULL;
         }
+		*/
     }
     else {
-        DBG_INFO(PHY_DEBUG, "OpenPort %s failed ", port);
+        DBG_INFO(PHY_DEBUG, "<PHY> Init: OpenPort %s failed ", port);
     }
     
     return phy;
@@ -119,7 +128,7 @@ int phy_send_double_break(void *ptr_phy)
     if (!VALID_PHY(phy))
         return ERROR_PTR;
 
-    DBG_INFO(PHY_DEBUG, "<PHY> Sending double break");
+    DBG_INFO(PHY_DEBUG, "<PHY> D-Break: Sending double break");
     /*
         # Re - init at a lower baud
         # At 300 bauds, the break character will pull the line low for 30ms
@@ -131,21 +140,21 @@ int phy_send_double_break(void *ptr_phy)
     stat.parity = EVENPARITY;
     result = SetPortState(SER(phy), &stat);
     if (result) {
-        DBG_INFO(PHY_DEBUG, "SetPortState failed %d", result);
+        DBG_INFO(PHY_DEBUG, "<PHY> D-Break: SetPortState failed %d", result);
         return -2;
     }
 
     /*Send two break characters, with 1 stop bit in between */
     result = phy_send(phy, data, 2);
     if (result) {
-        DBG_INFO(PHY_DEBUG, "phy_send failed %d", result);
+        DBG_INFO(PHY_DEBUG, "<PHY> D-Break: phy_send failed %d", result);
         return -3;
     }
 
     /*Re - init at the real baud*/
     result = SetPortState(SER(phy), &phy->stat);
     if (result) {
-        DBG_INFO(PHY_DEBUG, "re-SetPortState failed %d", result);
+        DBG_INFO(PHY_DEBUG, "<PHY> D-Break: re-SetPortState failed %d", result);
         return -5;
     }
 
@@ -176,7 +185,7 @@ int phy_send(void *ptr_phy, const u8 *data, int len)
 
     result = FlushPort(SER(phy));
     if (result) {
-        DBG_INFO(PHY_DEBUG, "FlushPort failed %d", result);
+        DBG_INFO(PHY_DEBUG, "<PHY> Send: FlushPort failed %d", result);
     }
 
     for (int i = 0; i < len; i++) {
@@ -184,18 +193,19 @@ int phy_send(void *ptr_phy, const u8 *data, int len)
         val = data[i];
         result = SendData(SER(phy), &val, 1);   //Todo: should check whether we could send all data once
         if (result) {
-            DBG_INFO(PHY_DEBUG, "SendData failed %d", result);
+            DBG_INFO(PHY_DEBUG, "<PHY> Send: SendData failed %d", result);
             return -2;
         }
+        
         /* Echo */
         result = ReadData(SER(phy), &val, 1);
         if (result != 1) {
-            DBG_INFO(PHY_DEBUG, "ReadData failed %d", result);
+            DBG_INFO(PHY_DEBUG, "<PHY> Send: ReadData failed %d", result);
             return -3;
         }
 
         if (data[i] != val) {
-            DBG_INFO(PHY_DEBUG, "ReadData mismatch %02x(%02x) located = %d", val, data[i], i);
+            DBG_INFO(PHY_DEBUG, "<PHY> Send: ReadData mismatch %02x(%02x) located = %d", val, data[i], i);
             return -4;
         }
 
@@ -244,18 +254,18 @@ int phy_receive(void *ptr_phy, u8 *data, int len)
         if (result == 1) {
             i++;
         }else {
-            DBG_INFO(PHY_DEBUG, "ReadData failed %d", result);
+            DBG_INFO(PHY_DEBUG, "<PHY> Recv: ReadData failed %d", result);
             retry--;
         }
         
         if (retry < 0) {
-            DBG_INFO(PHY_DEBUG, "ReadData timeout");
+            DBG_INFO(PHY_DEBUG, "<PHY> Recv: ReadData timeout");
             break;
         }
     }
 
     if (i)
-        DBG(PHY_DEBUG, "<PHY> Received(%d/%d):", data, i, "0x%02x ", i, len);
+        DBG(PHY_DEBUG, "<PHY> Recv: Received(%d/%d): ", data, i, "0x%02x ", i, len);
 
     return i;
 }
@@ -272,7 +282,7 @@ u8 phy_receive_byte(void *ptr_phy)
 
     result = phy_receive(ptr_phy, &resp, 1);
     if (result != 1) {
-        DBG_INFO(PHY_DEBUG, "phy_receive failed, Got %d bytes", result);
+        DBG_INFO(PHY_DEBUG, "<PHY> Recv one: phy_receive failed, Got %d bytes", result);
     }
 
     return resp;
@@ -290,20 +300,20 @@ u8 phy_receive_byte(void *ptr_phy)
 int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
 {
     int result;
-    int retry = 1;
+    int retry = 0;  //determine retries in higher level by protocol used
 
     DBG_INFO(PHY_DEBUG, "<PHY> Transfer: Write %d bytes, Read %d bytes", wlen, rlen);
 
     do {
         result = phy_send(ptr_phy, wdata, wlen);
         if (result) {
-            DBG_INFO(PHY_DEBUG, "phy_send failed %d", result);
+            DBG_INFO(PHY_DEBUG, "<PHY> Transfer: phy_send failed %d", result);
             result = -2;
         }
         else {
             result = phy_receive(ptr_phy, rdata, rlen);
             if (result != rlen) {
-                DBG_INFO(PHY_DEBUG, "phy_receive failed, Got %d bytes", result);
+                DBG_INFO(PHY_DEBUG, "<PHY> Transfer: phy_receive failed, Got %d bytes", result);
                 result = -3;
             }
             else {
@@ -347,7 +357,7 @@ int phy_sib(void *ptr_phy, u8 *data, int len)
 
     result = phy_transfer(phy, val, sizeof(val), data, len);
     if (result != len) {
-        DBG_INFO(PHY_DEBUG, "phy_transfer failed %d", result);
+        DBG_INFO(PHY_DEBUG, "<PHY> Sib: phy_transfer failed %d", result);
         return -3;
     }
 
