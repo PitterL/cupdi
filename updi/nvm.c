@@ -29,7 +29,7 @@ limitations under the License.
     @dev: point chip dev object
 */
 typedef struct _upd_nvm {
-#define UPD_NVM_MAGIC_WORD 'unvm'
+#define UPD_NVM_MAGIC_WORD 0xD2D2 //'unvm'
     unsigned int mgwd;  //magic word
     bool progmode;
     void *app;

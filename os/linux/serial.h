@@ -5,28 +5,15 @@
  * @date 2010 10 20
  * @project Terminal Emulator
  *
+ * 2018/09/10 Modified to adapt to linux system
+ * 
  * This file contains the definitions and prototypes for communication
  * across a serial port.
  */
-#ifndef __WIN32_SERIAL_H_
-#define __WIN32_SERIAL_H_
+#ifndef __LINUX_SERIAL_H_
+#define __LINUX_SERIAL_H_
 
-#include <Windows.h>
-#include <tchar.h>
-
-#ifndef EVENPARITY
-#define NOPARITY            0
-#define ODDPARITY           1
-#define EVENPARITY          2
-#define MARKPARITY          3
-#define SPACEPARITY         4
-#endif
-
-#ifndef TWOSTOPBITS
-#define ONESTOPBIT          0
-#define ONE5STOPBITS        1
-#define TWOSTOPBITS         2
-#endif
+#include "../platform.h"
 
 typedef struct __SER_PORT_STATE{
     DWORD baudRate;

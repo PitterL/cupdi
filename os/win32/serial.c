@@ -12,7 +12,7 @@
 #include "error.h"
 
 typedef struct _upd_sercom {
-#define UPD_SERCOM_MAGIC_WORD 'user'
+#define UPD_SERCOM_MAGIC_WORD 0xA5A5 //'user'
     unsigned int mgwd;
     HANDLE fd;
 }upd_sercom_t;

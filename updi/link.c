@@ -26,7 +26,7 @@ limitations under the License.
     @phy: pointer to phy object
 */
 typedef struct _upd_datalink {
-#define UPD_DATALINK_MAGIC_WORD 'ulin'
+#define UPD_DATALINK_MAGIC_WORD 0xC3C3 //'ulin'
     unsigned int mgwd;  //magic word
     void *phy;
 }upd_datalink_t;
@@ -155,7 +155,7 @@ int _link_ldcs(void *link_ptr, u8 address, u8 *data)
     if (!VALID_LINK(link) || !data)
         return ERROR_PTR;
 
-    DBG_INFO(LINK_DEBUG, "<LINK> LDCS from 0x02X", address);
+    DBG_INFO(LINK_DEBUG, "<LINK> LDCS from 0x%02x", address);
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp)) {
         DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
