@@ -735,7 +735,7 @@ int updi_verify_infoblock(void *nvm_ptr)
         return result;
     }
 
-    DBG(UPDI_DEBUG, "Pass");
+    DBG_INFO(UPDI_DEBUG, "Pass");
 out:
     if (buf)
         free(buf);
