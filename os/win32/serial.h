@@ -14,6 +14,20 @@
 #include <Windows.h>
 #include <tchar.h>
 
+#ifndef EVENPARITY
+#define NOPARITY            0
+#define ODDPARITY           1
+#define EVENPARITY          2
+#define MARKPARITY          3
+#define SPACEPARITY         4
+#endif
+
+#ifndef TWOSTOPBITS
+#define ONESTOPBIT          0
+#define ONE5STOPBITS        1
+#define TWOSTOPBITS         2
+#endif
+
 typedef struct __SER_PORT_STATE{
     DWORD baudRate;
     BYTE byteSize;

@@ -282,6 +282,7 @@ Makefile
 *.am
 *.sh
 *.ac
-
+*.o
+*.a
 
 *.bak
