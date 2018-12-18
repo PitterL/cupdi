@@ -259,3 +259,29 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+
+# vscode
+.vscode/
+.deps/
+
+# automake
+*.in
+*.m4
+*.cache
+*.status
+*.scan
+depcomp
+missing
+compile
+configure
+install-sh
+stamp-h1
+
+# linux file
+Makefile
+*.am
+*.sh
+*.ac
+
+
+*.bak

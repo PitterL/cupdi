@@ -1,5 +1,5 @@
 #include <windows.h>
-#include "time.h"
+#include "delay.h"
 
 //delay millisecond here
 void msleep(int ms)

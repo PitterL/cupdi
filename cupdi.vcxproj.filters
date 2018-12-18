@@ -24,9 +24,6 @@
     <ClInclude Include="os\platform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="os\win32\time.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="os\win32\logging.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -87,15 +84,12 @@
     <ClInclude Include="os\win32\swap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="os\win32\delay.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="cupdi.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="os\win32\time.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="os\win32\logging.c">
@@ -144,6 +138,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="os\win32\swap.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="os\win32\delay.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
