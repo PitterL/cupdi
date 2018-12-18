@@ -48,6 +48,7 @@ void *updi_physical_init(const char *port, int baud)
     void *ser;
     upd_physical_t *phy = NULL;
     SER_PORT_STATE_T stat;
+    u8 data[] = { UPDI_BREAK};
     int result;
 
     DBG_INFO(PHY_DEBUG, "<PHY> Opening port %s, baudrate %d", port, baud);
@@ -64,6 +65,13 @@ void *updi_physical_init(const char *port, int baud)
         phy->ibdly = 1;
         memcpy(&phy->stat, &stat, sizeof(stat));
         
+        //send an initial break as handshake
+        result = phy_send(phy, data, 1);
+        if (result) {
+            DBG_INFO(PHY_DEBUG, "<PHY> Init: phy_send failed %d", result);
+            return NULL;
+        }
+        /*
         // send an initial double break as handshake
         result = phy_send_double_break(phy);
         if (result) {
@@ -71,6 +79,7 @@ void *updi_physical_init(const char *port, int baud)
             updi_physical_deinit(phy);
             return NULL;
         }
+		*/
     }
     else {
         DBG_INFO(PHY_DEBUG, "<PHY> Init: OpenPort %s failed ", port);
@@ -291,7 +300,7 @@ u8 phy_receive_byte(void *ptr_phy)
 int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
 {
     int result;
-    int retry = 1;  //determine retries in higher level by protocol used
+    int retry = 0;  //determine retries in higher level by protocol used
 
     DBG_INFO(PHY_DEBUG, "<PHY> Transfer: Write %d bytes, Read %d bytes", wlen, rlen);
 

@@ -49,7 +49,7 @@ void *updi_datalink_init(const char *port, int baud)
 {
     upd_datalink_t *link = NULL;
     void *phy;
-    int result;
+    int result, retry = 1;
 
     DBG_INFO(LINK_DEBUG, "<LINK> init link");
     
@@ -59,25 +59,24 @@ void *updi_datalink_init(const char *port, int baud)
         link->mgwd = UPD_DATALINK_MAGIC_WORD;
         link->phy = (void *)phy;
 
-        // Set the inter-byte delay bit and disable collision detection
-        result = link_stcs(link, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT);
-        if (result) {
-            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
-            updi_datalink_deinit(link);
-            return NULL;
-        }
+        do {
+          link_set_init(link);
+          
+          result = link_check(link);
+          if (result) {
+              DBG_INFO(LINK_DEBUG, "link_check failed %d, retry=%d", result, retry);
 
-        result = link_stcs(link, UPDI_CS_CTRLA, 1 << UPDI_CTRLA_IBDLY_BIT);
-        if (result) {
-            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
-            return NULL;
-        }
+              // Send double break if all is not well, and re-check
+              result = phy_send_double_break(phy);
+              if (result) {
+                  DBG_INFO(PHY_DEBUG, "phy_send_double_break failed %d", result);
+              }
+          }
+        }while(retry-- && result);
 
-        result = link_check(link);
         if (result) {
-            DBG_INFO(LINK_DEBUG, "link_check failed %d", result);
-            updi_datalink_deinit(link);
-            return NULL;
+          updi_datalink_deinit(link);
+          return NULL;
         }
     }
 
@@ -98,6 +97,36 @@ void updi_datalink_deinit(void *link_ptr)
         updi_physical_deinit(PHY(link));
         free(link);
     }
+}
+
+/*
+    LINK Set the inter-byte delay bit and disable collision detection
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+    @no return
+*/
+void *link_set_init(void *link_ptr)
+{
+    upd_datalink_t *link = (upd_datalink_t *)link_ptr;
+    int result;
+
+    if (VALID_LINK(link)) {
+        // Disable collision detection
+        result = link_stcs(link, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT);
+        if (result) {
+            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
+            updi_datalink_deinit(link);
+            return NULL;
+        }
+
+        // Set the inter-byte delay bit
+        result = link_stcs(link, UPDI_CS_CTRLA, 1 << UPDI_CTRLA_IBDLY_BIT);
+        if (result) {
+            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
+            return NULL;
+        }
+    }
+
+    return link;
 }
 
 /*

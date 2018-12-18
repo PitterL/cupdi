@@ -1,11 +1,12 @@
-1. autogen.sh is used to generate the automake related file. The content is the below command.
+1. autoscan
+2. autogen.sh is used to generate the automake related file. The content is the below command.
 
 aclocal
 autoheader
 automake --add-missing --copy
 autoconf
 
-2. cross_compile.sh is used to generate cross compile makefile. It's the command as below.
+3. cross_compile.sh is used to generate cross compile makefile. It's the command as below.
 
 ./configure --host=arm-linux-gnueabihf
 
