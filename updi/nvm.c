@@ -741,7 +741,7 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @return 0 successful, other value failed
 */
-int nvm_reset(void *nvm_ptr, bool unlock)
+int nvm_reset(void *nvm_ptr, int delay_ms)
 {
     /*
         Reset
@@ -767,6 +767,9 @@ int nvm_reset(void *nvm_ptr, bool unlock)
             return -3;
         }
     }
+
+    if (delay_ms)
+        msleep(delay_ms);
     
     return result;
 }
