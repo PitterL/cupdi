@@ -276,6 +276,7 @@ compile
 configure
 install-sh
 stamp-h1
+config.h
 
 # linux file
 Makefile

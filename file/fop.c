@@ -58,7 +58,7 @@ unsigned char *read_whole_file(const char * file_name)
     bytes_read = fread(contents, sizeof(unsigned char), s, f);
     if (bytes_read != s) {
         fprintf(stderr, "Short read of '%s': expected %d bytes "
-            "but got %d: %s.\n", file_name, s, bytes_read,
+            "but got %d: %s.\n", file_name, s, (int)bytes_read,
             strerror(errno));
         /*Fixme: ftell() size may larger than fread()*/
         //goto failed;
@@ -98,8 +98,8 @@ char *make_name_with_extesion(const char *name, const char *extname)
         return NULL;
     }
 
-    size = strlen(name) + 1;
-    extsize = strlen(extname);
+    size = (int)strlen(name) + 1;
+    extsize = (int)strlen(extname);
     //search '.' position
     //  last character is NULL, and EXT name could get 3 characters max, so [-2: -4] is ext name, and [-5] is '.'
     for (i = -5; i <= -2; i++) {
