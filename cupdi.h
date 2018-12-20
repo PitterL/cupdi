@@ -9,6 +9,7 @@ int updi_write(void *nvm_ptr, char *cmd);
 int updi_write_fuse(void *nvm_ptr, char *cmd);
 int updi_read_infoblock(void *nvm_ptr);
 int updi_verify_infoblock(void *nvm_ptr);
+int updi_reset(void *nvm_ptr);
 int updi_debugview(void *nvm_ptr, char *cmd);
 
 /*

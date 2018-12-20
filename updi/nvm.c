@@ -194,10 +194,8 @@ int nvm_unlock_device(void *nvm_ptr)
 
     DBG_INFO(NVM_DEBUG, "<NVM> Unlock and erase a device");
 
-    if (nvm->progmode) {
-        DBG_INFO(NVM_DEBUG, "Device already unlocked");
-        return 0;
-    }
+    if (nvm->progmode)
+        DBG_INFO(NVM_DEBUG, "Device in programe mode and unlocked");
 
     // Unlock
     result = app_unlock(APP(nvm));
@@ -739,7 +737,42 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-    NVM write memory
+    NVM reset
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
+int nvm_reset(void *nvm_ptr, bool unlock)
+{
+    /*
+        Reset
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    int result;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Reset");
+
+    result = app_toggle_reset(APP(nvm), 1);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_toggle_reset failed %d", result);
+        return -2;
+    }
+
+    if (nvm->progmode) {
+        result = app_enter_progmode(APP(nvm));
+        if (result) {
+            DBG_INFO(APP_DEBUG, "app_enter_progmode, faled result %d", result);
+            return -3;
+        }
+    }
+    
+    return result;
+}
+
+/*
+    NVM get flash info, this is defined in device.c
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @info: chip flash information
     @return 0 successful, other value failed
