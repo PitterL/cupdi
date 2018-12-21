@@ -80,6 +80,6 @@ typedef void                *LPCTSTR;
 #error "No OS defined in platform.h !"
 #endif
 
-#define VALID_PTR(_ptr) ((_ptr) && (long)(_ptr) != ERROR_PTR)
+#define VALID_PTR(_ptr) ((_ptr) && (size_t)(_ptr) != ERROR_PTR)
 
 #endif

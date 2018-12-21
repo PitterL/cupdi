@@ -66,7 +66,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include <regex/re.h>
 #include "cupdi.h"
 
-#define SOFTWARE_VERSION "1.01" 
+#define SOFTWARE_VERSION "1.03" 
 
 static const char *const usage[] = {
     "Simple command line interface for UPDI programming:",
@@ -92,6 +92,7 @@ int main(int argc, const char *argv[])
     int flag = 0;
     bool unlock = false;
     int verbose = 1;
+    bool reset = false;
     bool test = false;
     bool version = false;
 
@@ -118,6 +119,7 @@ int main(int argc, const char *argv[])
         OPT_STRING('w', "write", &write, "Direct write to memory [addr0]:[dat0];[dat1];|[addr1]..."),
         OPT_STRING('g', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|keys=[n] (loop(Hex) set to 0 loop forvever, default 1, keys default 1)"),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
+        OPT_BOOLEAN('-', "reset", &reset, "UPDI reset device"),
         OPT_BOOLEAN('t', "test", &test, "Test UPDI device"),
         OPT_BOOLEAN('-', "version", &version, "Show version"),
         OPT_END(),
@@ -278,11 +280,20 @@ int main(int argc, const char *argv[])
         }
     }
 
+    if (reset) {
+        result = nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET);
+        if (result) {
+            DBG_INFO(UPDI_DEBUG, "NVM reset failed %d", result);
+            result = -15;
+            goto out;
+        }
+    }
+
     if (dbgview) {
         result = updi_debugview(nvm_ptr, dbgview);
         if (result) {
             DBG_INFO(UPDI_DEBUG, "Debugview failed %d", result);
-            result = -15;
+            result = -16;
             goto out;
         }
     }
@@ -538,7 +549,7 @@ unsigned int get_firmware_varible(void *nvm_ptr, unsigned int address)
 {
     char ver[4];
     int result;
-#define INVALID_FIRMWARE_CODE 0x12345678
+#define INVALID_FIRMWARE_CODE 0xFF2E7858 //'Xx. 16.16'
 
     if (!VALID_PTR(address)) {
         DBG_INFO(UPDI_DEBUG, "invalid fw address %x", address);
@@ -552,7 +563,7 @@ unsigned int get_firmware_varible(void *nvm_ptr, unsigned int address)
     }
     else {
         // Big endian store in firmware
-        // DBG(UPDI_DEBUG, "Firmware varible:", ver, 4, "0x%02x ");
+        DBG(UPDI_DEBUG, "Firmware varible #1:", ver, 4, "0x%02x ");
         DBG_INFO(UPDI_DEBUG, "Found firmware varible: '%c%c%c v%d.%d'", ver[3], ver[2], ver[1], ver[0] >> 4, ver[0] & 0xf);
 
         //Check whether it's visible character
@@ -613,16 +624,24 @@ int write_infoblock(void *nvm_ptr, const char *mapfile, const unsigned char *dat
     unsigned char infoblock[INFO_BLOCK_SIZE];
     int result = -1;
 
+    //Build Infor block should get value from sram, so there should do the reset
+   
+    result = nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET);
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "nvm_reset failed %d", result);
+        return -2;
+    }
+    
     address = get_version_address_from_map(mapfile);
     if (!VALID_PTR(address)) {
         DBG_INFO(UPDI_DEBUG, "get_version_address_from_map failed");
-        return -2;
+        return -3;
     }
 
     version = get_firmware_varible(nvm_ptr, address);
     if (version <= 0) {
         DBG_INFO(UPDI_DEBUG, "get_firmware_varible failed");
-        return -3;
+        return -4;
     }
 
     memset(infoblock, 0, sizeof(infoblock));
@@ -632,8 +651,8 @@ int write_infoblock(void *nvm_ptr, const char *mapfile, const unsigned char *dat
     infoblock[1] = (version >> 16) & 0xff;
     infoblock[2] = (version >> 8) & 0xff;
     infoblock[3] = version & 0xff;
-    // DBG(UPDI_DEBUG, "Firmware version:", infoblock, 4, "%02x ");
-    DBG_INFO(UPDI_DEBUG, "version: '%c%c%c v%d.%d'", infoblock[3], infoblock[2], infoblock[1], infoblock[0] >> 4, infoblock[0] & 0xf);
+    DBG(UPDI_DEBUG, "Firmware version #2:", infoblock, 4, "%02x ");
+    DBG_INFO(UPDI_DEBUG, "version: '%c%c%c v%d.%d'", infoblock[0], infoblock[0], infoblock[2], infoblock[3] >> 4, infoblock[3] & 0xf);
 
     // 4 bytes fw size (little endian)
     infoblock[4] = len & 0xff;
@@ -655,7 +674,13 @@ int write_infoblock(void *nvm_ptr, const char *mapfile, const unsigned char *dat
     infoblock[INFO_BLOCK_SIZE - 1] = calc_crc8(infoblock, INFO_BLOCK_SIZE - 1);
     DBG_INFO(UPDI_DEBUG, "Infoblock crc: 0x%02x", infoblock[INFO_BLOCK_SIZE - 1]);
 
-    return nvm_write_eeprom(nvm_ptr, INFO_BLOCK_ADDRESS_IN_EEPROM, infoblock, sizeof(infoblock));
+    result = nvm_write_eeprom(nvm_ptr, INFO_BLOCK_ADDRESS_IN_EEPROM, infoblock, sizeof(infoblock));
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "nvm_write_eeprom failed %d", result);
+        return -5;
+    }
+
+    return 0;
 }
 
 /*
@@ -679,6 +704,7 @@ int updi_read_infoblock(void *nvm_ptr)
     size = (infoblock[7] << 24) | (infoblock[6] << 16) | (infoblock[5] << 8) | infoblock[4];
     read_crc = (infoblock[INFO_BLOCK_SIZE - 2] << 16) | (infoblock[INFO_BLOCK_SIZE - 3] << 8) | infoblock[INFO_BLOCK_SIZE - 4];
 
+    DBG(UPDI_DEBUG, "Firmware version #3:", infoblock, 4, "%02x ");
     DBG_INFO(UPDI_DEBUG, "FW version: '%c%c%c v%d.%d', size: %d bytes, crc: 0x%x",
         infoblock[0], infoblock[1], infoblock[2], infoblock[3] >> 4, infoblock[3] & 0xf,
         size,
@@ -707,7 +733,8 @@ int updi_verify_infoblock(void *nvm_ptr)
 
     size = (infoblock[7] << 24) | (infoblock[6] << 16) | (infoblock[5] << 8) | infoblock[4];
     DBG_INFO(UPDI_DEBUG, "Fw version: '%c%c%c v%d.%d', size %d(%4x)", infoblock[0], infoblock[1], infoblock[2], infoblock[3] >> 4, infoblock[3] & 0xf, size, size);
-    
+    DBG(UPDI_DEBUG, "Firmware version:", infoblock, 4, "%02x ");
+
     if (infoblock[7] || infoblock[6]) {
         DBG(UPDI_DEBUG, "Infoblock size invalid:", infoblock + 4, 4, "%02x ");
         return -3;
@@ -792,7 +819,7 @@ int updi_flash(void *nvm_ptr, const char *file, int flag)
         result = write_infoblock(nvm_ptr, file, dhex->data, dhex->len);
         if (result) {
             DBG_INFO(UPDI_DEBUG, "write_infoblock failed %d", result);
-            result = -5;
+            result = -6;
             goto out;
         }
     }
@@ -1043,10 +1070,10 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_op opw)
 }
 
 /*
-Memory Write
-@nvm_ptr: updi_nvm_init() device handle
-@cmd: cmd string use for address and data. Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
-@returns 0 - success, other value failed code
+UPDI Memory Write
+    @nvm_ptr: updi_nvm_init() device handle
+    @cmd: cmd string use for address and data. Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
+    @returns 0 - success, other value failed code
 */
 int updi_write(void *nvm_ptr, char *cmd)
 {
@@ -1054,14 +1081,24 @@ int updi_write(void *nvm_ptr, char *cmd)
 }
 
 /*
-Fuse Write
-@nvm_ptr: updi_nvm_init() device handle
-@cmd: cmd string use for address and data. Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
-@returns 0 - success, other value failed code
+UPDI Fuse Write
+    @nvm_ptr: updi_nvm_init() device handle
+    @cmd: cmd string use for address and data. Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
+    @returns 0 - success, other value failed code
 */
 int updi_write_fuse(void *nvm_ptr, char *cmd)
 {
     return _updi_write(nvm_ptr, cmd, nvm_write_fuse);
+}
+
+/*
+UPDI Reset chip
+@nvm_ptr: updi_nvm_init() device handle
+@returns 0 - success, other value failed code
+*/
+int updi_reset(void *nvm_ptr)
+{
+    return nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET);
 }
 
 /*

@@ -171,7 +171,7 @@ TRE_DEF const char *tre_nmatch(const tre_comp *tregex, const char *text, unsigne
 
 TRE_DEF const char *tre_match(const tre_comp *tregex, const char *text, const char **end)
 {
-    return tre_nmatch(tregex, text, strlen(text), end);
+    return tre_nmatch(tregex, text, (unsigned int)strlen(text), end);
 }
 
 #define TRE_ISMETA(c) ((c=='s')||(c=='S')||(c=='w')||(c=='W')||(c=='d')||(c=='D'))
@@ -323,7 +323,7 @@ TRE_DEF int tre_ncompile(const char *pattern, unsigned plen, tre_comp *tregex)
 
             if (val > TRE_MAXQUANT)
                 return tre_err("Quantifier min value too big");
-            tnode[j].mn[0] = val;
+            tnode[j].mn[0] = (unsigned short)val;
 
             if (pattern[i] == ',')
             {
@@ -348,7 +348,7 @@ TRE_DEF int tre_ncompile(const char *pattern, unsigned plen, tre_comp *tregex)
                 }
             }
             tnode[j].type = (i + 1 < plen && pattern[i + 1] == '?') ? (i++, TRE_LQUANT) : TRE_QUANT;
-            tnode[j].mn[1] = val;
+            tnode[j].mn[1] = (unsigned short)val;
         } break;
 
         // Regular characters
@@ -365,7 +365,7 @@ TRE_DEF int tre_ncompile(const char *pattern, unsigned plen, tre_comp *tregex)
 
 TRE_DEF int tre_compile(const char *pattern, tre_comp *tregex)
 {
-    return tre_ncompile(pattern, strlen(pattern), tregex);
+    return tre_ncompile(pattern, (unsigned int)strlen(pattern), tregex);
 }
 
 #define TRE_MATCHDIGIT(c) ((c >= '0') && (c <= '9'))
@@ -477,7 +477,7 @@ static const char *matchquant(const tre_node *nodes, const char *text, const cha
     const char *end, *start = text;
     while (max && text < tend && matchone(nodes, *text)) { text++; max--; }
 
-    while (text - start >= min)
+    while (text - start >= (signed)min)
     {
         end = matchpattern(nodes + 2, text--, tend);
         if (end) { return end; }
