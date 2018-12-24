@@ -66,7 +66,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include <regex/re.h>
 #include "cupdi.h"
 
-#define SOFTWARE_VERSION "1.03" 
+#define SOFTWARE_VERSION "1.04" 
 
 static const char *const usage[] = {
     "Simple command line interface for UPDI programming:",
@@ -622,7 +622,7 @@ int write_infoblock(void *nvm_ptr, const char *mapfile, const unsigned char *dat
     unsigned int version;
     unsigned int fw_crc;
     unsigned char infoblock[INFO_BLOCK_SIZE];
-    int result = -1;
+    int result = -1, retry = 2;
 
     //Build Infor block should get value from sram, so there should do the reset
    
@@ -652,7 +652,7 @@ int write_infoblock(void *nvm_ptr, const char *mapfile, const unsigned char *dat
     infoblock[2] = (version >> 8) & 0xff;
     infoblock[3] = version & 0xff;
     DBG(UPDI_DEBUG, "Firmware version #2:", infoblock, 4, "%02x ");
-    DBG_INFO(UPDI_DEBUG, "version: '%c%c%c v%d.%d'", infoblock[0], infoblock[0], infoblock[2], infoblock[3] >> 4, infoblock[3] & 0xf);
+    DBG_INFO(UPDI_DEBUG, "version: '%c%c%c v%d.%d'", infoblock[0], infoblock[1], infoblock[2], infoblock[3] >> 4, infoblock[3] & 0xf);
 
     // 4 bytes fw size (little endian)
     infoblock[4] = len & 0xff;
@@ -1224,7 +1224,11 @@ int updi_debugview(void *nvm_ptr, char *cmd)
             delta_value = signal_value - ref_value;
 
             //Debug output:
-            DBG_INFO(DEFAULT_DEBUG, "T[%s][%d-%d]: delta,%d, ref,%d, signal,%d, cc,%.2f, sensor_state,%02xH, node_state,%02xH", timebuf, i, j,
+            /*
+            DBG(DEFAULT_DEBUG, "signal raw:", (unsigned char *)&ptc_signal, sizeof(ptc_signal), "0x%02x ");
+            DBG(DEFAULT_DEBUG, "ref raw:", (unsigned char *)&ptc_ref, sizeof(ptc_signal), "0x%02x ");
+            */
+            DBG_INFO(DEFAULT_DEBUG, "T[%s][%d-%d]: delta,%hd, ref,%hd, signal,%hd, cc,%.2f, sensor_state,%02xH, node_state,%02xH", timebuf, i, j,
                 delta_value,
                 ref_value,
                 signal_value,

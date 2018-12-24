@@ -4,7 +4,7 @@
 
 int16_t swap_int16(int16_t val)
 {
-#if (BYTE_ORDER == BIG_ENDIAN)
+#if defined(BYTE_ORDER) && (BYTE_ORDER == BIG_ENDIAN)
     return (val << 8) | ((val >> 8) & 0xFF);
 #else
     return val;
@@ -13,7 +13,7 @@ int16_t swap_int16(int16_t val)
 
 int32_t swap_int32(int32_t val)
 {
-#if (BYTE_ORDER == BIG_ENDIAN)
+#if defined(BYTE_ORDER) && (BYTE_ORDER == BIG_ENDIAN)
     return ((val >> 24) & 0xff) | // move byte 3 to byte 0
         ((val << 8) & 0xff0000) | // move byte 1 to byte 2
         ((val >> 8) & 0xff00) | // move byte 2 to byte 1
