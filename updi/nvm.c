@@ -760,6 +760,9 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
         return -2;
     }
 
+    if (delay_ms)
+        msleep(delay_ms);
+
     if (nvm->progmode) {
         result = app_enter_progmode(APP(nvm));
         if (result) {
@@ -767,9 +770,6 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
             return -3;
         }
     }
-
-    if (delay_ms)
-        msleep(delay_ms);
     
     return result;
 }
