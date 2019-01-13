@@ -173,7 +173,10 @@
     <ClInclude Include="os\win32\swap.h" />
     <ClInclude Include="os\win32\delay.h" />
     <ClInclude Include="regex\re.h" />
+    <ClInclude Include="string\join.h" />
     <ClInclude Include="string\split.h" />
+    <ClInclude Include="string\strlcat.h" />
+    <ClInclude Include="string\strndup.h" />
     <ClInclude Include="updi\application.h" />
     <ClInclude Include="updi\constants.h" />
     <ClInclude Include="updi\link.h" />
@@ -194,7 +197,10 @@
     <ClCompile Include="os\win32\swap.c" />
     <ClCompile Include="os\win32\delay.c" />
     <ClCompile Include="regex\re.c" />
+    <ClCompile Include="string\join.c" />
     <ClCompile Include="string\split.c" />
+    <ClCompile Include="string\strlcat.c" />
+    <ClCompile Include="string\strndup.c" />
     <ClCompile Include="updi\application.c" />
     <ClCompile Include="updi\link.c" />
     <ClCompile Include="updi\nvm.c" />

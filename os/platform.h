@@ -9,6 +9,7 @@ typedef unsigned int u32;
 typedef int bool;
 #define false 0
 #define true 1
+
 #define ARRAY_SIZE(_) (sizeof (_) / sizeof (*_))
 
 #if defined(UTILS_COMPILER_H_INCLUDED)
@@ -23,6 +24,7 @@ typedef int bool;
 #define SET_AND_CLR_BIT(_x, _sbit, _cbit) (SET_BIT((_x), (_sbit)), CLR_BIT((_x), (_cbit)))
 
 #if defined(_WIN32) || defined(_WIN64) 
+
 #include "win32/serial.h"
 #include "win32/delay.h"
 #include "win32/swap.h"

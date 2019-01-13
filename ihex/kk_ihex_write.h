@@ -77,14 +77,14 @@
 extern "C" {
 #endif
 
-    #ifndef restrict
+#ifndef restrict
 #define restrict
 #endif
 
 #include "kk_ihex.h"
 
 // Default number of data bytes written per line
-#if IHEX_LINE_MAX_LENGTH >= 32
+#if IHEX_LINE_MAX_LENGTH >= 16
 #define IHEX_DEFAULT_OUTPUT_LINE_LENGTH 16
 #else
 #define IHEX_DEFAULT_OUTPUT_LINE_LENGTH IHEX_LINE_MAX_LENGTH

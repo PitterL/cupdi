@@ -10,6 +10,7 @@
  */
 #include "serial.h"
 #include "error.h"
+#include <string/strlcat.h>
 
 typedef struct _upd_sercom {
 #define UPD_SERCOM_MAGIC_WORD 0xA5A5 //'user'
@@ -38,7 +39,7 @@ HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *st) {
     char comport[16] = "\\\\.\\";
 
     /* Create the file descriptor handle */
-    strncat(comport, port, sizeof(comport) - 1);
+    strlcat(comport, port, sizeof(comport) - 1);
     if ((fd = CreateFileA(comport, GENERIC_READ | GENERIC_WRITE, 0, NULL,
                     OPEN_EXISTING, 0/*FILE_FLAG_OVERLAPPED*/, NULL))
         == INVALID_HANDLE_VALUE) {

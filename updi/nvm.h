@@ -20,7 +20,14 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len);
 int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len);
 int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len);
 int nvm_reset(void *nvm_ptr, int delay_ms);
+
+int nvm_get_block_info(void *nvm_ptr, /*NVM_TYPE_T*/int type, nvm_info_t *info);
+/*
 int nvm_get_flash_info(void *nvm_ptr, nvm_info_t *info);
+int nvm_get_eeprom_info(void *nvm_ptr, nvm_info_t *info);
+int nvm_get_userrow_info(void *nvm_ptr, nvm_info_t *info);
+int nvm_get_fuses_info(void *nvm_ptr, nvm_info_t *info);
+*/
 
 typedef int(*nvm_op)(void *nvm_ptr, u16 address, const u8 *data, int len);
 
@@ -29,4 +36,8 @@ Max waiting time for chip reset
 */
 #define TIMEOUT_WAIT_CHIP_RESET 50
 
+/* 
+UPDI Max Transfer size
+*/
+#define UPDI_MAX_TRANSFER_SIZE (UPDI_MAX_REPEAT_SIZE + 1)
 #endif

@@ -55,3 +55,39 @@ const device_info_t * get_chip_info(const char *dev_name)
 
     return NULL;
 }
+
+/*
+Device get block info, this is defined in device.c
+@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+@info: chip flash information
+@return 0 successful, other value failed
+*/
+int dev_get_nvm_info(const void *dev_ptr, NVM_TYPE_T type, nvm_info_t * info)
+{
+    /*
+    get NVM information
+    */
+    const device_info_t *dev = (const device_info_t *)dev_ptr;
+    const nvm_info_t *iblock;
+
+    switch (type) {
+    case NVM_FLASH:
+        iblock = &dev->mmap->flash;
+        break;
+    case NVM_EEPROM:
+        iblock = &dev->mmap->eeprom;
+        break;
+    case NVM_USERROW:
+        iblock = &dev->mmap->userrow;
+        break;
+    case NVM_FUSES:
+        iblock = &dev->mmap->fuse;
+        break;
+    default:
+        return -2;
+    }
+
+    memcpy(info, iblock, sizeof(*info));
+
+    return 0;
+}

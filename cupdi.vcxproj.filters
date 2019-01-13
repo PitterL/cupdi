@@ -81,6 +81,15 @@
     <ClInclude Include="os\win32\delay.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="string\strlcat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="string\join.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="string\strndup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cupdi.c">
@@ -135,6 +144,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="os\win32\delay.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="string\strlcat.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="string\join.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="string\strndup.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

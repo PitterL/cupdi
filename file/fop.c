@@ -1,86 +1,81 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
 
-/* This routine returns the size of the file it is called with. */
-/*static unsigned get_file_size(const char * file_name)
-{
-    struct stat sb;
-    if (stat(file_name, &sb) != 0) {
-        fprintf(stderr, "'stat' failed for '%s': %s.\n",
-            file_name, strerror(errno));
-        return 0;
-    }
-    return sb.st_size;
-}*/
-unsigned long get_file_size(const char* file)
-{
-    FILE * f = fopen(file, "r");
-    fseek(f, 0, SEEK_END);
-    unsigned long len = (unsigned long)ftell(f);
-    fclose(f);
-    return len;
-}
+#include <regex/re.h>
+#include <string/strlcat.h>
+#include <string/join.h>
+#include <string/split.h>
+#include <string/strndup.h>
+#include <os/platform.h>
 
 /*
-This routine reads the entire file into memory. user should release the memory after use.
-@file_name: file name
-@return file content string, NULL means failed
+  getdelim(), getline() - read a delimited record from stream, ersatz implementation
+  For more details, see: http://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
 */
-unsigned char *read_whole_file(const char * file_name)
-{
-    unsigned s;
-    unsigned char * contents = NULL;
-    FILE * f = NULL;
-    size_t bytes_read;
-    int status;
+int getdelim(char **lineptr, unsigned int *n, int delim, FILE *stream) {
+    char c, *cur_pos, *new_lineptr;
+    unsigned int new_lineptr_len;
 
-    s = get_file_size(file_name);
-    if (!s) {
-        fprintf(stderr, "File '%s' not exist or Null\n", file_name);
-        return NULL;
+    if (lineptr == NULL || n == NULL || stream == NULL) {
+        errno = EINVAL;
+        return -1;
     }
 
-    contents = malloc(s + 1);
-    if (!contents) {
-        fprintf(stderr, "Not enough memory.\n");
-        return NULL;
+    if (*lineptr == NULL) {
+        *n = 128; /* init len */
+        if ((*lineptr = (char *)malloc(*n)) == NULL) {
+            errno = ENOMEM;
+            return -1;
+        }
     }
 
-    f = fopen(file_name, "rb");
-    if (!f) {
-        fprintf(stderr, "Could not open '%s': %s.\n", file_name,
-            strerror(errno));
-        goto failed;
-    }
-    bytes_read = fread(contents, sizeof(unsigned char), s, f);
-    if (bytes_read != s) {
-        fprintf(stderr, "Short read of '%s': expected %d bytes "
-            "but got %d: %s.\n", file_name, s, (int)bytes_read,
-            strerror(errno));
-        /*Fixme: ftell() size may larger than fread()*/
-        //goto failed;
-    }
-    status = fclose(f);
-    if (status != 0) {
-        fprintf(stderr, "Error closing '%s': %s.\n", file_name,
-            strerror(errno));
-        goto failed;
-    }
-    return contents;
+    cur_pos = *lineptr;
+    for (;;) {
+        c = getc(stream);
 
-failed:
-    if (contents)
-        free(contents);
+        if (ferror(stream) || (c == EOF && cur_pos == *lineptr))
+            return -1;
 
-    if (f)
-        fclose(f);
+        if (c == EOF)
+            break;
 
-    return NULL;
+        if ((*lineptr + *n - cur_pos) < 2) {
+            if (/*SSIZE_MAX*/INT_MAX / 2 < *n) {
+#ifdef EOVERFLOW
+                errno = EOVERFLOW;
+#else
+                errno = ERANGE; /* no EOVERFLOW defined */
+#endif
+                return -1;
+            }
+            new_lineptr_len = *n * 2;
+
+            if ((new_lineptr = (char *)realloc(*lineptr, new_lineptr_len)) == NULL) {
+                errno = ENOMEM;
+                return -1;
+            }
+            cur_pos = new_lineptr + (cur_pos - *lineptr);
+            *lineptr = new_lineptr;
+            *n = new_lineptr_len;
+        }
+
+        *cur_pos++ = c;
+
+        if (c == delim)
+            break;
+    }
+
+    *cur_pos = '\0';
+    return (int)(cur_pos - *lineptr);
 }
 
+int getline(char **lineptr, unsigned int *n, FILE *stream) {
+    return getdelim(lineptr, n, '\n', stream);
+}
 
 /*
 Combine the input <main name> + <ext name>, user should release the memory after use.
@@ -88,27 +83,38 @@ Combine the input <main name> + <ext name>, user should release the memory after
 @extname: change the extname
 @return new combined name, NULL means failed
 */
-char *make_name_with_extesion(const char *name, const char *extname)
+char *trim_name_with_extesion(const char *name, const char a_delim, int order, const char *tailname)
 {
     char *new_name;
     int i, size, mainsize, extsize, new_size;
+    int found = 0;
 
-    if (!name || !extname) {
+    if (!name || !tailname) {
         fprintf(stderr, "Name or Extname is Null\n");
         return NULL;
     }
 
+    if (order <= 0)
+        order = 1;
+
+    //search delimiter position
     size = (int)strlen(name) + 1;
-    extsize = (int)strlen(extname);
-    //search '.' position
-    //  last character is NULL, and EXT name could get 3 characters max, so [-2: -4] is ext name, and [-5] is '.'
-    for (i = -5; i <= -2; i++) {
-        if (name[size + i] == '.')
+    extsize = (int)strlen(tailname);
+    for (i = -1; i >= -size; i--) {
+        if (name[size + i] == a_delim)
+            found++;
+
+        if (found == order)
             break;
     }
 
+    if (found != order) {
+        fprintf(stderr, "delimiter not found\n");
+        return NULL;
+    }
+
     mainsize = size + i;
-    new_size = mainsize + extsize + 2; /*<main>.<ext>[NULL]*/
+    new_size = mainsize + extsize + 2; /*<trim>[d]<tailname>[NULL]*/
     new_name = malloc(new_size);
     if (!new_name) {
         fprintf(stderr, "Not enough memory.\n");
@@ -116,8 +122,221 @@ char *make_name_with_extesion(const char *name, const char *extname)
     }
 
     strncpy(new_name, name, mainsize);
-    new_name[mainsize] = '.';
-    strncpy(new_name + mainsize + 1, extname, extsize + 1); //Copy 'NULL'
+    new_name[mainsize] = a_delim;
+    strncpy(new_name + mainsize + 1, tailname, extsize + 1); //Copy 'NULL'
 
     return new_name;
+}
+
+typedef int(*fn_search_defined_buf)(char *content, const char *pat_str, const char *pat_value, unsigned int *output, int outlen, unsigned int invalid);
+/*
+Get value content in source file, the format is: #define <varname> 0x12345678
+@buffer: data content buff to search (the content will be changed after function called)
+@pat_str: defined array regex trunk for search
+@pat_val: defined regex element in array trunk for search
+@output: varible value output array buffer
+@outlen: varible value count
+@invalid: if var in array not valid, filled to this value
+@return how many varibles get, negative mean error occur
+*/
+int _search_defined_value_from_buf(char *content, const char *pat_str, const char *pat_value, unsigned int *output, int outlen, unsigned int invalid)
+{
+    tre_comp tregex;
+    const char *st;
+
+    unsigned int val;
+    int result = -2;
+
+    if (!content || !pat_str || !pat_value || !output || !outlen)
+        return -1;
+
+    tre_compile(pat_str, &tregex);
+    st = tre_match(&tregex, content, NULL);
+
+    if (st) {
+        result = 0;
+
+        tre_compile(pat_value, &tregex);
+        st = tre_match(&tregex, st, NULL);
+        if (st) {
+            val = (unsigned int)strtol(st, NULL, 16); // 0 is error
+            *output = val;
+            result++;
+        }
+    }
+
+    return result;
+}
+
+/*
+Get Array content in source file, the format is: #define <varname> {NULL, 0x6a, ...}
+@buffer: data content buff to search (the content will be changed after function called)
+@pat_str: defined array regex trunk for search
+@pat_val: defined regex element in array trunk for search
+@output: varible value output array buffer
+@outlen: varible value count
+@invalid: if var in array not valid, filled to this value
+@return how many varibles get, negative mean error occur
+*/
+int _search_defined_array_from_buf(char *content, const char *pat_str, const char *pat_value, unsigned int *output, int outlen, unsigned int invalid)
+{
+    tre_comp tregex;
+    const char *st, *end;
+    char *trunk;
+
+    const char array_delim = ',';
+    char **tk_s;
+
+    unsigned int val;
+    int i;
+    int result = -2;
+
+    if (!content || !pat_str ||!pat_value || !output || !outlen)
+        return -1;
+
+    tre_compile(pat_str, &tregex);
+    st = tre_match(&tregex, content, &end);
+
+    if (st) {
+        result = 0;
+        //get data array start position
+        while (st < end && *st != '{')
+            st++;
+
+        if (*st != '{') {
+            fprintf(stderr, "Parse defined array search '{' failed");
+            goto out;
+        }
+
+        if (end - st <= 2) {
+            //no data here
+            goto out;
+        }
+
+        //*end = '\0';    //replace '}' to terminate
+        trunk = strndup(st + 1, end - st - 1);
+
+        tk_s = str_split(trunk, array_delim);
+        if (!tk_s) {
+            fprintf(stderr, "Parse defined array str tk_s: %s failed", trunk);
+            free(trunk);
+            goto out;
+        }
+
+        tre_compile(pat_value, &tregex);
+        for (i = 0; tk_s[i]; i++) {
+            if (i < outlen) {
+                if (tre_match(&tregex, tk_s[i], NULL)) {
+                    val = (unsigned int)strtol(tk_s[i], NULL, 16); // 0 is error
+                    output[i] = val;
+                }
+                else {
+                    output[i] = invalid;
+                }
+                result++;
+            }
+            free(tk_s[i]);
+        }
+        free(tk_s);
+        free(trunk);
+    }
+
+out:
+    return result;
+}
+
+/*
+Get Array content in source file, the format is: #define FUSES_CONTENT {NULL, 0x6a, ...}
+@file: file to search
+@pat_str: defined array regex trunk for search
+@pat_val: defined regex element in array trunk for search
+@output: varible value output array buffer
+@outlen: varible value count
+@invalid: if var in array not valid, filled to this value
+@return how many varibles get, negative mean error occur
+*/
+int _search_defined_array_from_file(const char *file, fn_search_defined_buf fn_search, const char *pat_str, const char *pat_val, unsigned int *output, int outlen, unsigned int invalid)
+{
+    FILE * f = NULL;
+    int status;
+
+    char * line = NULL;
+    unsigned int len = 0;
+    int read;
+    int result = -2;
+
+    f = fopen(file, "r");
+    if (!f) {
+        fprintf(stderr, "Could not open '%s': %s.\n", file,
+            strerror(errno));
+        return -1;
+    }
+
+    while ((read = getline(&line, &len, f)) != -1) {
+        /*
+            printf("Retrieved line of length %zu:\n", read);
+            printf("%s", line);
+        */
+
+        result = fn_search(line, pat_str, pat_val, output, outlen, invalid);
+        if (result >= 0)
+            break;
+    }
+
+    if (line)
+        free(line);
+
+    status = fclose(f);
+    if (status != 0) {
+        fprintf(stderr, "Error closing '%s': %s.\n", file,
+            strerror(errno));
+    }
+
+    return result;
+}
+
+/*
+Get int array content in source file, the format is: #define <varname> {NULL, 0x6a, ...}
+@file: file to search
+@varname: defined varible array name
+@output: varible value output array buffer
+@outlen: varible value count
+@invalid: if var in array not valid, filled to this value
+@return how many varibles get, negative mean error occur
+*/
+int search_defined_array_int_from_file(const char *file, const char *varname, unsigned int *output, int outlen, unsigned int invalid)
+{
+    char pat_str[TRE_MAX_BUFLEN];
+    const char *pat_raw[] = { "^#define", varname, "\\{[\\w\\s,]*\\}" };
+    const char *pat_value = "0x[0-9a-fA-F]{2,}";
+    const char *space_delims = "\\s+";
+
+    //create pattern to search
+    pat_str[0] = '\0';
+    str_join(pat_str, sizeof(pat_str), pat_raw, _countof(pat_raw), space_delims);
+
+    return _search_defined_array_from_file(file, _search_defined_array_from_buf, pat_str, pat_value, output, outlen, invalid);
+}
+
+/*
+Get value content in source file, the format is: #define <varname> 0x123456
+@file: file to search
+@varname: defined varible array name
+@output: varible value output array buffer
+@outlen: varible value count
+@invalid: if var in array not valid, filled to this value
+@return how many varibles get, negative mean error occur
+*/
+int search_defined_value_int_from_file(const char *file, const char *varname, unsigned int *output)
+{
+    char pat_str[TRE_MAX_BUFLEN];
+    const char *pat_raw[] = { "^#define", varname, "[\\w]{4,}" };
+    const char *pat_value = "0x[0-9a-fA-F]{2,}";
+    const char *space_delims = "\\s+";
+
+    //create pattern to search
+    pat_str[0] = '\0';
+    str_join(pat_str, sizeof(pat_str), pat_raw, _countof(pat_raw), space_delims);
+
+    return _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, 0x0);
 }
