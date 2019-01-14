@@ -46,14 +46,7 @@ typedef struct _upd_nvm {
 #define VALID_NVM(_nvm) ((_nvm) && ((_nvm)->mgwd == UPD_NVM_MAGIC_WORD))
 #define APP(_nvm) ((_nvm)->app)
 #define NVM_REG(_nvm, _name) ((_nvm)->dev->mmap->reg._name)
-//#define NVM_FLASH_INFO(_nvm) (&(_nvm)->dev->mmap->flash)
-//#define NVM_FLASH(_nvm, _name) (NVM_FLASH_INFO(_nvm)->_name)
-//#define NVM_EEPROM_INFO(_nvm) (&(_nvm)->dev->mmap->eeprom)
-//#define NVM_EEPROM(_nvm, _name) (NVM_EEPROM_INFO(_nvm)->_name)
-//#define NVM_USERROW_INFO(_nvm) (&(_nvm)->dev->mmap->userrow)
-//#define NVM_USERROW(_nvm, _name) (NVM_USERROW_INFO(_nvm)->_name)
-//#define NVM_FUSES_INFO(_nvm) (&(_nvm)->dev->mmap->fuse)
-//#define NVM_FUSES(_nvm, _name) (NVM_FUSES_INFO(_nvm)->_name)
+
 /*
     NVM object init
     @port: serial port name of Window or Linux
@@ -243,13 +236,13 @@ int nvm_chip_erase(void *nvm_ptr)
 }
 
 /*
-NVM read common nvm area(flash/eeprom/userrow/fuses)
-@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-@info: NVM memory info
-@address: target address
-@data: data output buffer
-@len: data len
-@return 0 successful, other value failed
+    NVM read common nvm area(flash/eeprom/userrow/fuses)
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @info: NVM memory info
+    @address: target address
+    @data: data output buffer
+    @len: data len
+    @return 0 successful, other value failed
 */
 int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u16 address, u8 *data, int len)
 {
@@ -287,70 +280,6 @@ int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u16 address, u8 *dat
     @len: data len
     @return 0 successful, other value failed
 */
-
-int nvm_read_flash_old(void *nvm_ptr, u16 address, u8 *data, int len)
-{
-    /*
-        Reads from flash
-    */
-
-    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    nvm_info_t info;
-    int i, off, flash_address, flash_size,  pages, page_size;
-    int result = 0;
-
-    if (!VALID_NVM(nvm) || !data)
-        return ERROR_PTR;
-
-    DBG_INFO(NVM_DEBUG, "<NVM> Read from flash");
-
-    if (!nvm->progmode) {
-        DBG_INFO(NVM_DEBUG, "Flash read at locked mode");
-    }
-
-    result = nvm_get_block_info(nvm, NVM_FLASH, &info);
-    if (result) {
-        DBG_INFO(NVM_DEBUG, "nvm_get_block_info failed");
-        return -3;
-    }
-
-    flash_address = info.nvm_start;
-    flash_size = info.nvm_size;
-    if (address < flash_address)
-        address += flash_address;
-
-    if (address + len > flash_address + flash_size) {
-        DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
-        return -2;
-    }
-
-    page_size = info.nvm_pagesize;
-    if (len & (page_size - 1)) {
-        DBG_INFO(NVM_DEBUG, "Only full page aligned flash supported, len %x.", len);
-        return -3;
-    }
-    
-    pages = len / page_size;
-    for (i = 0, off = 0; i < pages; i++) {
-        DBG_INFO(NVM_DEBUG, "Reading Page(%d/%d) at 0x%x", i, pages, address + off);
-        
-        result = app_read_nvm(APP(nvm), address + off, data + off, page_size);
-        if (result) {
-            DBG_INFO(NVM_DEBUG, "app_read_nvm failed %d", result);
-            break;
-        }
-        
-        off += page_size;
-    }
-
-    if (i < pages || result) {
-        DBG_INFO(NVM_DEBUG, "Read flash count %d failed %d", i, result);
-        return -4;
-    }
-
-    return 0;
-}
-
 int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
@@ -409,27 +338,6 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
         DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
         return -4;
     }
-
-    /*
-    page_size = info.nvm_pagesize;
-    if ((address | len) & (page_size - 1)) {
-        DBG_INFO(NVM_DEBUG, "Only full page aligned flash supported, address %hx, len %x.", address, len);
-        return -5;
-    }
-
-    pages = len / page_size;
-    for (i = 0, off = 0; i < pages; i++) {
-        DBG_INFO(NVM_DEBUG, "Writing flash page(%d/%d) at 0x%x", i, pages, address + off);
-
-        result = app_write_nvm(APP(nvm), address + off, data + off, page_size);
-        if (result) {
-            DBG_INFO(NVM_DEBUG, "app_write_nvm failed %d", result);
-            break;
-        }
-
-        off += page_size;
-    }
-    */
 
     page_size = info.nvm_pagesize;
     pages = (len + page_size - 1) / page_size;
@@ -567,12 +475,12 @@ int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u16 address, const 
 }
 
 /*
-NVM write eeprom
-@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-@address: target address
-@data: data buffer
-@len: data len
-@return 0 successful, other value failed
+    NVM write eeprom
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
 */
 int nvm_write_eeprom(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
@@ -590,12 +498,12 @@ int nvm_write_eeprom(void *nvm_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-NVM write userrow
-@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-@address: target address
-@data: data buffer
-@len: data len
-@return 0 successful, other value failed
+    NVM write userrow
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
 */
 int nvm_write_userrow(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
@@ -613,7 +521,7 @@ int nvm_write_userrow(void *nvm_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-NVM read fuse
+    NVM read fuse
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @address: target address
     @data: data buffer
@@ -636,7 +544,7 @@ int nvm_read_fuse(void *nvm_ptr, u16 address, u8 *data, int len)
 }
 
 /*
-NVM write fuse
+    NVM write fuse
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @info: Fuse memory info
     @address: target address
@@ -701,7 +609,7 @@ int _nvm_write_fuse(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8
 }
 
 /*
-NVM write fuse
+    NVM write fuse
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @info: Fuse memory info
     @address: target address
@@ -823,12 +731,12 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-NVM write auto selec which part to be operated
-@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-@address: target address
-@data: data buffer
-@len: data len
-@return 0 successful, other value failed
+    NVM write auto selec which part to be operated
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
 */
 int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
 {

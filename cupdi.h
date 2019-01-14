@@ -3,6 +3,7 @@
 
 int updi_erase(void *nvm_ptr);
 int updi_program(void *nvm_ptr, const char *file);
+int updi_compare(void *nvm_ptr, const char *file);
 int updi_verifiy_infoblock(void *nvm_ptr);
 int updi_update(void *nvm_ptr, const char *file);
 int updi_save(void *nvm_ptr, const char *file);
