@@ -6,16 +6,17 @@
  *
  */
 
-#include "getline.h"
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
 #include <limits.h>
 #include <os\platform.h>
 
-int getdelim(char **lineptr, unsigned int *n, int delim, FILE *stream) {
+#include "getline.h"
+
+ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
     char c, *cur_pos, *new_lineptr;
-    unsigned int new_lineptr_len;
+    size_t new_lineptr_len;
 
     if (lineptr == NULL || n == NULL || stream == NULL) {
         errno = EINVAL;
@@ -41,7 +42,7 @@ int getdelim(char **lineptr, unsigned int *n, int delim, FILE *stream) {
             break;
 
         if ((*lineptr + *n - cur_pos) < 2) {
-            if (/*SSIZE_MAX*/INT_MAX / 2 < *n) {
+            if (SSIZE_MAX / 2 < *n) {
 #ifdef EOVERFLOW
                 errno = EOVERFLOW;
 #else
@@ -67,10 +68,9 @@ int getdelim(char **lineptr, unsigned int *n, int delim, FILE *stream) {
     }
 
     *cur_pos = '\0';
-    return (int)(cur_pos - *lineptr);
+    return (ssize_t)(cur_pos - *lineptr);
 }
 
-int getline(char **lineptr, unsigned int *n, FILE *stream) {
+ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
     return getdelim(lineptr, n, '\n', stream);
 }
-

@@ -1,16 +1,14 @@
 #ifndef __UD_PLATFORM_H
 #define __UD_PLATFORM_H
 
-//#define _LINUX
-
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
-typedef int bool;
-#define false 0
-#define true 1
+
+#include <stdbool.h>
 
 #define ARRAY_SIZE(_) (sizeof (_) / sizeof (*_))
+#define VALID_PTR(_ptr) ((_ptr) && (size_t)(_ptr) != ERROR_PTR)
 
 #if defined(UTILS_COMPILER_H_INCLUDED)
     #define SET_BIT(_x, _bit) Set_bits((_x), (1 << (_bit)))
@@ -24,16 +22,21 @@ typedef int bool;
 #define SET_AND_CLR_BIT(_x, _sbit, _cbit) (SET_BIT((_x), (_sbit)), CLR_BIT((_x), (_cbit)))
 
 #if defined(_WIN32) || defined(_WIN64) 
+typedef long ssize_t;
 
-#include "win32/serial.h"
-#include "win32/delay.h"
-#include "win32/swap.h"
-#include "win32/logging.h"
-#include "win32/error.h"
-
+#define SSIZE_MAX INT_MAX
 #define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop) )
 
-#elif defined(_LINUX)
+#include <os/win32/serial.h>
+#include <os/win32/delay.h>
+#include <os/win32/swap.h>
+#include <os/win32/logging.h>
+#include <os/win32/error.h>
+
+#include <string/getline.h>
+#include <string/strndup.h>
+
+#elif defined(__GNUC__)
 
 typedef int                 BOOL;
 typedef unsigned char       BYTE;
@@ -81,7 +84,5 @@ typedef void                *LPCTSTR;
 #else
 #error "No OS defined in platform.h !"
 #endif
-
-#define VALID_PTR(_ptr) ((_ptr) && (size_t)(_ptr) != ERROR_PTR)
 
 #endif

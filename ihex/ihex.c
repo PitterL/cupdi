@@ -4,6 +4,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include <os/platform.h>
 #include "ihex.h"
 /*
 Get buffer by the segment value
@@ -332,7 +333,7 @@ void unload_segment_by_sid(hex_data_t *dhex, ihex_segment_t segmentid)
     int i;
 
     //alloc data buffer
-    for (i = 0; i < _countof(dhex->segment); i++) {
+    for (i = 0; i < ARRAY_SIZE(dhex->segment); i++) {
         seg = &dhex->segment[i];
         if (seg->sid == segmentid) {
             if (seg->data)
@@ -348,7 +349,7 @@ void unload_segments(hex_data_t *dhex)
     int i;
 
     //alloc data buffer
-    for (i = 0; i < _countof(dhex->segment); i++) {
+    for (i = 0; i < ARRAY_SIZE(dhex->segment); i++) {
         seg = &dhex->segment[i];
         if (seg->data)
             free(seg->data);
@@ -415,7 +416,7 @@ int save_hex_info_to_file(const char *file, const hex_data_t *dhex)
 #endif
     ihex_init(&ihex, ihex_flush_buffer, outfile);
     
-    for (i = 0; i < _countof(dhex->segment); i++) {
+    for (i = 0; i < ARRAY_SIZE(dhex->segment); i++) {
         seg = &dhex->segment[i];
         if (seg->data) {
             ihex_write_at_segment(&ihex, seg->sid, seg->addr_from);

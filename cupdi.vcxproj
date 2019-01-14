@@ -173,6 +173,7 @@
     <ClInclude Include="os\win32\swap.h" />
     <ClInclude Include="os\win32\delay.h" />
     <ClInclude Include="regex\re.h" />
+    <ClInclude Include="string\getline.h" />
     <ClInclude Include="string\join.h" />
     <ClInclude Include="string\split.h" />
     <ClInclude Include="string\strlcat.h" />
@@ -197,6 +198,7 @@
     <ClCompile Include="os\win32\swap.c" />
     <ClCompile Include="os\win32\delay.c" />
     <ClCompile Include="regex\re.c" />
+    <ClCompile Include="string\getline.c" />
     <ClCompile Include="string\join.c" />
     <ClCompile Include="string\split.c" />
     <ClCompile Include="string\strlcat.c" />
