@@ -66,7 +66,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include "cupdi.h"
 
 /* CUPDI Software version */
-#define SOFTWARE_VERSION "1.05"
+#define SOFTWARE_VERSION "1.06"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS "qtouch\\touch.h"
@@ -1744,7 +1744,7 @@ int updi_debugview(void *nvm_ptr, char *cmd)
         }
 
         for (j = 0; tk_w[j]; j++)
-            free(tk_w[i]);
+            free(tk_w[j]);
         free(tk_s[i]);
     }
     free(tk_s);

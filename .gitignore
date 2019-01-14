@@ -276,9 +276,15 @@ config.*
 missing
 stamp-h1
 compile
+clean
 
 # linux file
 *.o
 *.a
-
+Makefile
+Makefile.in
 *.bak
+
+#temp file
+armhf/
+cupdi

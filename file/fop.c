@@ -9,73 +9,7 @@
 #include <string/strlcat.h>
 #include <string/join.h>
 #include <string/split.h>
-#include <string/strndup.h>
 #include <os/platform.h>
-
-/*
-  getdelim(), getline() - read a delimited record from stream, ersatz implementation
-  For more details, see: http://pubs.opengroup.org/onlinepubs/9699919799/functions/getline.html
-*/
-int getdelim2(char **lineptr, unsigned int *n, int delim, FILE *stream) {
-    char c, *cur_pos, *new_lineptr;
-    unsigned int new_lineptr_len;
-
-    if (lineptr == NULL || n == NULL || stream == NULL) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    if (*lineptr == NULL) {
-        *n = 128; /* init len */
-        if ((*lineptr = (char *)malloc(*n)) == NULL) {
-            errno = ENOMEM;
-            return -1;
-        }
-    }
-
-    cur_pos = *lineptr;
-    for (;;) {
-        c = getc(stream);
-
-        if (ferror(stream) || (c == EOF && cur_pos == *lineptr))
-            return -1;
-
-        if (c == EOF)
-            break;
-
-        if ((*lineptr + *n - cur_pos) < 2) {
-            if (/*SSIZE_MAX*/INT_MAX / 2 < *n) {
-#ifdef EOVERFLOW
-                errno = EOVERFLOW;
-#else
-                errno = ERANGE; /* no EOVERFLOW defined */
-#endif
-                return -1;
-            }
-            new_lineptr_len = *n * 2;
-
-            if ((new_lineptr = (char *)realloc(*lineptr, new_lineptr_len)) == NULL) {
-                errno = ENOMEM;
-                return -1;
-            }
-            cur_pos = new_lineptr + (cur_pos - *lineptr);
-            *lineptr = new_lineptr;
-            *n = new_lineptr_len;
-        }
-
-        *cur_pos++ = c;
-
-        if (c == delim)
-            break;
-    }
-
-    *cur_pos = '\0';
-    return (int)(cur_pos - *lineptr);
-}
-
-int getline2(char **lineptr, unsigned int *n, FILE *stream) {
-    return getdelim2(lineptr, n, '\n', stream);
-}
 
 /*
 Combine the input <main name> + <ext name>, user should release the memory after use.
@@ -261,7 +195,7 @@ int _search_defined_array_from_file(const char *file, fn_search_defined_buf fn_s
     int status;
 
     char * line = NULL;
-    unsigned int len = 0;
+    size_t len = 0;
     int read;
     int result = -2;
 
@@ -272,7 +206,7 @@ int _search_defined_array_from_file(const char *file, fn_search_defined_buf fn_s
         return -1;
     }
 
-    while ((read = getline2(&line, &len, f)) != -1) {
+    while ((read = getline(&line, &len, f)) != -1) {
         /*
             printf("Retrieved line of length %zu:\n", read);
             printf("%s", line);
