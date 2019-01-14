@@ -29,4 +29,7 @@ typedef struct _device_info {
 
 const device_info_t * get_chip_info(const char *dev_name);
 
+typedef enum _NVM_TYPE { NVM_FLASH, NVM_EEPROM, NVM_USERROW, NVM_FUSES, NUM_NVM_TYPES } NVM_TYPE_T;
+int dev_get_nvm_info(const void *dev, NVM_TYPE_T type, nvm_info_t * info);
+
 #endif

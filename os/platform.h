@@ -1,14 +1,17 @@
 #ifndef __UD_PLATFORM_H
 #define __UD_PLATFORM_H
 
-#define _LINUX
-
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
+
+#include <stdbool.h>
+/*
 typedef int bool;
 #define false 0
 #define true 1
+*/
+
 #define ARRAY_SIZE(_) (sizeof (_) / sizeof (*_))
 
 #if defined(UTILS_COMPILER_H_INCLUDED)
@@ -31,7 +34,7 @@ typedef int bool;
 
 #define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop) )
 
-#elif defined(_LINUX)
+#elif defined(__GNUC__)
 
 typedef int                 BOOL;
 typedef unsigned char       BYTE;

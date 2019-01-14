@@ -27,14 +27,14 @@ unsigned char crc8(unsigned char crc, unsigned char data)
 /*
 Calculate buffer with crc8
     @base: buffer input
-    @end_off: data size
+    @size: data size
     @returns calculated crc value
 */
-unsigned int calc_crc8(const unsigned char *base, int end_off)
+unsigned char calc_crc8(const unsigned char *base, int size)
 {
     unsigned char crc = 0;
     const unsigned char *ptr = base;
-    const unsigned char *last_val = base + end_off - 1;
+    const unsigned char *last_val = base + size - 1;
 
     while (ptr <= last_val) {
         crc = crc8(crc, *ptr);
@@ -68,14 +68,14 @@ unsigned int crc24(unsigned int crc, unsigned char firstbyte, unsigned char seco
 /*
 Calculate buffer with crc24
     @base: buffer input
-    @end_off: data size
+    @size: data size
     @returns calculated crc value, only bit[0~23] is valid
 */
-unsigned int calc_crc24(const unsigned char *base, int end_off)
+unsigned int calc_crc24(const unsigned char *base, int size)
 {
     unsigned int crc = 0;
     const unsigned char *ptr = base;
-    const unsigned char *last_val = base + end_off - 1;
+    const unsigned char *last_val = base + size - 1;
 
     while (ptr < last_val) {
         crc = crc24(crc, *ptr, *(ptr + 1));

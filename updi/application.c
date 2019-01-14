@@ -501,10 +501,10 @@ int app_execute_nvm_command(void *app_ptr, u8 command)
 }
 
 /*
-APP erase page
-@app_ptr: APP object pointer, acquired from updi_application_init()
-@page: page address to be erased
-@return 0 successful, other value if failed
+    APP erase page
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @page: page address to be erased
+    @return 0 successful, other value if failed
 */
 int app_page_erase(void *app_ptr, u16 address)
 {
@@ -1010,13 +1010,13 @@ int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command
-@app_ptr: APP object pointer, acquired from updi_application_init()
-@address: target address
-@data: data buffer
-@len: data len
-@use_word_access: 2 bytes mode for writting
-@return 0 successful, other value if failed
+    APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @use_word_access: 2 bytes mode for writting
+    @return 0 successful, other value if failed
 */
 int _app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access)
 {
@@ -1024,12 +1024,12 @@ int _app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, bo
 }
 
 /*
-APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command, and determine whether use 2 byte for writting
-@app_ptr: APP object pointer, acquired from updi_application_init()
-@address: target address
-@data: data buffer
-@len: data len
-@return 0 successful, other value if failed
+    APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command, and determine whether use 2 byte for writting
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value if failed
 */
 int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
@@ -1039,7 +1039,7 @@ int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
-APP load register value
+    APP load register value
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
     @data: data buffer
@@ -1066,7 +1066,7 @@ int app_ld_reg(void *app_ptr, u16 address, u8* data, int len)
 }
 
 /*
-APP set register value
+    APP set register value
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
     @data: data buffer
