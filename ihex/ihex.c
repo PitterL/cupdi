@@ -55,7 +55,7 @@ segment_buffer_t *get_segment_by_id_addr(hex_data_t *dhex, ihex_segment_t segmen
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
         seg = &dhex->segment[i];
-        if (seg->sid == segmentid && addr >= seg->addr_from && addr <= seg->addr_to)
+        if (seg->sid == segmentid && addr >= seg->addr_from && addr < seg->addr_to)
             return seg;
     }
 
@@ -103,10 +103,10 @@ segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t 
         seg = &dhex->segment[i];
         //the segment exist, expand the address
         if (seg->sid == segmentid && seg->addr_to) {
-            if (addr >= seg->addr_from && addr <= seg->addr_to + 1) {   //in buffer, or continous at tail coul call realloc
-                addr_to = addr + len - 1;
+            if (addr >= seg->addr_from && addr <= seg->addr_to) {   //in buffer, or continous at tail coul call realloc
+                addr_to = addr + len;
                 addr_to = max(addr_to, seg->addr_to);
-                size = addr_to - seg->addr_from + 1;
+                size = addr_to - seg->addr_from;
                 seg->addr_to = addr_to;
 
                 if (data) {
@@ -153,7 +153,7 @@ segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t 
 
             seg->sid = segmentid;
             seg->addr_from = addr;
-            seg->addr_to = addr + len - 1;
+            seg->addr_to = addr + len;
             return seg;
         }
     }
@@ -176,14 +176,14 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
     ihex_address_t addr_from, addr_to;
     
     addr_from = addr;
-    addr_to = addr + len - 1;
+    addr_to = addr + len;
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
         seg = &dhex->segment[i];
         //the segment exist, expand the address
         if (seg->sid == segmentid && seg->addr_to) {
-            if ((addr_from >= seg->addr_from && addr_from <= seg->addr_to + 1) ||
-                (addr_to >= seg->addr_from - 1 && addr_to <= seg->addr_to) ||
+            if ((addr_from >= seg->addr_from && addr_from <= seg->addr_to) ||
+                (addr_to >= seg->addr_from && addr_to <= seg->addr_to) ||
                 (addr_from <= seg->addr_from && addr_to >= seg->addr_to)) {
                 seg->addr_from = min(addr_from, seg->addr_from);
                 seg->addr_to = max(addr_to, seg->addr_to);
@@ -199,7 +199,7 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
         if (!seg->sid && !seg->addr_from && !seg->addr_to) {
             seg->sid = segmentid;
             seg->addr_from = addr;
-            seg->addr_to = addr + len - 1;
+            seg->addr_to = addr + len;
             return seg;
         }
     }
