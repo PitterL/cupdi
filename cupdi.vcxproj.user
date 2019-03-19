@@ -4,11 +4,21 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>-d tiny817 -c COM29  --dbgview "ds=0x00803e7c|dr=0x00803e9e|loop=0|keys=1  -f "D:\Users\a41450\atmel studio\Desay_FAW_VW_EBO_tn816Auto_128ms\Desay_FAW_VW_EBO_tn816Auto_128ms\Debug\Desay_FAW_VW_EBO_tn816Auto_128ms.ihex"</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments> -d tiny817 -c COM29 --pack-info -f "D:\Users\a41450\atmel studio\Desay_FAW_VW_EBO_tn816Auto_128ms\Desay_FAW_VW_EBO_tn816Auto_128ms\Debug\Desay_FAW_VW_EBO_tn816Auto_128ms.ihex"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-d tiny817 -c COM29  --dbgview "ds=0x00803e7c|dr=0x00803e9e|loop=0|keys=1  -f "D:\Users\a41450\atmel studio\Desay_FAW_VW_EBO_tn816Auto_128ms\Desay_FAW_VW_EBO_tn816Auto_128ms\Debug\Desay_FAW_VW_EBO_tn816Auto_128ms.ihex"</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments> -d tiny817 -c COM29 --pack-build -f "D:\Users\a41450\atmel studio\Desay_FAW_VW_EBO_tn816Auto_128ms\Desay_FAW_VW_EBO_tn816Auto_128ms\Debug\Desay_FAW_VW_EBO_tn816Auto_128ms.ihex"</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LocalDebuggerCommandArguments>
+    </LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalDebuggerCommandArguments>
+    </LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

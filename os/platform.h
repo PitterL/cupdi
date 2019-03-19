@@ -19,8 +19,14 @@ typedef unsigned int u32;
     #define CLR_BIT(_x, _bit) ((_x) &= ~(1 << (_bit)))
     #define TEST_BIT(_x, _bit) ((_x) & (1 << (_bit)))
 #endif
+#define BIT_MASK(_bit) (1 << (_bit))
+
 #define SET_AND_CLR_BIT(_x, _sbit, _cbit) (SET_BIT((_x), (_sbit)), CLR_BIT((_x), (_cbit)))
 
+#define L8_TO_LT16(__v0, __v1) ((((short)(__v1)) << 8) | ((short)(__v0)))
+#define L16_TO_LT32(__v0, __v1) ((((short)(__v1)) << 16) | ((short)(__v0)))
+
+/* Windows platform */
 #if defined(_WIN32) || defined(_WIN64) 
 typedef long ssize_t;
 
@@ -36,6 +42,7 @@ typedef long ssize_t;
 #include <string/getline.h>
 #include <string/strndup.h>
 
+/* Linux platform */
 #elif defined(__GNUC__)
 
 typedef int                 BOOL;

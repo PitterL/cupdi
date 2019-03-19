@@ -93,6 +93,9 @@
     <ClInclude Include="string\getline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="infoblock\ib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cupdi.c">
@@ -159,6 +162,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="string\getline.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="infoblock\s1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="infoblock\ib_router.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="infoblock\s2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

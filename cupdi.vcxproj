@@ -166,6 +166,7 @@
     <ClInclude Include="ihex\kk_ihex.h" />
     <ClInclude Include="ihex\kk_ihex_read.h" />
     <ClInclude Include="ihex\kk_ihex_write.h" />
+    <ClInclude Include="infoblock\ib.h" />
     <ClInclude Include="os\platform.h" />
     <ClInclude Include="os\win32\error.h" />
     <ClInclude Include="os\win32\logging.h" />
@@ -193,6 +194,9 @@
     <ClCompile Include="ihex\ihex.c" />
     <ClCompile Include="ihex\kk_ihex_read.c" />
     <ClCompile Include="ihex\kk_ihex_write.c" />
+    <ClCompile Include="infoblock\ib_router.c" />
+    <ClCompile Include="infoblock\s1.c" />
+    <ClCompile Include="infoblock\s2.c" />
     <ClCompile Include="os\win32\logging.c" />
     <ClCompile Include="os\win32\serial.c" />
     <ClCompile Include="os\win32\swap.c" />
