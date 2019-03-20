@@ -4664,7 +4664,7 @@ fi
 done
 
 
-ac_config_files="$ac_config_files Makefile argparse/Makefile crc/Makefile device/Makefile file/Makefile ihex/Makefile os/linux/Makefile regex/Makefile string/Makefile updi/Makefile"
+ac_config_files="$ac_config_files Makefile argparse/Makefile crc/Makefile device/Makefile file/Makefile ihex/Makefile os/linux/Makefile regex/Makefile string/Makefile updi/Makefile infoblock/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -5403,6 +5403,7 @@ do
     "regex/Makefile") CONFIG_FILES="$CONFIG_FILES regex/Makefile" ;;
     "string/Makefile") CONFIG_FILES="$CONFIG_FILES string/Makefile" ;;
     "updi/Makefile") CONFIG_FILES="$CONFIG_FILES updi/Makefile" ;;
+    "infoblock/Makefile") CONFIG_FILES="$CONFIG_FILES infoblock/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

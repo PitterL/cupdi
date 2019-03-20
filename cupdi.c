@@ -63,14 +63,16 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include <string/split.h>
 #include <file/fop.h>
 #include <crc/crc.h>
+#include <infoblock/ib.h>
 #include "cupdi.h"
 
 /* CUPDI Software version */
-#define SOFTWARE_VERSION "1.06"
+#define SOFTWARE_VERSION "1.07"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS "qtouch\\touch.h"
 #define VCS_HEX_FILE_EXTENSION_NAME "ihex"
+#define MAP_FILE_EXTENSION_NAME "map"
 #define SAVE_FILE_EXTENSION_NAME "save"
 #define DUMP_FILE_EXTENSION_NAME "dump"
 
@@ -399,69 +401,55 @@ int updi_erase(void *nvm_ptr)
     return 0;
 }
 
-PACK(
-typedef struct _infomation_hearder {
-    char ver[2];
-    unsigned short size;
-}) information_header_t;
-
-typedef struct _build_number {
-    char major : 4;
-    char minor : 4;
-}build_number_t;
-
-PACK(
-typedef struct _fw_ver {
-    char ver[3];
-    build_number_t build;
-}) fw_ver_t;
-
-typedef union _firmware_version{
-    fw_ver_t data;
-    unsigned int value;
-}firmware_version_t;
-
-typedef struct _info_crc {
-    unsigned int fw: 24;
-    unsigned int info: 8;
-}info_crc_t;
-
-typedef union _information_crc {
-    info_crc_t data;
-    unsigned int value;
-}information_crc_t;
-
-#define INFO_BLOCK_VER_MAJOR 's'
-#define INFO_BLOCK_VER_MINOR '1'
-PACK(
-typedef struct _information_block_s1 {
-    information_header_t header;
-    firmware_version_t fw_version;
-    int fw_size;
-    information_crc_t crc;
-})information_block_s1_t;
-
 /*
     Get Info block from eeprom
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @info: output buffer for infoblock
     @return 0 successful, other value failed
 */
-int get_infoblock_from_eeprom(void *nvm_ptr, information_block_s1_t *info)
+int get_infoblock_from_eeprom(void *nvm_ptr, information_container_t *info)
 {
+    nvm_info_t iblock;
+    information_header_t header;
+    char * buf = NULL;
+    int len;
     int result;
 
-    result = nvm_read_eeprom(nvm_ptr, INFO_BLOCK_ADDRESS_IN_EEPROM, (u8 *)info, sizeof(*info));
+    result = nvm_get_block_info(nvm_ptr, NVM_EEPROM, &iblock);
     if (result) {
-        DBG_INFO(UPDI_DEBUG, "nvm_read_eeprom failed %d", result);
+        DBG_INFO(UPDI_DEBUG, "nvm_get_block_info failed %d", result);
         return -2;
     }
 
-    result = calc_crc8((unsigned char *)info, sizeof(*info));
-    if (result != 0) {
-        DBG_INFO(UPDI_DEBUG, "Info Block calc crc8 mismatch, calculated = %02x:", result);
-        DBG(UPDI_DEBUG, "Info Block:", (unsigned char *)info, sizeof(*info), "%02X ");
-        result = -3;
+    result = nvm_read_eeprom(nvm_ptr, INFO_BLOCK_ADDRESS_IN_EEPROM, (u8 *)&header, sizeof(header));
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "nvm_read_eeprom failed %d", result);
+        return -3;
+    }
+
+    len = header.data.size;
+    if (len <= 0 || len > iblock.nvm_size || len > ib_max_block_size()) {
+        DBG_INFO(UPDI_DEBUG, "Header '%04x', size = %d is incorrect", header.data.version.value, len);
+        return -4;
+    }
+
+    buf = malloc(len);
+    if (!buf) {
+        DBG_INFO(UPDI_DEBUG, "malloc infoblock size %d failed", len);
+        return -5;
+    }
+
+    result = nvm_read_eeprom(nvm_ptr, INFO_BLOCK_ADDRESS_IN_EEPROM, (u8 *)buf, len);
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "nvm_read_eeprom %d bytes failed %d", len, result);
+        return -6;
+    }
+
+    result = infoblock_set_data_ptr(info, buf, len, BIT_MASK(MEM_SHARE_RELEASE));
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "Info Block set data ptr failed %d", result);
+        DBG(UPDI_DEBUG, "Info Block:", (unsigned char *)buf, len, "%02X ");
+        result = -5;
     }
 
     return result;
@@ -471,12 +459,12 @@ int get_infoblock_from_eeprom(void *nvm_ptr, information_block_s1_t *info)
     Get infoblock from hex data structure
     @block: nvm info
     @dhex: hex data structure
-    @output: infoblock output buffer
+    @output: infoblock container output buffer
     return 0 if sucessful, else failed
 */
-int _get_infoblock_from_hex_info(nvm_info_t *block, hex_data_t *dhex, information_block_s1_t *output)
+int _get_infoblock_from_hex_info(nvm_info_t *block, hex_data_t *dhex, information_container_t *output)
 {
-    information_block_s1_t *info;
+    information_header_t *head;
     segment_buffer_t *seg;
     ihex_segment_t sid;
     int start, size, off;
@@ -490,17 +478,15 @@ int _get_infoblock_from_hex_info(nvm_info_t *block, hex_data_t *dhex, informatio
             start += INFO_BLOCK_ADDRESS_IN_EEPROM;
 
         off = start - INFO_BLOCK_ADDRESS_IN_EEPROM;
-        size = seg->addr_to - start + 1;
-        if (size >= sizeof(information_block_s1_t)) {
-            info = (information_block_s1_t *)(seg->data + off);
-            result = calc_crc8((unsigned char *)info, sizeof(*info));
-            if (result != 0) {
-                DBG_INFO(UPDI_DEBUG, "Info Block calc crc8 mismatch, calculated = %02x:", result);
-                DBG(UPDI_DEBUG, "Info Block:", (unsigned char *)info, sizeof(*info), "%02X ");
+        size = seg->addr_to - start;
+        if (size >= sizeof(*head)) {
+            head = (information_header_t *)(seg->data + off);
+            result = infoblock_set_data_ptr(output, (char *)head, size, BIT_MASK(MEM_SHARE));
+            if (result) {
+                DBG_INFO(UPDI_DEBUG, "Info Block matching failed, failed %d", result);
+                DBG(UPDI_DEBUG, "Info Block:", (unsigned char *)head, size, "%02X ");
                 result = -3;
             }
-            else
-                memcpy(output, info, sizeof(*info));
         }
         else {
             DBG_INFO(UPDI_DEBUG, "Info Block size %d is too small in seg", size);
@@ -522,7 +508,7 @@ int _get_infoblock_from_hex_info(nvm_info_t *block, hex_data_t *dhex, informatio
     @output: infoblock output buffer
     return 0 if sucessful, else failed
 */
-int get_infoblock_from_hex_info_nvm(void *nvm_ptr, hex_data_t *dhex, information_block_s1_t *output)
+int get_infoblock_from_hex_info_nvm(void *nvm_ptr, hex_data_t *dhex, information_container_t *output)
 {
     nvm_info_t iblock;
     int result;
@@ -540,10 +526,10 @@ int get_infoblock_from_hex_info_nvm(void *nvm_ptr, hex_data_t *dhex, information
     Get infoblock from hex data structure
     @dev: device info structure, get by get_chip_info()
     @dhex: hex data structure
-    @output: infoblock output buffer
+    @output: infoblock container output buffer
     return 0 if sucessful, else failed
 */
-int get_infoblock_from_hex_info_dev(const device_info_t * dev, hex_data_t *dhex, information_block_s1_t *output)
+int get_infoblock_from_hex_info_dev(const device_info_t * dev, hex_data_t *dhex, information_container_t *output)
 {
     nvm_info_t iblock;
     int result;
@@ -608,7 +594,7 @@ int load_version_value_from_file(const char *file, int *ver)
 
     result = search_defined_value_int_from_file(file, "FIRMWARE_VERSION", &version);
     if (result != 1) {
-        DBG_INFO(UPDI_DEBUG, "search_defined_value_int_from_file failed %d", result);
+        DBG_INFO(UPDI_DEBUG, "search_defined_value_int_from_file fw version failed %d", result);
         return -2;
     }
 
@@ -618,52 +604,36 @@ int load_version_value_from_file(const char *file, int *ver)
 }
 
 /*
-    Show infoblock
-    @info: infoblock structure
-    return None
+Get Firmware signal/reference structure address from file
+@file: file name to search
+@ver: version output buffer
+return 0 if sucessful, else failed
 */
-void show_infoblock(information_block_s1_t * info)
+int load_dsdr_value_from_file(const char *file, int *dsdr)
 {
-    DBG(UPDI_DEBUG, "Information Block Content:", (u8 *)info, sizeof(*info), "%02X ");
+    unsigned int ds, dr;
+    int result;
 
-    DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c %hhd.%hhd",
-        info->fw_version.data.ver[0],
-        info->fw_version.data.ver[1],
-        info->fw_version.data.ver[2],
-        info->fw_version.data.build.major,
-        info->fw_version.data.build.minor);
+    result = search_map_value_int_from_file(file, "ptc_qtlib_node_stat1", &ds);
+    if (result != 1) {
+        DBG_INFO(UPDI_DEBUG, "search_map_value_int_from_file ds failed %d", result);
+        return -2;
+    }
 
-    DBG_INFO(UPDI_DEBUG, "fw_size: %d bytes(0x%x)",
-        info->fw_size, 
-        info->fw_size);
+    result = search_map_value_int_from_file(file, "qtlib_key_data_set1", &dr);
+    if (result != 1) {
+        DBG_INFO(UPDI_DEBUG, "search_map_value_int_from_file dr failed %d", result);
+        return -3;
+    }
 
-    DBG_INFO(UPDI_DEBUG, "fw_crc: 0x%06x",
-        info->crc.data.fw);
-}
+    if (!ds || !dr) {
+        DBG_INFO(UPDI_DEBUG, "get ds/dr reg address invalid", result);
+        return -4;
+    }
 
-/*
-    Build Info block
-    @info: infoblock structure memory pointer
-    @data: flash data buffer
-    @len: flash data len
-    @version: firmware version
-    return None
-*/
-void build_information_block(information_block_s1_t *info, const char *data, int len, unsigned int version)
-{
-    memset(info, 0, sizeof(*info));
-
-    info->header.ver[0] = INFO_BLOCK_VER_MAJOR;
-    info->header.ver[1] = INFO_BLOCK_VER_MINOR;
-    info->header.size = (unsigned short)sizeof(*info);
-
-    info->fw_version.value = version;
-    info->fw_size = len;
-
-    info->crc.data.fw = calc_crc24(data, len);
-    info->crc.data.info = calc_crc8((unsigned char *)info, sizeof(*info) - 1);
-
-    show_infoblock(info);
+    *dsdr = L16_TO_LT32(ds, dr);
+    
+    return 0;
 }
 
 /*
@@ -673,17 +643,18 @@ void build_information_block(information_block_s1_t *info, const char *data, int
 */
 int updi_show_infoblock(void *nvm_ptr)
 {
-    information_block_s1_t infoblock;
+    information_container_t info_container;
     int result;
 
-    result = get_infoblock_from_eeprom(nvm_ptr, &infoblock);
+    memset(&info_container, 0, sizeof(info_container));
+    result = get_infoblock_from_eeprom(nvm_ptr, &info_container);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "get_infoblock_from_eeprom failed", result);
         return -2;
     }
 
-    show_infoblock(&infoblock);
-
+    ib_show(&info_container);
+    ib_destory(&info_container);
     return 0;
 }
 
@@ -743,30 +714,39 @@ char *get_nvm_content(void *nvm_ptr, int type, int *req_size)
 */
 int updi_verifiy_infoblock(void *nvm_ptr)
 {
-    information_block_s1_t infoblock;
+    information_container_t info_container;
     char *buf = NULL;
-    int len, crc;
+    int len, crc, info_crc;
     int result;
 
-    result = get_infoblock_from_eeprom(nvm_ptr, &infoblock);
+    memset(&info_container, 0, sizeof(info_container));
+    result = get_infoblock_from_eeprom(nvm_ptr, &info_container);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "get_infoblock_from_eeprom failed", result);
         return -2;
     }
 
-    len = infoblock.fw_size;
+    len = ib_get(&info_container, IB_FW_SIZE);
+    if (len <= 0) {
+        DBG_INFO(UPDI_DEBUG, "get firmware size = %d failed", len);
+        result = -3;
+        goto out;
+    }
+    
     buf = get_nvm_content(nvm_ptr, NVM_FLASH, &len);
     if (!buf) {
         DBG_INFO(UPDI_DEBUG, "get_flash_content failed");
-        result = -3;
+        result = -4;
+        goto out;
     }
 
     // DBG(UPDI_DEBUG, "Flash data ", buf, len, "%02x ");
 
     crc = calc_crc24(buf, len);
-    if (infoblock.crc.data.fw != crc) {
-        DBG_INFO(UPDI_DEBUG, "Info Block read fw crc24 mismatch %06x(%06x)", infoblock.crc.data.fw, crc);
-        result = -4;
+    info_crc = ib_get(&info_container, IB_CRC_FW);
+    if (info_crc < 0 || info_crc != crc) {
+        DBG_INFO(UPDI_DEBUG, "Info Block read fw crc24 mismatch %06x(%06x)", info_crc, crc);
+        result = -5;
         goto out;
     }
 
@@ -775,6 +755,7 @@ out:
     if (buf)
         free(buf);
 
+    ib_destory(&info_container);
     return result;
 }
 
@@ -843,10 +824,14 @@ out:
 */
 int compare_nvm_crc(void *nvm_ptr, hex_data_t *dhex)
 {
-    information_block_s1_t file_info_block, eeprom_info_block;
+    information_container_t file_info_container, eeprom_info_block;
+    int ecrc, fcrc;
     int result;
 
-    result = get_infoblock_from_hex_info_nvm(nvm_ptr, dhex, &file_info_block);
+    memset(&file_info_container, 0, sizeof(file_info_container));
+    memset(&eeprom_info_block, 0, sizeof(eeprom_info_block));
+
+    result = get_infoblock_from_hex_info_nvm(nvm_ptr, dhex, &file_info_container);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "get_infoblock_from_hex_info failed %d", result);
         result = -3;
@@ -860,15 +845,19 @@ int compare_nvm_crc(void *nvm_ptr, hex_data_t *dhex)
         goto out;
     }
 
-    if (file_info_block.crc.value != eeprom_info_block.crc.value) {
-        DBG_INFO(UPDI_DEBUG, "Fw CRC 0x%x mismatch file CRC 0x%x", eeprom_info_block.crc.value, file_info_block.crc.value);
+    ecrc = ib_get(&eeprom_info_block, IB_CRC_FW);
+    fcrc = ib_get(&file_info_container, IB_CRC_FW);
+    if (ecrc < 0 || fcrc < 0 || ecrc != fcrc) {
+        DBG_INFO(UPDI_DEBUG, "Fw CRC 0x%x mismatch file CRC 0x%x", ecrc, fcrc);
         result = -5;
         goto out;
     }
 
-    DBG_INFO(UPDI_DEBUG, "CRC 0x%x matched ", eeprom_info_block.crc.value);
-out:
+    DBG_INFO(UPDI_DEBUG, "CRC 0x%x matched ", ecrc);
 
+out:
+    ib_destory(&eeprom_info_block);
+    ib_destory(&file_info_container);
     return result;
 }
 
@@ -995,49 +984,67 @@ int updi_update(void *nvm_ptr, const char *file)
 int updi_save(void *nvm_ptr, const char *file)
 {
     hex_data_t dhex_info;
-    information_block_s1_t infoblock;
+    information_container_t info_container;
     unsigned char *buf = NULL;
     int len;
-    int crc;
+    int crc, ecrc;
     char * save_file = NULL;
     int result;
 
     memset(&dhex_info, 0, sizeof(dhex_info));
-
+    memset(&info_container, 0, sizeof(info_container));
     //Get infoblock first
-    result = get_infoblock_from_eeprom(nvm_ptr, &infoblock);
+    result = get_infoblock_from_eeprom(nvm_ptr, &info_container);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "get_infoblock_from_eeprom failed", result);
         return -2;
     }
 
     //flash content
-    len = infoblock.fw_size;
+    len = ib_get(&info_container, IB_FW_SIZE);
+    if (len <= 0) {
+        DBG_INFO(UPDI_DEBUG, "get_flash_content failed");
+        result = -3;
+        goto out;
+    }
+
     buf = get_nvm_content(nvm_ptr, NVM_FLASH, &len);
     if (!buf) {
         DBG_INFO(UPDI_DEBUG, "get_flash_content failed");
         result = -3;
+        goto out;
     }
     
     crc = calc_crc24(buf, len);
-    if (infoblock.crc.data.fw != crc) {
-        DBG_INFO(UPDI_DEBUG, "Info Block read fw crc24 mismatch %06x(%06x)", infoblock.crc.data.fw, crc);
+    ecrc = ib_get(&info_container, IB_CRC_FW);
+    if (ecrc < 0 || ecrc != crc) {
+        DBG_INFO(UPDI_DEBUG, "Info Block read fw crc24 mismatch %06x(%06x), force save flash data with size %d", ecrc, crc, len);
+        /*
+        result = -4;
+        goto out;
+        */
     }
 
     result = save_content_to_segment(nvm_ptr, NVM_FLASH, &dhex_info, 0, buf, len);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "save_flash_content_to_segment failed %d", result);
-        result = -4;
+        result = -5;
         goto out;
     }
     free(buf);
     buf = NULL;
 
     //eeprom content
-    result = save_content_to_segment(nvm_ptr, NVM_EEPROM, &dhex_info, INFO_BLOCK_ADDRESS_IN_EEPROM, (char *)&infoblock, sizeof(infoblock));
+    len = ib_get(&info_container, IB_HEAD_SIZE);
+    if (len <= 0) {
+        DBG_INFO(UPDI_DEBUG, "get eeprom size = %d failed", len);
+        result = -6;
+        goto out;
+    }
+    result = save_content_to_segment(nvm_ptr, NVM_EEPROM, &dhex_info, INFO_BLOCK_ADDRESS_IN_EEPROM, (char *)info_container.head, len);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "save_eeprom_content_to_segment failed %d", result);
-        result = -5;
+        result = -7;
         goto out;
     }
 
@@ -1046,14 +1053,14 @@ int updi_save(void *nvm_ptr, const char *file)
     buf = get_nvm_content(nvm_ptr, NVM_FUSES, &len);
     if (!buf) {
         DBG_INFO(UPDI_DEBUG, "get_fuses_content failed");
-        result = -6;
+        result = -8;
         goto out;
     }
     
     result = save_content_to_segment(nvm_ptr, NVM_FUSES, &dhex_info, 0, buf, len);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "save_eeprom_content_to_segment failed %d", result);
-        result = -7;
+        result = -9;
         goto out;
     }
 
@@ -1061,14 +1068,14 @@ int updi_save(void *nvm_ptr, const char *file)
     save_file = trim_name_with_extesion(file, '.', 1, SAVE_FILE_EXTENSION_NAME);
     if (!save_file) {
         DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", SAVE_FILE_EXTENSION_NAME, result);
-        result = -8;
+        result = -9;
         goto out;
     }
 
     result = save_hex_info_to_file(save_file, &dhex_info);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "save_hex_info failed %d", result);
-        result = -9;
+        result = -10;
         goto out;
     }
 
@@ -1082,7 +1089,7 @@ out:
         free(save_file);
 
     unload_segments(&dhex_info);
-
+    ib_destory(&info_container);
     return result;
 }
 
@@ -1221,28 +1228,72 @@ out:
 segment_buffer_t * load_version_segment_from_file(const device_info_t * dev, const char *file, const char *data, int len, hex_data_t *dhex)
 {
     nvm_info_t iblock;
-    segment_buffer_t *seg;
+    segment_buffer_t *seg = NULL;
     ihex_segment_t sid;
-    unsigned int version;
-    information_block_s1_t infoblock;
+    unsigned int version, dsdr_addr;
+    int crc24, size;
+    information_container_t info_container;
+    char * vcs_file = NULL;
+    char * map_file = NULL;
     int result;
 
-    result = load_version_value_from_file(file, &version);
+    memset(&info_container, 0, sizeof(info_container));
+
+    vcs_file = trim_name_with_extesion(file, '\\', 2, VAR_FILE_RELATIVE_POS);
+    if (!vcs_file) {
+        DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed", VAR_FILE_RELATIVE_POS);
+        goto out;
+    }
+
+    result = load_version_value_from_file(vcs_file, &version);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "load_version_value_from_file failed %d", result);
-        return NULL;
+        goto out;
+    }
+
+    map_file = trim_name_with_extesion(file, '.', 1, MAP_FILE_EXTENSION_NAME);
+    if (!map_file) {
+        DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", MAP_FILE_EXTENSION_NAME, result);
+        goto out;
+    }
+
+    result = load_dsdr_value_from_file(map_file, &dsdr_addr);
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "load_dsdr_value_from_file failed %d", result);
+        goto out;
     }
 
     result = dev_get_nvm_info(dev, NVM_EEPROM, &iblock);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        return NULL;
+        goto out;
     }
 
-    build_information_block(&infoblock, data, len, version);
+    crc24 = calc_crc24(data, len);
+    result = create_information_block_s2(&info_container, crc24, len, version, dsdr_addr);
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "create_information_block_s2 failed %d", result);
+        goto out;
+    }
+
+    size = ib_get(&info_container, IB_HEAD_SIZE);
+    if (size <= 0) {
+        DBG_INFO(UPDI_DEBUG, "get head size = %d failed %d", size, result);
+        goto out;
+    }
+
     sid = ADDR_TO_SEGMENTID(iblock.nvm_start);
     unload_segment_by_sid(dhex, sid);
-    seg = set_segment_data_by_id_addr(dhex, sid, INFO_BLOCK_ADDRESS_IN_EEPROM, sizeof(infoblock), (char *)&infoblock, SEG_ALLOC_MEMORY);
+    seg = set_segment_data_by_id_addr(dhex, sid, INFO_BLOCK_ADDRESS_IN_EEPROM, size, (char *)info_container.head, SEG_ALLOC_MEMORY);
+    if (!seg) {
+        DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed");
+        goto out;
+    }
+
+out:
+    ib_destory(&info_container);
+    if (vcs_file)
+        free(vcs_file);
 
     return seg;
 }
@@ -1262,6 +1313,7 @@ int load_fuse_content_from_file(const device_info_t * dev, const char * file, he
     unsigned char val;
     unsigned int *fuses_config = NULL;
     const int invalid_value = 0x800;
+    char *vcs_file = NULL;
     int i, result = 0;
 
     result = dev_get_nvm_info(dev, NVM_FUSES, &iblock);
@@ -1277,9 +1329,15 @@ int load_fuse_content_from_file(const device_info_t * dev, const char * file, he
         goto out;
     }
 
-    result = search_defined_array_int_from_file(file, "FUSES_CONTENT", fuses_config, iblock.nvm_size, invalid_value);
+    vcs_file = trim_name_with_extesion(file, '\\', 2, VAR_FILE_RELATIVE_POS);
+    if (!vcs_file) {
+        DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", VAR_FILE_RELATIVE_POS, result);
+        goto out;
+    }
+
+    result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock.nvm_size, invalid_value);
     if (result == 0) {
-        DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", file);
+        DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", vcs_file);
         goto out;
     }
     else if (result < 0 || result > iblock.nvm_size) {
@@ -1311,6 +1369,9 @@ int load_fuse_content_from_file(const device_info_t * dev, const char * file, he
         }
     }
 out:
+    if (vcs_file)
+        free(vcs_file);
+
     if (fuses_config)
         free(fuses_config);
 
@@ -1327,7 +1388,6 @@ int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file)
 {
     hex_data_t dhex_info;
     segment_buffer_t *seg;
-    char * vcs_file = NULL;
     char * ihex_file = NULL;
 
     int result = 0;
@@ -1342,21 +1402,14 @@ int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file)
         goto out;
     }
 
-    vcs_file = trim_name_with_extesion(file, '\\', 2, VAR_FILE_RELATIVE_POS);
-    if (!vcs_file) {
-        DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", VAR_FILE_RELATIVE_POS, result);
-        result = -4;
-        goto out;
-    }
-
-    seg = load_version_segment_from_file(dev, vcs_file, seg->data, seg->len, &dhex_info);
+    seg = load_version_segment_from_file(dev, file, seg->data, seg->len, &dhex_info);
     if (!seg) {
         DBG_INFO(UPDI_DEBUG, "Skip load_version_segment_from_file (failed)");
         //result = -5;
         //goto out;
     }
 
-    result = load_fuse_content_from_file(dev, vcs_file, &dhex_info);
+    result = load_fuse_content_from_file(dev, file, &dhex_info);
     if (result < 0) {
         DBG_INFO(UPDI_DEBUG, "Skip load_fuse_content_from_file(error=%d)", result);
         //result = -6;
@@ -1364,7 +1417,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file)
     }
 
     ihex_file = trim_name_with_extesion(file, '.', 1, VCS_HEX_FILE_EXTENSION_NAME);
-    if (!vcs_file) {
+    if (!ihex_file) {
         DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", VCS_HEX_FILE_EXTENSION_NAME, result);
         return -7;
     }
@@ -1379,8 +1432,6 @@ int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file)
     DBG_INFO(UPDI_DEBUG, "Saved Hex to \"%s\"", ihex_file);
 
 out:
-    if (vcs_file)
-        free(vcs_file);
 
     if (ihex_file)
         free(ihex_file);
@@ -1399,14 +1450,15 @@ out:
 int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file)
 {
     hex_data_t dhex_info;
-    information_block_s1_t file_info_block;
+    information_container_t file_info_container;
     nvm_info_t iblock;
     segment_buffer_t *seg;
     ihex_segment_t sid;
-    int crc;
+    int fw_size, fw_crc, crc;
     int result = 0;
 
     memset(&dhex_info, 0, sizeof(dhex_info));
+    memset(&file_info_container, 0, sizeof(file_info_container));
 
     result = load_segments_from_file(file, &dhex_info);
     if (result) {
@@ -1414,7 +1466,7 @@ int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file)
         return -2;
     }
 
-    result = get_infoblock_from_hex_info_dev(dev, &dhex_info, &file_info_block);
+    result = get_infoblock_from_hex_info_dev(dev, &dhex_info, &file_info_container);
     if (result) {
         DBG_INFO(UPDI_DEBUG, "get_infoblock_from_hex_info failed %d", result);
         result = -3;
@@ -1436,21 +1488,24 @@ int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file)
         goto out;
     }
 
-    if (seg->len < file_info_block.fw_size) {
-        DBG_INFO(UPDI_DEBUG, "seg size not enough, seg = %d, infoblock size %d", seg->len, file_info_block.fw_size);
+    fw_size = ib_get(&file_info_container, IB_FW_SIZE);
+    if (fw_size <= 0 || seg->len < fw_size) {
+        DBG_INFO(UPDI_DEBUG, "seg size not enough, seg = %d, infoblock size %d", seg->len, fw_size);
         result = -5;
         goto out;
     }
 
-    crc = calc_crc24(seg->data, file_info_block.fw_size);
-    if (file_info_block.crc.data.fw != crc) {
-        DBG_INFO(UPDI_DEBUG, "Info Block read file crc24 mismatch %06x(%06x)", file_info_block.crc.data.fw, crc);
+    fw_crc = ib_get(&file_info_container, IB_CRC_FW);
+    crc = calc_crc24(seg->data, fw_size);
+    if (fw_crc < 0 || crc < 0 || fw_crc != crc) {
+        DBG_INFO(UPDI_DEBUG, "Info Block read file crc24 mismatch %06x(%06x)", fw_crc, crc);
         result = -6;
         goto out;
     }
 
-    show_infoblock(&file_info_block);
+    ib_show(&file_info_container);
 out:
+    ib_destory(&file_info_container);
     unload_segments(&dhex_info);
 
     return result;

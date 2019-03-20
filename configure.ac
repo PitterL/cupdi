@@ -37,5 +37,6 @@ AC_CONFIG_FILES([Makefile
                  os/linux/Makefile
 		 regex/Makefile
                  string/Makefile
-                 updi/Makefile])
+                 updi/Makefile
+				 infoblock/Makefile])
 AC_OUTPUT

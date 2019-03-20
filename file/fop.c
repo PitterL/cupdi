@@ -9,6 +9,7 @@
 #include <string/strlcat.h>
 #include <string/join.h>
 #include <string/split.h>
+#include <string/strndup.h>
 #include <os/platform.h>
 
 /*
@@ -273,4 +274,27 @@ int search_defined_value_int_from_file(const char *file, const char *varname, un
     str_join(pat_str, sizeof(pat_str), pat_raw, ARRAY_SIZE(pat_raw), space_delims);
 
     return _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, 0x0);
+}
+
+/*
+Get value content in source file, the format is: #define <varname> 0x123456
+@file: file to search
+@varname: defined varible array name
+@output: varible value output array buffer
+@outlen: varible value count
+@invalid: if var in array not valid, filled to this value
+@return how many varibles get, negative mean error occur
+*/
+int search_map_value_int_from_file(const char *file, const char *varname, unsigned int *output)
+{
+    char pat_str[TRE_MAX_BUFLEN];
+    const char *pat_raw[] = { "", "0x[0-9a-fA-F]{4,}", varname };
+    const char *pat_value = "0x[0-9a-fA-F]{4,}";
+    const char *space_delims = "\\s+";
+
+    //create pattern to search
+    pat_str[0] = '\0';
+    str_join(pat_str, sizeof(pat_str), pat_raw, ARRAY_SIZE(pat_raw), space_delims);
+
+    return _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, (unsigned int)-1);
 }
