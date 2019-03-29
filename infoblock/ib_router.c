@@ -8,18 +8,18 @@ int infoblock_set_data_ptr(information_container_t *info, char *data, int len, i
     unsigned crc8;
 
     head = (information_header_t *)data;
-    if (head->data.size != len)
+    if (head->data.size > len)
         return -3;
 
-    crc8 = calc_crc8((unsigned char *)data, len);
+    crc8 = calc_crc8((unsigned char *)data, head->data.size);
     if (crc8 != 0)
         return -2;
 
     switch (head->data.version.value) {
     case INFO_BLOCK_S1_VERSION:
-        return set_information_block_ptr_s1(info, data, len, flag);
+        return set_information_block_ptr_s1(info, data, head->data.size, flag);
     case INFO_BLOCK_S2_VERSION:
-        return set_information_block_ptr_s2(info, data, len, flag);
+        return set_information_block_ptr_s2(info, data, head->data.size, flag);
     default:
         return -3;
     }

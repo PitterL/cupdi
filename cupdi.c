@@ -67,7 +67,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include "cupdi.h"
 
 /* CUPDI Software version */
-#define SOFTWARE_VERSION "1.07"
+#define SOFTWARE_VERSION "1.08"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS "qtouch\\touch.h"
@@ -399,6 +399,38 @@ int updi_erase(void *nvm_ptr)
     }
 
     return 0;
+}
+
+/*
+    Print segment info in hex data
+    @dev: device info structure, get by get_chip_info()
+    @type: NVM type
+    @dhex: hex data structure
+    @return 0 if found the segment data
+*/
+int dev_hex_show(const device_info_t * dev, int type, hex_data_t *dhex)
+{
+    nvm_info_t iblock;
+    segment_buffer_t *seg;
+    ihex_segment_t sid;
+    int i, result = -3;
+
+    result = dev_get_nvm_info(dev, type, &iblock);
+    if (result) {
+        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", type, result);
+        return -2;
+    }
+
+    sid = ADDR_TO_SEGMENTID(iblock.nvm_start);
+    for (i = 0; i < ARRAY_SIZE(dhex->segment); i++) {
+        seg = &dhex->segment[i];
+        if (seg->sid == sid) {
+            DBG(UPDI_DEBUG, "nvm-%d: ", seg->data, seg->len, "%02x ", type);
+            result = 0;
+        }
+    }
+
+    return result;
 }
 
 /*
@@ -1503,7 +1535,11 @@ int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file)
         goto out;
     }
 
+    //Show ib area
     ib_show(&file_info_container);
+
+    //Show Fuse area
+    dev_hex_show(dev, NVM_FUSES, &dhex_info);
 out:
     ib_destory(&file_info_container);
     unload_segments(&dhex_info);

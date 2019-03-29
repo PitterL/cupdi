@@ -42,6 +42,7 @@ typedef long ssize_t;
 #include <string/getline.h>
 #include <string/strndup.h>
 
+/* Linux platform */
 #elif defined(__GNUC__)
 
 typedef int                 BOOL;
