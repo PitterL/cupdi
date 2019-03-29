@@ -808,6 +808,7 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
 /*
     NVM get block info, this is defined in device.c
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @type: NVM type
     @info: chip flash information
     @return 0 successful, other value failed
 */

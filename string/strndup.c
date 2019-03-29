@@ -12,7 +12,7 @@ You should have received a copy of the GNU Lesser General Public
 License along with the GNU C Library; if not, see
 <http://www.gnu.org/licenses/>.  */
 #ifdef HAVE_CONFIG_H
-# include "config.h"
+//# include "config.h"
 #endif
 #include <stdio.h>
 #include <sys/types.h>
@@ -21,7 +21,7 @@ License along with the GNU C Library; if not, see
 # include <stdlib.h>
 # include <string.h>
 #else
-char *malloc();
+extern void *malloc (size_t __size);
 #endif
 #undef __strndup
 #undef strndup

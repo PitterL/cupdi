@@ -8,7 +8,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments> -d tiny817 -c COM29 --pack-build -f "D:\Users\a41450\atmel studio\Desay_FAW_VW_EBO_tn816Auto_128ms\Desay_FAW_VW_EBO_tn816Auto_128ms\Debug\Desay_FAW_VW_EBO_tn816Auto_128ms.ihex"</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments> -d tiny817 -c COM29 --pack-info -f "D:\Users\a41450\atmel studio\Desay_FAW_VW_EBO_tn816Auto_128ms\Desay_FAW_VW_EBO_tn816Auto_128ms\Debug\fw.dump"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

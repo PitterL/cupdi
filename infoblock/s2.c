@@ -138,9 +138,9 @@ void show_ib_element_s2(information_header_t *head)
         get_ib_element_s2(head, IB_CRC_FW));
 }
 
-int create_information_block_s2(information_container_t *info, int fw_crc24, int fw_size, int fw_version, int dsdr_addr)
+int create_information_block_s2(/*information_container_t*/void *info_ptr, int fw_crc24, int fw_size, int fw_version, int dsdr_addr)
 {
-    //information_container_t *info = (information_container_t *)info_ptr;
+    information_container_t *info = (information_container_t *)info_ptr;
     information_block_s2_t *ib;
     unsigned short size;
 
@@ -172,9 +172,9 @@ int create_information_block_s2(information_container_t *info, int fw_crc24, int
     return 0;
 }
 
-int set_information_block_ptr_s2(information_container_t *info, char *data, int len, int flag)
+int set_information_block_ptr_s2(/*information_container_t*/ void *info_ptr, char *data, int len, int flag)
 {
-    //information_container_t *info = (information_container_t *)info_ptr;
+    information_container_t *info = (information_container_t *)info_ptr;
     information_header_t * head = (information_header_t *)data;
     unsigned short size;
 
