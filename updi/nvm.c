@@ -170,6 +170,33 @@ int nvm_leave_progmode(void *nvm_ptr)
 }
 
 /*
+NVM chip disable UPDI interface temporarily
+@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+@return 0 successful, other value failed
+*/
+int nvm_disable(void *nvm_ptr)
+{
+    /*
+    Disable UPDI interface temporarily
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    int result;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Disable UPDI interface");
+
+    result = app_disable(APP(nvm));
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_disable failed %d", result);
+        return -2;
+    }
+
+    return 0;
+}
+
+/*
     NVM set chip into Locked Mode with UPDI_KEY_CHIPERASE command
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @return 0 successful, other value failed

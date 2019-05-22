@@ -193,7 +193,7 @@ int ReadData(void *ptr_ser, LPVOID rx, DWORD len) {
     }
     */
 
-    if (!ReadFile(FD(ser), rx, 1, &read, NULL)) {
+    if (!ReadFile(FD(ser), rx, len, &read, NULL)) {
         return -2;
     }
 
