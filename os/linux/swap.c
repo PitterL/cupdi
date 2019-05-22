@@ -6,7 +6,7 @@ int16_t _swap_int16(int16_t val)
     return (val << 8) | ((val >> 8) & 0xFF);
 }
 
-int16_t lt_int16_to_cup(int16_t val)
+int16_t lt_int16_to_cpu(int16_t val)
 {
 #if defined(BYTE_ORDER) && (BYTE_ORDER == BIG_ENDIAN)
     return _swap_int16(val);

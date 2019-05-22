@@ -48,8 +48,8 @@ void *updi_physical_init(const char *port, int baud)
     void *ser;
     upd_physical_t *phy = NULL;
     SER_PORT_STATE_T stat;
-    u8 data[] = { UPDI_BREAK};
-    int result;
+    //u8 data[] = { UPDI_BREAK };
+    //int result;
 
     DBG_INFO(PHY_DEBUG, "<PHY> Opening port %s, baudrate %d", port, baud);
 
@@ -62,16 +62,18 @@ void *updi_physical_init(const char *port, int baud)
         phy = (upd_physical_t *)malloc(sizeof(*phy));
         phy->mgwd = UPD_PHYSICAL_MAGIC_WORD;
         phy->ser = ser;
-        phy->ibdly = 1;
+        phy->ibdly = 0;
+        stat.baudRate = baud;
         memcpy(&phy->stat, &stat, sizeof(stat));
         
         //send an initial break as handshake
+        /*
         result = phy_send(phy, data, 1);
         if (result) {
             DBG_INFO(PHY_DEBUG, "<PHY> Init: phy_send failed %d", result);
             return NULL;
         }
-        /*
+        
         // send an initial double break as handshake
         result = phy_send_double_break(phy);
         if (result) {
@@ -105,6 +107,61 @@ void updi_physical_deinit(void *ptr_phy)
         ClosePort(SER(phy));
     }
     free(phy);
+}
+
+/*
+PHY set Sercom baudrate
+@ptr_phy: APP object pointer, acquired from updi_physical_init()
+@return 0 successful, other value if failed
+*/
+int phy_set_baudrate(void *ptr_phy, int baud)
+{
+    upd_physical_t *phy = (upd_physical_t *)ptr_phy;
+    SER_PORT_STATE_T stat;
+    int result;
+
+    if (!VALID_PHY(phy))
+        return ERROR_PTR;
+
+    DBG_INFO(PHY_DEBUG, "<PHY> Set Baudrate");
+
+    memcpy(&stat, &phy->stat, sizeof(stat));
+
+    stat.baudRate = baud;
+    result = SetPortState(SER(phy), &stat);
+    if (result) {
+        DBG_INFO(PHY_DEBUG, "<PHY> set Baud %d failed %d", baud, result);
+        return -2;
+    }
+
+    memcpy(&phy->stat, &stat, sizeof(stat));
+    
+    return 0;
+}
+
+/*
+PHY send break
+@ptr_phy: APP object pointer, acquired from updi_physical_init()
+@return 0 successful, other value if failed
+*/
+int phy_send_break(void *ptr_phy)
+{
+    upd_physical_t * phy = (upd_physical_t *)ptr_phy;
+    u8 data[] = { UPDI_BREAK };
+    int result;
+
+    if (!VALID_PHY(phy))
+        return ERROR_PTR;
+
+    DBG_INFO(PHY_DEBUG, "<PHY> Break: Sending break");
+
+    result = phy_send(phy, data, 1);
+    if (result) {
+        DBG_INFO(PHY_DEBUG, "<PHY> Send Break: phy_send failed %d", result);
+        return -2;
+    }
+
+    return 0;
 }
 
 /*
@@ -162,13 +219,13 @@ int phy_send_double_break(void *ptr_phy)
 }
 
 /*
-    PHY send data
+    PHY send data by each byte
     @ptr_phy: APP object pointer, acquired from updi_physical_init()
     @data: data to be sent
     @len: data lenght
     @return 0 successful, other value if failed
 */
-int phy_send(void *ptr_phy, const u8 *data, int len)
+int phy_send_each(void *ptr_phy, const u8 *data, int len)
 {
     /*
         Sends a char array to UPDI with inter - byte delay
@@ -209,10 +266,81 @@ int phy_send(void *ptr_phy, const u8 *data, int len)
             return -4;
         }
 
-        msleep(phy->ibdly);
+        if (phy->ibdly)
+            msleep(phy->ibdly);
     }
 
     return 0;
+}
+
+/*
+PHY send data
+@ptr_phy: APP object pointer, acquired from updi_physical_init()
+@data: data to be sent
+@len: data lenght
+@return 0 successful, other value if failed
+*/
+int phy_send(void *ptr_phy, const u8 *data, int len)
+{
+    /*
+    Sends a char array to UPDI with inter - byte delay
+    Note that the byte will echo back
+    */
+    upd_physical_t * phy = (upd_physical_t *)ptr_phy;
+    int i, result;
+    u8 *rbuf;
+
+    if (!VALID_PHY(phy))
+        return ERROR_PTR;
+
+    DBG(PHY_DEBUG, "<PHY> Send:", data, len, "0x%02x ");
+
+    rbuf = malloc(len);
+    if (!rbuf) {
+        DBG_INFO(PHY_DEBUG, "<PHY> Send: malloc rbuf(%d) failed", len);
+        return -2;
+    }
+
+    result = FlushPort(SER(phy));
+    if (result) {
+        DBG_INFO(PHY_DEBUG, "<PHY> Send: FlushPort failed %d", result);
+    }
+
+    /* Send */
+    result = SendData(SER(phy), data, len); 
+    if (result) {
+        DBG_INFO(PHY_DEBUG, "<PHY> Send: SendData (%d) failed %d", len, result);
+        result = -3;
+    }
+
+    /* Echo */
+    if (result == 0) {
+        result = ReadData(SER(phy), rbuf, len);
+        if (result != len) {
+            DBG_INFO(PHY_DEBUG, "<PHY> Send: ReadData (%d) failed %d", len, result);
+            result = -4;
+        }
+    }
+
+    if (result == len) {
+        for (i = 0; i < len; i++) {
+            if (data[i] != rbuf[i]) {
+                DBG_INFO(PHY_DEBUG, "<PHY> Send: ReadData mismatch %02x(%02x) located = %d", rbuf[i], data[i], i);
+                result = -5;
+                break;
+            }
+        }
+    }
+
+    if (phy->ibdly)
+        msleep(phy->ibdly);
+
+    free(rbuf);
+
+    if (result == len)
+        return 0;
+    else
+        return result;
 }
 
 /*
@@ -224,17 +352,17 @@ int phy_send(void *ptr_phy, const u8 *data, int len)
 */
 int phy_send_byte(void *ptr_phy, u8 val)
 {
-    return phy_send(ptr_phy, &val, 1);
+    return phy_send_each(ptr_phy, &val, 1);
 }
 
 /*
-    PHY receive data
+    PHY receive data by each byte
     @ptr_phy: APP object pointer, acquired from updi_physical_init()
     @data: data buffer to receive
     @len: data lenght
     @return 0 successful, other value if failed
 */
-int phy_receive(void *ptr_phy, u8 *data, int len)
+int phy_receive_each(void *ptr_phy, u8 *data, int len)
 {
     /*
         Receives a frame of a known number of chars from UPDI
@@ -271,6 +399,35 @@ int phy_receive(void *ptr_phy, u8 *data, int len)
 }
 
 /*
+PHY receive data
+@ptr_phy: APP object pointer, acquired from updi_physical_init()
+@data: data buffer to receive
+@len: data lenght
+@return 0 successful, other value if failed
+*/
+int phy_receive(void *ptr_phy, u8 *data, int len)
+{
+    /*
+    Receives a frame of a known number of chars from UPDI
+    */
+    upd_physical_t * phy = (upd_physical_t *)ptr_phy;
+    int result;
+
+    if (!VALID_PHY(phy))
+        return ERROR_PTR;
+
+    /* Read */
+    result = ReadData(SER(phy), data, len);
+    if (result != len) {
+        DBG(PHY_DEBUG, "<PHY> Recv: Received(%d/%d) failed: ", data, result, "0x%02x ", result, len);
+    }
+
+    DBG(PHY_DEBUG, "<PHY> Recv: Received(%d/%d): ", data, result, "0x%02x ", result, len);
+
+    return result;
+}
+
+/*
     PHY receive one byte data
     @ptr_phy: APP object pointer, acquired from updi_physical_init()
     @return data received, oxff if failed(conflicted with the data content original 0xFF)
@@ -280,7 +437,7 @@ u8 phy_receive_byte(void *ptr_phy)
     u8 resp = 0xFF;    //default resp
     int result;
 
-    result = phy_receive(ptr_phy, &resp, 1);
+    result = phy_receive_each(ptr_phy, &resp, 1);
     if (result != 1) {
         DBG_INFO(PHY_DEBUG, "<PHY> Recv one: phy_receive failed, Got %d bytes", result);
     }

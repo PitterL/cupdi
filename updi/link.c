@@ -49,28 +49,29 @@ void *updi_datalink_init(const char *port, int baud)
 {
     upd_datalink_t *link = NULL;
     void *phy;
-    int result, retry = 1;
+    int result, retry = 3;
 
     DBG_INFO(LINK_DEBUG, "<LINK> init link");
     
-    phy = updi_physical_init(port, baud);
+    phy = updi_physical_init(port, 115200);  //default baudrate first
     if (phy) {
         link = (upd_datalink_t *)malloc(sizeof(*link));
         link->mgwd = UPD_DATALINK_MAGIC_WORD;
         link->phy = (void *)phy;
 
         do {
-          link_set_init(link);
-          
+          result = link_set_init(link, baud);
+          if (result) {
+              DBG_INFO(LINK_DEBUG, "link_set_init failed %d, retry=%d", result, retry);
+              phy_send_double_break(phy);
+              continue;
+          }
+
           result = link_check(link);
           if (result) {
               DBG_INFO(LINK_DEBUG, "link_check failed %d, retry=%d", result, retry);
-
-              // Send double break if all is not well, and re-check
-              result = phy_send_double_break(phy);
-              if (result) {
-                  DBG_INFO(PHY_DEBUG, "phy_send_double_break failed %d", result);
-              }
+              phy_send_double_break(phy);
+              continue;
           }
         }while(retry-- && result);
 
@@ -102,31 +103,70 @@ void updi_datalink_deinit(void *link_ptr)
 /*
     LINK Set the inter-byte delay bit and disable collision detection
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
-    @no return
+    @return 0 successful, other value if failed
 */
-void *link_set_init(void *link_ptr)
+int link_set_init(void *link_ptr, int baud)
 {
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
+    u8 clksel, resp = 0;
     int result;
 
-    if (VALID_LINK(link)) {
-        // Disable collision detection
-        result = link_stcs(link, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT);
-        if (result) {
-            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
-            updi_datalink_deinit(link);
-            return NULL;
-        }
+    if (!VALID_LINK(link))
+        return ERROR_PTR;
 
-        // Set the inter-byte delay bit
-        result = link_stcs(link, UPDI_CS_CTRLA, 1 << UPDI_CTRLA_IBDLY_BIT);
+    result = phy_set_baudrate(PHY(link), 115200);
+    if (result) {
+        DBG_INFO(LINK_DEBUG, "phy_set_baudrate default failed %d", result);
+        return -4;
+    }
+
+    // Disable collision detection
+    result = link_stcs(link, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT);
+    if (result) {
+        DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
+        return -5;
+    }
+
+    // Set the inter-byte delay bit
+    result = link_stcs(link, UPDI_CS_CTRLA, 1 << UPDI_CTRLA_IBDLY_BIT);
+    if (result) {
+        DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
+        return -6;
+    }
+
+    // Set baudrate and clock
+    if (baud <= 225000) {
+        clksel = UPDI_ASI_CTRLA_CLKSEL_4M;
+    }
+    else if (baud <= 450000) {
+        clksel = UPDI_ASI_CTRLA_CLKSEL_8M;
+    }
+    else if (baud <= 900000) {
+        clksel = UPDI_ASI_CTRLA_CLKSEL_16M;
+    }
+    else {
+        DBG_INFO(LINK_DEBUG, "Unsupported baudrate for UPDI clk %d, max 0.9Mhz", baud);
+        return -2;
+    }
+
+    // clock source
+    result = _link_ldcs(link_ptr, UPDI_ASI_CTRLA, &resp);
+    if (result || resp != clksel) {
+        result = link_stcs(link, UPDI_ASI_CTRLA, clksel);
         if (result) {
-            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
-            return NULL;
+            DBG_INFO(LINK_DEBUG, "link_stcs UPDI_ASI_CTRLA failed %d", result);
+            return -3;
         }
     }
 
-    return link;
+    // Baudrate
+    result = phy_set_baudrate(PHY(link), baud);
+    if (result) {
+        DBG_INFO(LINK_DEBUG, "phy_set_baudrate failed %d", result);
+        return -4;
+    }
+
+    return 0;
 }
 
 /*
@@ -147,6 +187,17 @@ int link_check(void *link_ptr)
         return ERROR_PTR;
     
     DBG_INFO(LINK_DEBUG, "<LINK> link check");
+
+    result = _link_ldcs(link_ptr, UPDI_CS_STATUSB, &resp);
+    if (result) {
+        DBG_INFO(LINK_DEBUG, "UPDI not ready");
+        return -2;
+    }
+
+    if (resp) {
+        DBG_INFO(LINK_DEBUG, "UPDI status error %d, send BREAK", resp);
+        //phy_send_break(PHY(link));
+    }
 
     result = _link_ldcs(link_ptr, UPDI_CS_STATUSA, &resp);
     if (result) {

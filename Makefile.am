@@ -1,5 +1,5 @@
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = argparse crc device file ihex os/linux regex string updi
+SUBDIRS = argparse crc device file ihex os/linux regex string updi infoblock
 
 bin_PROGRAMS = cupdi
 cupdi_SOURCES = cupdi.c

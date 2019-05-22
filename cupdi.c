@@ -67,7 +67,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include "cupdi.h"
 
 /* CUPDI Software version */
-#define SOFTWARE_VERSION "1.08"
+#define SOFTWARE_VERSION "1.09"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS "qtouch\\touch.h"
@@ -102,6 +102,7 @@ int main(int argc, const char *argv[])
     bool unlock = false;
     int verbose = 1;
     bool reset = false;
+    bool disable = false;
     bool test = false;
     bool version = false;
     int pack = 0;
@@ -134,6 +135,7 @@ int main(int argc, const char *argv[])
         OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|keys=[n] (loop(Hex) set to 0 loop forvever, default 1, keys default 1)"),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_BOOLEAN('-', "reset", &reset, "UPDI reset device"),
+        OPT_BOOLEAN('-', "disable", &disable, "UPDI disable"),
         OPT_BOOLEAN('t', "test", &test, "Test UPDI device"),
         OPT_BOOLEAN('-', "version", &version, "Show version"),
         OPT_BIT('-', "pack-build", &pack, "Pack info block to Intel HEX file, (macro FIRMWARE_VERSION at 'touch.h')save with extension'.ihex'", NULL, (1 << PACK_BUILD), 0),
@@ -376,7 +378,16 @@ int main(int argc, const char *argv[])
         }
     }
 
-out:
+    if (disable) {
+        result = nvm_disable(nvm_ptr);
+        if (result) {
+            DBG_INFO(UPDI_DEBUG, "nvm_disable failed %d", result);
+            result = -17;
+            goto out;
+        }
+    }
+
+ out:
     nvm_leave_progmode(nvm_ptr);
     updi_nvm_deinit(nvm_ptr);
 
@@ -1538,7 +1549,7 @@ int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file)
     //Show ib area
     ib_show(&file_info_container);
 
-    //Show Fuse area
+    //Fuse area
     dev_hex_show(dev, NVM_FUSES, &dhex_info);
 out:
     ib_destory(&file_info_container);
@@ -1869,10 +1880,10 @@ int updi_debugview(void *nvm_ptr, char *cmd)
             tm_info = localtime(&timer);
             strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
 
-            val = (int16_t)lt_int16_to_cup(ptc_signal.node_comp_caps);
+            val = (int16_t)lt_int16_to_cpu(ptc_signal.node_comp_caps);
             cc_value = (val & 0x0F)*0.00675 + ((val >> 4) & 0x0F)*0.0675 + ((val >> 8) & 0x0F)*0.675 + ((val >> 12) & 0x3) * 6.75;
-            ref_value = (int16_t)lt_int16_to_cup(ptc_ref.channel_reference);
-            signal_value = (int16_t)lt_int16_to_cup(ptc_signal.node_acq_signals);
+            ref_value = (int16_t)lt_int16_to_cpu(ptc_ref.channel_reference);
+            signal_value = (int16_t)lt_int16_to_cpu(ptc_signal.node_acq_signals);
             delta_value = signal_value - ref_value;
 
             //Debug output:

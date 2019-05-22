@@ -349,10 +349,37 @@ int app_leave_progmode(void *app_ptr)
         return -2;
     }
 
+    result = app_disable(app_ptr);
+    if (result) {
+        DBG_INFO(APP_DEBUG, "app_disable failed %d", result);
+        return -3;
+    }
+
+    return 0;
+}
+
+/*
+APP disable updi interface
+@app_ptr: APP object pointer, acquired from updi_application_init()
+@return 0 successful, other value if failed
+*/
+int app_disable(void *app_ptr)
+{
+    /*
+    Disable UPDI interface temperarily
+    */
+    upd_application_t *app = (upd_application_t *)app_ptr;
+    int result;
+
+    if (!VALID_APP(app))
+        return ERROR_PTR;
+
+    DBG_INFO(APP_DEBUG, "<APP> Disable");
+
     result = link_stcs(LINK(app), UPDI_CS_CTRLB, (1 << UPDI_CTRLB_UPDIDIS_BIT) | (1 << UPDI_CTRLB_CCDETDIS_BIT));
     if (result) {
         DBG_INFO(APP_DEBUG, "link_stcs failed %d", result);
-        return -3;
+        return -2;
     }
 
     return 0;
