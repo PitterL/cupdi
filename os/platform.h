@@ -5,7 +5,15 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 
-#include <stdbool.h>
+//Don't use <stdbool.h>, it may use char as bool
+//#include <stdbool.h>
+#if defined bool
+#undef bool
+#endif
+
+#define bool	int
+#define false	0
+#define true	1
 
 #define ARRAY_SIZE(_) (sizeof (_) / sizeof (*_))
 #define VALID_PTR(_ptr) ((_ptr) && (size_t)(_ptr) != ERROR_PTR)

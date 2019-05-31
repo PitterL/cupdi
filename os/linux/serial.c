@@ -30,11 +30,17 @@ typedef struct _upd_sercom {
 
 #define VALID_SER(_ser) ((_ser) && (((upd_sercom_t *)(_ser))->mgwd == UPD_SERCOM_MAGIC_WORD) && ((upd_sercom_t *)(_ser))->fd)
 #define FD(_ser) ((int)(_ser)->fd)
-
+/*
+  Below baudrate is defined at:
+   arm-linux-gnueabihf\libc\usr\include\bits\termios.h */
 static speed_t speed_arr[] = {B0, B50, B75, B110, B134, B150, B200, B300, B600, B1200, B1800,
-                              B2400, B4800, B9600, B19200, B38400, B57600, B115200, B230400};
+                              B2400, B4800, B9600, B19200, B38400, B57600, B115200, B230400,
+                              B460800, B500000, B576000, B921600, B1000000};
 static int name_arr[] = {0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800,
-                        2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400};
+                        2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400,
+                        460800, 500000, 576000, 921600, 1000000};
+
+#define RECEIVE_DELAY_EACH_TIME 5 //ms. Test 9600 baudrate is enough for the delay time
 
 static speed_t GetBaudRate(int baudrate)
 {
@@ -121,9 +127,6 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
         return -3;
     }
 
-    /* Flush stale I/O data (if any) */
-    tcflush(fd, TCIOFLUSH);
-
     memset(&tio, 0, sizeof(tio));
     status = cfsetispeed(&tio, GetBaudRate(st->baudRate));  // Set input speed
     if (status == -1) {
@@ -135,9 +138,6 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
         printf("Could not configure output speed (%s)s\n", strerror(errno));
         return -5;
     }
-
-    /* Flush stale I/O data (if any) */
-    tcflush(fd, TCIOFLUSH);
 
     /* Set databits */
     tio.c_cflag &= ~CSIZE;
@@ -205,8 +205,8 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
     tio.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);  /* Non Cannonical mode   
 
     /* Control characters */
-    tio.c_cc[VTIME] = 10; // Inter-character timer unused 1/10s
-    tio.c_cc[VMIN]  = 0; // Blocking read until 1 character received
+    tio.c_cc[VTIME] = 5; // Inter-character timer unused 1/10s
+    tio.c_cc[VMIN]  = 0; // If set, blocking read until 1 character received
 
     /* Flush stale I/O data (if any) */
     tcflush(fd, TCIFLUSH);
@@ -218,6 +218,9 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
         printf("Could not apply port settings (%s)s\n", strerror(errno));
         return -9;
     }
+
+    /* Flush stale I/O data (if any) */
+    tcflush(fd, TCIOFLUSH);
 
     return 0;
 }
@@ -269,7 +272,8 @@ int SendData(void *ptr_ser, const LPVOID tx, DWORD len) {
  */
 int ReadData(void *ptr_ser, LPVOID rx, DWORD len) {
     upd_sercom_t *ser = (upd_sercom_t *)ptr_ser;
-    DWORD reading = 0;
+    int reading = 0;
+    int offset = 0;
 /*    WORD fs_sel;
     fd_set fs_read;
     struct timeval time;
@@ -293,12 +297,18 @@ int ReadData(void *ptr_ser, LPVOID rx, DWORD len) {
     }
 */    
 
-    reading = read(FD(ser), rx, len);
-    if (reading < 0) {
-        return -2;
-    }
+    do {
+      reading = read(FD(ser), rx + offset, len - offset);
+      if (reading <= 0)
+          break;
 
-    return reading;
+      offset += reading;
+      if (offset < len)
+        msleep(RECEIVE_DELAY_EACH_TIME);
+        
+    }while(offset < len);
+
+    return offset;
 }
 
 /**

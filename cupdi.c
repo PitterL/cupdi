@@ -67,7 +67,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include "cupdi.h"
 
 /* CUPDI Software version */
-#define SOFTWARE_VERSION "1.09"
+#define SOFTWARE_VERSION "1.10"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS "qtouch\\touch.h"
@@ -99,12 +99,12 @@ int main(int argc, const char *argv[])
     char *write = NULL;
     char *dbgview = NULL;
     int flag = 0;
-    bool unlock = false;
+    int unlock = false;
     int verbose = 1;
-    bool reset = false;
-    bool disable = false;
-    bool test = false;
-    bool version = false;
+    int reset = false;
+    int disable = false;
+    int test = false;
+    int version = false;
     int pack = 0;
     //char *pack_version = NULL;
 
@@ -168,6 +168,8 @@ int main(int argc, const char *argv[])
         DBG_INFO(UPDI_DEBUG, "CUPDI version: %s", SOFTWARE_VERSION);
         return 0;
     }
+
+    DBG_INFO(UPDI_DEBUG, "Device name %d %p, %s", sizeof(bool), dev_name, dev_name);
 
     //<Part 1> The command below requires device name
     if (!dev_name) {
