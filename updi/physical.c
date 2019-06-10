@@ -65,8 +65,9 @@ void *updi_physical_init(const char *port, int baud)
         stat.baudRate = baud;
         memcpy(&phy->stat, &stat, sizeof(stat));
         
-        //send an initial break as handshake
-        result = phy_send_break(phy);
+        // Send an initial break as handshake
+        // Use double break whatever
+        result = phy_send_double_break(phy);
         if (result) {
             DBG_INFO(PHY_DEBUG, "<PHY> Init: send break failed %d", result);
             return NULL;

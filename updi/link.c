@@ -130,14 +130,16 @@ int link_set_init(void *link_ptr, int baud)
         DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
         return -3;
     }
-
+    
     // Set the inter-byte delay bit
+#ifdef DISABLE_INTER_BYTE
     DBG_INFO(LINK_DEBUG, "<LINK> Set the inter-byte delay bit");
     result = link_stcs(link, UPDI_CS_CTRLA, 1 << UPDI_CTRLA_IBDLY_BIT);
     if (result) {
         DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
         return -4;
     }
+#endif
 
     // Set baudrate and clock
     if (baud <= 225000) {
