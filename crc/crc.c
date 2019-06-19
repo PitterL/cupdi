@@ -56,7 +56,7 @@ unsigned int crc24(unsigned int crc, unsigned char firstbyte, unsigned char seco
     static const unsigned int crcpoly = 0x80001B;
     unsigned int data_word;
 
-    data_word = (secondbyte << 8) | firstbyte;
+    data_word = ((unsigned short)secondbyte << 8) | firstbyte;
     crc = ((crc << 1) ^ data_word);
 
     if (crc & 0x1000000)
