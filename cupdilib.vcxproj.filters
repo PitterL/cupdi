@@ -21,15 +21,69 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="cupdi\updi\application.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\updi\constants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\updi\link.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\updi\nvm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\updi\physical.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\device\device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dllmain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\os\include\os_err.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\os\include\os_logging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\os\include\os_serial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\os\include\os_time.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cupdi\os\include\platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="cupdi\updi\application.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cupdilib.cpp">
+    <ClCompile Include="cupdi\updi\link.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dllmain.cpp">
+    <ClCompile Include="cupdi\updi\nvm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cupdi\updi\physical.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cupdi\os\win32\logging.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cupdi\os\win32\serial.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cupdi\os\win32\time.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dllmain.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cupdi\device\device.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
