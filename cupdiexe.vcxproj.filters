@@ -15,18 +15,72 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
+    <ClInclude Include="cupdi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="targetver.h">
+    <ClInclude Include="argparse\argparse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ihex\ihex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\include\os_err.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\include\os_logging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\include\os_serial.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\include\os_time.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\include\platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\include\lib_intf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os\include\lib_device.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ihex\kk_ihex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ihex\kk_ihex_read.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ihex\kk_ihex_write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="string\split.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="cupdi.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cupdiexe.cpp">
+    <ClCompile Include="argparse\argparse.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ihex\ihex.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="os\win32\logging.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="os\win32\interface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ihex\kk_ihex_read.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ihex\kk_ihex_write.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="string\split.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
