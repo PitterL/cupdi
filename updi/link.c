@@ -208,8 +208,31 @@ int link_check(void *link_ptr)
     }
 
     if (resp) {
-        DBG_INFO(LINK_DEBUG, "UPDI response status error %d, may send a BREAK", resp);
+        DBG_INFO(LINK_DEBUG, "UPDI response status error %d at StatusB, may send a BREAK", resp);
+        switch (resp) {
+        case 0x1:
+            DBG_INFO(LINK_ERROR, "[Parity Error] Wrong sampling of the parity bit");
+            break;
+        case 0x2:
+            DBG_INFO(LINK_ERROR, "[Frame Error] Wrong sampling of frame Stop bits");
+            break;
+        case 0x3:
+            DBG_INFO(LINK_ERROR, "[Access Layer Time-out Error] UPDI can get no data or response from the Access layer.   \
+                Examples of error cases are system domain in Sleep or   \
+                system domain Reset.");
+            break;
+        case 0x4:
+            DBG_INFO(LINK_ERROR, "[Clock Recovery Error] Wrong sampling of frame Start bit");
+            break;
+        case 0x7:
+            DBG_INFO(LINK_ERROR, "[Contention Error] Signalize Driving Contention on the UPDI RXD/TXD line");
+            break;
+        default:
+            DBG_INFO(LINK_ERROR, "[Unknown] UPDI Error Signature unknown");
+        }
         //phy_send_break(PHY(link));
+
+        //FIXME: how to handle this?
     }
 
     DBG_INFO(LINK_DEBUG, "<LINK> link get StatusA");
