@@ -119,9 +119,10 @@ void show_ib_element_s2(information_header_t *head)
 
     DBG(UPDI_DEBUG, "Information Block Content:", (u8 *)ib, sizeof(*ib), "%02X ");
 
-    DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c %hhd.%hhd",
+    DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c(%hhd) %hhd.%hhd",
         (char)get_ib_element_s2(head, IB_FW_VER_NAME_N0),
         (char)get_ib_element_s2(head, IB_FW_VER_NAME_N1),
+        (char)get_ib_element_s2(head, IB_FW_VER_NAME_N2),
         (char)get_ib_element_s2(head, IB_FW_VER_NAME_N2),
         (char)get_ib_element_s2(head, IB_FW_VER_NAME_BUILD_MAJOR),
         (char)get_ib_element_s2(head, IB_FW_VER_NAME_BUILD_MINOR));

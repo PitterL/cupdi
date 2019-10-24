@@ -687,7 +687,7 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Read memory");
+    DBG_INFO(NVM_DEBUG, "<NVM> Read memory 0x%x size %d(0x%x)", address, len, len);
 
     if (!nvm->progmode)
         DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
@@ -698,11 +698,11 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
         if (size > UPDI_MAX_TRANSFER_SIZE)
             size = UPDI_MAX_TRANSFER_SIZE;
     
-        DBG_INFO(NVM_DEBUG, "Reading Memory %d bytes at address 0x%x", size, address + off);
+        //DBG_INFO(NVM_DEBUG, "Reading Memory %d bytes at address 0x%x", size, address + off);
 
         result = app_read_data_bytes(APP(nvm), address + off, data + off, size);
         if (result) {
-            DBG_INFO(NVM_DEBUG, "app_read_data_bytes failed %d", result);
+            DBG_INFO(NVM_DEBUG, "app_read_data_bytes failed %d at 0x%x, size %d", result, address + off, size);
             break;
         }
 
@@ -799,6 +799,8 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
             }
         }
     }
+
+    return 0;
 }
 
 /*
