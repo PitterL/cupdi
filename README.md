@@ -64,4 +64,12 @@ Example:
     Save Flash content:
         cupdi.exe -c COM7 -d tiny817 -v 2 -s -f tiny817.hex     (The content will save to tiny817.hex.out)
     
-  
+# Building
+
+```
+bash autogen.sh
+bash configure
+make
+```
+
+Binary will be generated in the repo root, execute with `./cupdi`
