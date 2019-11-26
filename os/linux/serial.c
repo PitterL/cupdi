@@ -191,7 +191,9 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
     }
 
     /* Set flow control -- none */   
+#if defined(_BSD_SOURCE) || defined(_SVID_SOURCE)
     tio.c_cflag &= ~CRTSCTS;
+#endif
     tio.c_iflag &= ~(IXON | IXOFF | IXANY);
 
     //tio.c_cflag |= CRTSCTS;
