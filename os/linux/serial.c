@@ -30,6 +30,14 @@ typedef struct _upd_sercom {
 
 #define VALID_SER(_ser) ((_ser) && (((upd_sercom_t *)(_ser))->mgwd == UPD_SERCOM_MAGIC_WORD) && ((upd_sercom_t *)(_ser))->fd)
 #define FD(_ser) ((int)(_ser)->fd)
+#ifdef __APPLE__
+static speed_t speed_arr[] = {B0, B50, B75, B110, B134, B150, B200, B300, B600, B1200, B1800,
+                              B2400, B4800, B9600, B19200, B38400, B57600, B115200, B230400,
+                              };
+static int name_arr[] = {0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800,
+                        2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400,
+                        };
+#else
 /*
   Below baudrate is defined at:
    arm-linux-gnueabihf\libc\usr\include\bits\termios.h */
@@ -39,6 +47,7 @@ static speed_t speed_arr[] = {B0, B50, B75, B110, B134, B150, B200, B300, B600, 
 static int name_arr[] = {0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800,
                         2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400,
                         460800, 500000, 576000, 921600, 1000000};
+#endif
 
 #define RECEIVE_DELAY_EACH_TIME 5 //ms. Test 9600 baudrate is enough for the delay time
 
@@ -116,6 +125,9 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
 
     if (!isatty(fd)) {
         printf("Not a tty device\n");
+#ifdef __APPLE__
+        printf("Make sure to use /dev/cu.* device instead of /dev/tty.*\n");
+#endif
         return -2;
     }
 
