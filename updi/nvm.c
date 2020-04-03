@@ -591,7 +591,7 @@ int _nvm_write_fuse(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Writes to fuse");
+    DBG_INFO(NVM_DEBUG, "<NVM> Writes to fuse(hex) [%04hX]: %02hhX", address, value);
 
     if (!nvm->progmode) {
         DBG_INFO(NVM_DEBUG, "Enter progmode first!");
