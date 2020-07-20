@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <os/platform.h>
 
 char** str_split(char* a_str, const char a_delim)
 {
@@ -41,7 +42,7 @@ char** str_split(char* a_str, const char a_delim)
         while (token)
         {
             assert(idx < count);
-            *(result + idx++) = strdup(token);
+            *(result + idx++) = __strndup(token, 255);
             token = strtok(0, delim);
         }
         assert(idx == count - 1);

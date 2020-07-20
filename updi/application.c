@@ -31,7 +31,7 @@ typedef struct _upd_application {
 #define UPD_APPLICATION_MAGIC_WORD 0xB4B4 //'uapp'
     unsigned int mgwd;  //magic word
     void *link;
-    device_info_t *dev;
+    const device_info_t *dev;
 }upd_application_t;
 
 /*
@@ -51,7 +51,7 @@ typedef struct _upd_application {
     @dev: point chip dev object
     @return APP ptr, NULL if failed
 */
-void *updi_application_init(const char *port, int baud, void *dev)
+void *updi_application_init(const char *port, int baud, const void *dev)
 {
     upd_application_t *app = NULL;
     void *link;
@@ -63,7 +63,7 @@ void *updi_application_init(const char *port, int baud, void *dev)
         app = (upd_application_t *)malloc(sizeof(*app));
         app->mgwd = UPD_APPLICATION_MAGIC_WORD;
         app->link = (void *)link;
-        app->dev = (device_info_t *)dev;
+        app->dev = (const device_info_t *)dev;
     }
 
     return app;

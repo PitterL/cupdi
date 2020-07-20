@@ -33,7 +33,7 @@ typedef struct _upd_nvm {
     unsigned int mgwd;  //magic word
     bool progmode;
     void *app;
-    device_info_t *dev;
+    const device_info_t *dev;
 }upd_nvm_t;
 
 /*
@@ -54,7 +54,7 @@ typedef struct _upd_nvm {
     @dev: point chip dev object
     @return NVM ptr, NULL if failed
 */
-void *updi_nvm_init(const char *port, int baud, void *dev)
+void *updi_nvm_init(const char *port, int baud, const void *dev)
 {
     upd_nvm_t *nvm = NULL;
     void *app;
@@ -66,7 +66,7 @@ void *updi_nvm_init(const char *port, int baud, void *dev)
         nvm = (upd_nvm_t *)malloc(sizeof(*nvm));
         nvm->mgwd = UPD_NVM_MAGIC_WORD;
         nvm->progmode = false;
-        nvm->dev = (device_info_t *)dev;
+        nvm->dev = (const device_info_t *)dev;
         nvm->app = (void *)app;
     }
 
