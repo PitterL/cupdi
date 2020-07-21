@@ -67,7 +67,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include "cupdi.h"
 
 /* CUPDI Software version */
-#define SOFTWARE_VERSION "1.12"
+#define SOFTWARE_VERSION "1.13"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS "qtouch\\touch.h"
@@ -233,20 +233,23 @@ int main(int argc, const char *argv[])
     if (write || fuses || flag) {
         result = nvm_enter_progmode(nvm_ptr);
         if (result) {
-            DBG_INFO(UPDI_DEBUG, "Device is locked(%d). Performing unlock with chip erase.", result);
-            result = nvm_unlock_device(nvm_ptr);
+            DBG_INFO(UPDI_DEBUG, "Device enter progmode failed(%d)", result);
+            if (TEST_BIT(flag, FLAG_UNLOCK)) {
+                DBG_INFO(UPDI_DEBUG, "Device is locked(%d). Performing unlock with chip erase.", result);
+                result = nvm_unlock_device(nvm_ptr);
+                if (result) {
+                    DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
+                    result = -5;
+                    goto out;
+                }
+            }
+
+            result = nvm_get_device_info(nvm_ptr);
             if (result) {
-                DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
-                result = -5;
+                DBG_INFO(UPDI_DEBUG, "nvm_get_device_info in program failed");
+                result = -6;
                 goto out;
             }
-        }
-
-        result = nvm_get_device_info(nvm_ptr);
-        if (result) {
-            DBG_INFO(UPDI_DEBUG, "nvm_get_device_info in program failed");
-            result = -6;
-            goto out;
         }
     }
 
