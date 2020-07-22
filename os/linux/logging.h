@@ -16,6 +16,16 @@ typedef enum {
     SER_DEBUG
 } verbose_t;
 
+typedef enum {
+    DEFAULT_ERROR = 0,
+    UPDI_ERROR = 1,
+    NVM_ERROR = 1,
+    APP_ERROR = 1,
+    LINK_ERROR = 1,
+    PHY_ERROR = 1,
+    SER_ERROR = 1
+} verbose_e_t;
+
 void set_verbose_level(verbose_t level);
 void DBG(verbose_t level, char *format, const unsigned char *data, int len, const unsigned char * dformat, ...);
 void DBG_INFO(verbose_t level, char* format, ...);

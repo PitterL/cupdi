@@ -33,7 +33,7 @@ typedef struct _upd_nvm {
     unsigned int mgwd;  //magic word
     bool progmode;
     void *app;
-    device_info_t *dev;
+    const device_info_t *dev;
 }upd_nvm_t;
 
 /*
@@ -54,7 +54,7 @@ typedef struct _upd_nvm {
     @dev: point chip dev object
     @return NVM ptr, NULL if failed
 */
-void *updi_nvm_init(const char *port, int baud, void *dev)
+void *updi_nvm_init(const char *port, int baud, const void *dev)
 {
     upd_nvm_t *nvm = NULL;
     void *app;
@@ -66,7 +66,7 @@ void *updi_nvm_init(const char *port, int baud, void *dev)
         nvm = (upd_nvm_t *)malloc(sizeof(*nvm));
         nvm->mgwd = UPD_NVM_MAGIC_WORD;
         nvm->progmode = false;
-        nvm->dev = (device_info_t *)dev;
+        nvm->dev = (const device_info_t *)dev;
         nvm->app = (void *)app;
     }
 
@@ -591,7 +591,7 @@ int _nvm_write_fuse(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Writes to fuse");
+    DBG_INFO(NVM_DEBUG, "<NVM> Writes to fuse(hex) [%04hX]: %02hhX", address, value);
 
     if (!nvm->progmode) {
         DBG_INFO(NVM_DEBUG, "Enter progmode first!");
@@ -687,7 +687,7 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Read memory");
+    DBG_INFO(NVM_DEBUG, "<NVM> Read memory 0x%x size %d(0x%x)", address, len, len);
 
     if (!nvm->progmode)
         DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
@@ -698,11 +698,11 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
         if (size > UPDI_MAX_TRANSFER_SIZE)
             size = UPDI_MAX_TRANSFER_SIZE;
     
-        DBG_INFO(NVM_DEBUG, "Reading %d bytes at address 0x%x", size, address + off);
+        //DBG_INFO(NVM_DEBUG, "Reading Memory %d bytes at address 0x%x", size, address + off);
 
         result = app_read_data_bytes(APP(nvm), address + off, data + off, size);
         if (result) {
-            DBG_INFO(NVM_DEBUG, "app_read_data_bytes failed %d", result);
+            DBG_INFO(NVM_DEBUG, "app_read_data_bytes failed %d at 0x%x, size %d", result, address + off, size);
             break;
         }
 
@@ -743,7 +743,7 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
         if (size > UPDI_MAX_TRANSFER_SIZE)
             size = UPDI_MAX_TRANSFER_SIZE;
 
-        DBG_INFO(NVM_DEBUG, "Writing %d bytes at address 0x%x", size, address + off);
+        DBG_INFO(NVM_DEBUG, "Writing Memory %d bytes at address 0x%x", size, address + off);
 
         result = app_write_data_bytes(APP(nvm), address + off, data + off, size);
         if (result) {
@@ -769,7 +769,7 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    nvm_op op, nvm_ops[] = { nvm_write_flash, nvm_write_eeprom, nvm_write_userrow, nvm_write_fuse };
+    nvm_op op, nvm_ops[] = { nvm_write_flash, nvm_write_eeprom, nvm_write_userrow, nvm_write_fuse, nvm_write_mem };
     int i, result;
 
     if (!VALID_NVM(nvm))
@@ -777,21 +777,30 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
 
     DBG_INFO(NVM_DEBUG, "<NVM> Write Auto");
 
-    op = nvm_write_mem; //default operate memory
     for (i = 0; i < NUM_NVM_TYPES; i++) {
         result = nvm_get_block_info(nvm_ptr, i, &info);
         if (result) {
             DBG_INFO(NVM_DEBUG, "<NVM> nvm_get_block_info %d failed", i);
-            return -i;
+            return -2;
         }
 
-        if (address >= info.nvm_start && address + len <= info.nvm_start + info.nvm_size) {
-            op = nvm_ops[i];
-            break;
+        if (address >= info.nvm_start && address < info.nvm_start + info.nvm_size) {
+            if (address + len <= info.nvm_start + info.nvm_size) {
+                op = nvm_ops[i];
+                if (op && len)
+                    return op(nvm_ptr, address, data, len);
+
+                DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", op, len);
+                return -3;
+            }
+            else {
+                DBG_INFO(NVM_DEBUG, "<NVM> write auto - block overflow (addr, len): target(%x, %x) / memory(%x, %x) ", address, len, info.nvm_start, info.nvm_size);
+                return -4;
+            }
         }
     }
 
-    return op(nvm_ptr, address, data, len);
+    return 0;
 }
 
 /*

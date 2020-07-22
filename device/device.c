@@ -9,25 +9,25 @@
 */
 
 
-/* dev_name | {flash_start | flash_size | flash_pagesize} | {syscfg_address | nvmctrl_address | sigrow_address } | {fuses} | {userrow} | {eeprom} */
+/* dev_name | {flash_start | flash_size | flash_pagesize} | {syscfg_address | nvmctrl_address | sigrow_address } | {fuses} | {userrow} | {eeprom} {sram} */
 const chip_info_t device_tiny_321x = {
-    //  tiny1617/tiny1616
-    "tiny321x",{ 0x8000, 32 * 1024, 64 },{ 0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 32, 32 },{ 0x1400, 128, 32}
+    //  tiny3217/tiny3216
+    "tiny321x",{ 0x8000, 32 * 1024, 128 },{ 0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 64, 32 },{ 0x1400, 256, 64}, {0x3800, 2 * 1024, 1024/*dummy*/}
 };
 
 const chip_info_t device_tiny_161x = {
     //  tiny1617/tiny1616
-    "tiny161x",{ 0x8000, 16 * 1024, 64 },{ 0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 32, 32 },{ 0x1400, 128, 32 }
+    "tiny161x",{ 0x8000, 16 * 1024, 64 },{ 0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 32, 32 },{ 0x1400, 256, 32 }, { 0x3800, 2 * 1024, 1024/*dummy*/ }
 };
 
 const chip_info_t device_tiny_81x = {
     //  tiny817/tiny816/tiny814
-    "tiny81x", {0x8000, 8 * 1024, 64}, {0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 32, 32 },{ 0x1400, 128, 32 }
+    "tiny81x", {0x8000, 8 * 1024, 64}, {0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 32, 32 },{ 0x1400, 128, 32 }, { 0x3E00, 512, 512/*dummy*/ }
 };
 
 const chip_info_t device_tiny_41x = {
     //  tiny417
-    "tiny41x", {0x8000, 4 * 1024, 64}, {0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 32, 32 },{ 0x1400, 128, 32 }
+    "tiny41x", {0x8000, 4 * 1024, 64}, {0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 32, 32 },{ 0x1400, 128, 32 },{ 0x3F00, 256, 256/*dummy*/ }
 };
 
 static const device_info_t g_device_list[] = {
@@ -83,6 +83,9 @@ int dev_get_nvm_info(const void *dev_ptr, NVM_TYPE_T type, nvm_info_t * info)
         break;
     case NVM_FUSES:
         iblock = &dev->mmap->fuse;
+        break;
+    case MEM_SRAM:
+        iblock = &dev->mmap->sram;
         break;
     default:
         return -2;

@@ -15,7 +15,9 @@
 /*
 Combine the input <main name> + <ext name>, user should release the memory after use.
 @name: original name
-@extname: change the extname
+@a_delim: delimiter to trim
+@order: skip chars from begin
+@tailname: extensition name
 @return new combined name, NULL means failed
 */
 char *trim_name_with_extesion(const char *name, const char a_delim, int order, const char *tailname)
@@ -45,7 +47,7 @@ char *trim_name_with_extesion(const char *name, const char a_delim, int order, c
 
     if (found != order) {
         fprintf(stderr, "delimiter not found\n");
-        return NULL;
+        i = -1; // add extension directly
     }
 
     mainsize = size + i;
