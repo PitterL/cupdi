@@ -24,7 +24,7 @@ typedef enum {
     LINK_ERROR = 1,
     PHY_ERROR = 1,
     SER_ERROR = 1
-} verbose_t;
+} verbose_e_t;
 
 void set_verbose_level(verbose_t level);
 void DBG(verbose_t level, char *format, const unsigned char *data, int len, const unsigned char * dformat, ...);
