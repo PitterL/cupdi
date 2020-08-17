@@ -18,12 +18,70 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="argparse\argparse.h" />
+    <ClInclude Include="crc\crc.h" />
+    <ClInclude Include="cupdi.h" />
+    <ClInclude Include="device\device.h" />
+    <ClInclude Include="file\fop.h" />
+    <ClInclude Include="ihex\ihex.h" />
+    <ClInclude Include="ihex\kk_ihex.h" />
+    <ClInclude Include="ihex\kk_ihex_read.h" />
+    <ClInclude Include="ihex\kk_ihex_write.h" />
+    <ClInclude Include="infoblock\ib.h" />
+    <ClInclude Include="infoblock\s1.h" />
+    <ClInclude Include="infoblock\s2.h" />
+    <ClInclude Include="os\platform.h" />
+    <ClInclude Include="os\win32\delay.h" />
+    <ClInclude Include="os\win32\error.h" />
+    <ClInclude Include="os\win32\logging.h" />
+    <ClInclude Include="os\win32\serial.h" />
+    <ClInclude Include="os\win32\swap.h" />
+    <ClInclude Include="regex\re.h" />
+    <ClInclude Include="string\getline.h" />
+    <ClInclude Include="string\join.h" />
+    <ClInclude Include="string\split.h" />
+    <ClInclude Include="string\strlcat.h" />
+    <ClInclude Include="string\strndup.h" />
+    <ClInclude Include="updi\application.h" />
+    <ClInclude Include="updi\constants.h" />
+    <ClInclude Include="updi\link.h" />
+    <ClInclude Include="updi\nvm.h" />
+    <ClInclude Include="updi\physical.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="argparse\argparse.c" />
+    <ClCompile Include="crc\crc.c" />
+    <ClCompile Include="cupdi.c" />
+    <ClCompile Include="device\device.c" />
+    <ClCompile Include="file\fop.c" />
+    <ClCompile Include="ihex\ihex.c" />
+    <ClCompile Include="ihex\kk_ihex_read.c" />
+    <ClCompile Include="ihex\kk_ihex_write.c" />
+    <ClCompile Include="infoblock\ib_router.c" />
+    <ClCompile Include="infoblock\s1.c" />
+    <ClCompile Include="infoblock\s2.c" />
+    <ClCompile Include="os\win32\delay.c" />
+    <ClCompile Include="os\win32\logging.c" />
+    <ClCompile Include="os\win32\serial.c" />
+    <ClCompile Include="os\win32\swap.c" />
+    <ClCompile Include="regex\re.c" />
+    <ClCompile Include="string\getline.c" />
+    <ClCompile Include="string\join.c" />
+    <ClCompile Include="string\split.c" />
+    <ClCompile Include="string\strlcat.c" />
+    <ClCompile Include="string\strndup.c" />
+    <ClCompile Include="updi\application.c" />
+    <ClCompile Include="updi\link.c" />
+    <ClCompile Include="updi\nvm.c" />
+    <ClCompile Include="updi\physical.c" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{9EF5C8C0-187A-4269-94AE-026A24E729B3}</ProjectGuid>
+    <ProjectGuid>{7914573E-06D1-4CB1-975B-EDE94C43C9BA}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>cupdi</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -72,18 +130,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <SourcePath>$(VC_SourcePath);</SourcePath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <SourcePath>$(VC_SourcePath);</SourcePath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <SourcePath>$(VC_SourcePath);</SourcePath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <SourcePath>$(VC_SourcePath);</SourcePath>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -94,7 +156,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS  /D _CRT_NONSTDC_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -109,8 +173,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS  /D _CRT_NONSTDC_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -127,8 +192,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS  /D _CRT_NONSTDC_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,8 +213,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS  /D _CRT_NONSTDC_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -157,62 +224,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="argparse\argparse.h" />
-    <ClInclude Include="crc\crc.h" />
-    <ClInclude Include="cupdi.h" />
-    <ClInclude Include="device\device.h" />
-    <ClInclude Include="file\fop.h" />
-    <ClInclude Include="ihex\ihex.h" />
-    <ClInclude Include="ihex\kk_ihex.h" />
-    <ClInclude Include="ihex\kk_ihex_read.h" />
-    <ClInclude Include="ihex\kk_ihex_write.h" />
-    <ClInclude Include="infoblock\ib.h" />
-    <ClInclude Include="os\platform.h" />
-    <ClInclude Include="os\win32\error.h" />
-    <ClInclude Include="os\win32\logging.h" />
-    <ClInclude Include="os\win32\serial.h" />
-    <ClInclude Include="os\win32\swap.h" />
-    <ClInclude Include="os\win32\delay.h" />
-    <ClInclude Include="regex\re.h" />
-    <ClInclude Include="string\getline.h" />
-    <ClInclude Include="string\join.h" />
-    <ClInclude Include="string\split.h" />
-    <ClInclude Include="string\strlcat.h" />
-    <ClInclude Include="string\strndup.h" />
-    <ClInclude Include="updi\application.h" />
-    <ClInclude Include="updi\constants.h" />
-    <ClInclude Include="updi\link.h" />
-    <ClInclude Include="updi\nvm.h" />
-    <ClInclude Include="updi\physical.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="argparse\argparse.c" />
-    <ClCompile Include="crc\crc.c" />
-    <ClCompile Include="cupdi.c" />
-    <ClCompile Include="device\device.c" />
-    <ClCompile Include="file\fop.c" />
-    <ClCompile Include="ihex\ihex.c" />
-    <ClCompile Include="ihex\kk_ihex_read.c" />
-    <ClCompile Include="ihex\kk_ihex_write.c" />
-    <ClCompile Include="infoblock\ib_router.c" />
-    <ClCompile Include="infoblock\s1.c" />
-    <ClCompile Include="infoblock\s2.c" />
-    <ClCompile Include="os\win32\logging.c" />
-    <ClCompile Include="os\win32\serial.c" />
-    <ClCompile Include="os\win32\swap.c" />
-    <ClCompile Include="os\win32\delay.c" />
-    <ClCompile Include="regex\re.c" />
-    <ClCompile Include="string\getline.c" />
-    <ClCompile Include="string\join.c" />
-    <ClCompile Include="string\split.c" />
-    <ClCompile Include="string\strlcat.c" />
-    <ClCompile Include="string\strndup.c" />
-    <ClCompile Include="updi\application.c" />
-    <ClCompile Include="updi\link.c" />
-    <ClCompile Include="updi\nvm.c" />
-    <ClCompile Include="updi\physical.c" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

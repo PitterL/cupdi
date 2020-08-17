@@ -3,20 +3,4 @@
   <PropertyGroup>
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>-c com29 -d tiny3217 -f "D:\Users\a41450\atmel studio\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\Debug\3217_dump.ihex" --dump</LocalDebuggerCommandArguments>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-c com29 -d tiny3217 -f "D:\Users\a41450\atmel studio\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\Debug\3217_dump.ihex" --dump</LocalDebuggerCommandArguments>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>-c com29 -d tiny3217 -f "D:\Users\a41450\atmel studio\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\Debug\3217_dump.ihex" --dump</LocalDebuggerCommandArguments>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>-c com29 -d tiny3217 -f "D:\Users\a41450\atmel studio\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\ATtiny3217-1Finger-Position-Tracking-Project-MPT2\Debug\3217_dump.ihex" --dump</LocalDebuggerCommandArguments>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-  </PropertyGroup>
 </Project>
