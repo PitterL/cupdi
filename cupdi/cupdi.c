@@ -82,7 +82,7 @@ int cupdi_operate()
     void *nvm_ptr;
     int result;
 	
-	dev_name = "tiny1617";
+	dev_name = "tiny3217";
 
     dev = get_chip_info(dev_name);
     if (!dev) {

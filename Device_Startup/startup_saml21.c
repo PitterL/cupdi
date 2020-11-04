@@ -116,7 +116,7 @@ const DeviceVectors exception_table = {
         .pvStack                = (void*) (&_estack),
 
         .pfnReset_Handler       = (void*) Reset_Handler,
-        .pfnNonMaskableInt_Handler = (void*) NonMaskableInt_Handler,
+        //.pfnNonMaskableInt_Handler = (void*) NonMaskableInt_Handler,
         .pfnHardFault_Handler   = (void*) HardFault_Handler,
         .pvReservedM12          = (void*) (0UL), /* Reserved */
         .pvReservedM11          = (void*) (0UL), /* Reserved */
@@ -125,7 +125,7 @@ const DeviceVectors exception_table = {
         .pvReservedM8           = (void*) (0UL), /* Reserved */
         .pvReservedM7           = (void*) (0UL), /* Reserved */
         .pvReservedM6           = (void*) (0UL), /* Reserved */
-        .pfnSVCall_Handler      = (void*) SVCall_Handler,
+        //.pfnSVCall_Handler      = (void*) SVCall_Handler,
         .pvReservedM4           = (void*) (0UL), /* Reserved */
         .pvReservedM3           = (void*) (0UL), /* Reserved */
         .pfnPendSV_Handler      = (void*) PendSV_Handler,

@@ -217,7 +217,7 @@
       <Value>../hpl/port</Value>
       <Value>../hpl/sercom</Value>
       <Value>../hri</Value>
-      <Value>%24(PackRepoDir)\Atmel\SAML21_DFP\1.2.125\saml21b\include</Value>
+      <Value>%24(PackRepoDir)\atmel\SAML21_DFP\1.2.120\saml21b\include</Value>
     </ListValues>
   </armgcc.compiler.directories.IncludePaths>
   <armgcc.compiler.optimization.level>Optimize for size (-Os)</armgcc.compiler.optimization.level>
@@ -254,7 +254,7 @@
       <Value>../hpl/port</Value>
       <Value>../hpl/sercom</Value>
       <Value>../hri</Value>
-      <Value>%24(PackRepoDir)\Atmel\SAML21_DFP\1.2.125\saml21b\include</Value>
+      <Value>%24(PackRepoDir)\atmel\SAML21_DFP\1.2.120\saml21b\include</Value>
     </ListValues>
   </armgcc.assembler.general.IncludePaths>
   <armgcc.preprocessingassembler.general.IncludePaths>
@@ -275,7 +275,7 @@
       <Value>../hpl/port</Value>
       <Value>../hpl/sercom</Value>
       <Value>../hri</Value>
-      <Value>%24(PackRepoDir)\Atmel\SAML21_DFP\1.2.125\saml21b\include</Value>
+      <Value>%24(PackRepoDir)\atmel\SAML21_DFP\1.2.120\saml21b\include</Value>
     </ListValues>
   </armgcc.preprocessingassembler.general.IncludePaths>
 </ArmGcc>
@@ -314,7 +314,7 @@
       <Value>../hpl/port</Value>
       <Value>../hpl/sercom</Value>
       <Value>../hri</Value>
-      <Value>%24(PackRepoDir)\Atmel\SAML21_DFP\1.2.125\saml21b\include</Value>
+      <Value>%24(PackRepoDir)\atmel\SAML21_DFP\1.2.120\saml21b\include</Value>
     </ListValues>
   </armgcc.compiler.directories.IncludePaths>
   <armgcc.compiler.optimization.level>Optimize for size (-Os)</armgcc.compiler.optimization.level>
@@ -354,7 +354,7 @@
       <Value>../hpl/port</Value>
       <Value>../hpl/sercom</Value>
       <Value>../hri</Value>
-      <Value>%24(PackRepoDir)\Atmel\SAML21_DFP\1.2.125\saml21b\include</Value>
+      <Value>%24(PackRepoDir)\atmel\SAML21_DFP\1.2.120\saml21b\include</Value>
     </ListValues>
   </armgcc.assembler.general.IncludePaths>
   <armgcc.assembler.debugging.DebugLevel>Default (-g)</armgcc.assembler.debugging.DebugLevel>
@@ -376,7 +376,7 @@
       <Value>../hpl/port</Value>
       <Value>../hpl/sercom</Value>
       <Value>../hri</Value>
-      <Value>%24(PackRepoDir)\Atmel\SAML21_DFP\1.2.125\saml21b\include</Value>
+      <Value>%24(PackRepoDir)\atmel\SAML21_DFP\1.2.120\saml21b\include</Value>
     </ListValues>
   </armgcc.preprocessingassembler.general.IncludePaths>
   <armgcc.preprocessingassembler.debugging.DebugLevel>Default (-Wa,-g)</armgcc.preprocessingassembler.debugging.DebugLevel>
