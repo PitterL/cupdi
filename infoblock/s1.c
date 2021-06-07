@@ -61,7 +61,7 @@ static int get_fw_version_value(const firmware_version_t *fw_ver, int type)
     }
 }
 
-static int get_fw_size_value(const firmware_size_t *fw_size, int type)
+static uint32_t get_fw_size_value(const firmware_size_t *fw_size, int type)
 {
     return fw_size->value;
 }
@@ -78,7 +78,7 @@ static int get_crc_value(const information_crc_t *crc, int type)
     }
 }
 
-int get_ib_element_s1(information_header_t *head, int type)
+uint32_t get_ib_element_s1(information_header_t *head, int type)
 {
     information_block_s1_t *ib= (information_block_s1_t *)head;
     int major = TO_OP(type);
@@ -103,12 +103,12 @@ void show_ib_element_s1(information_header_t *head)
     
     DBG(UPDI_DEBUG, "Information Block Content:", (u8 *)ib, sizeof(*ib), "%02X ");
 
-    DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c %hhd.%hhd",
+    DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c %hhx.%hhx",
         (char)get_ib_element_s1(head, IB_FW_VER_NAME_N0),
         (char)get_ib_element_s1(head, IB_FW_VER_NAME_N1),
         (char)get_ib_element_s1(head, IB_FW_VER_NAME_N2),
-        (char)get_ib_element_s1(head, IB_FW_VER_NAME_BUILD_MAJOR),
-        (char)get_ib_element_s1(head, IB_FW_VER_NAME_BUILD_MINOR));
+        (unsigned char)get_ib_element_s1(head, IB_FW_VER_NAME_BUILD_MAJOR) & 0xF,
+        (unsigned char)get_ib_element_s1(head, IB_FW_VER_NAME_BUILD_MINOR) & 0xF);
 
     DBG_INFO(UPDI_DEBUG, "fw_size: %d bytes(0x%x)",
         get_ib_element_s1(head, IB_FW_SIZE),

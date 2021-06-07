@@ -24,8 +24,8 @@ typedef union _information_header {
 }information_header_t;
 
 typedef struct _build_number {
-    char minor : 4;
-    char major : 4;
+    unsigned char minor : 4;
+	unsigned char major : 4;
 }build_number_t;
 
 PACK(
