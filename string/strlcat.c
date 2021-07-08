@@ -34,6 +34,8 @@
 #include <string.h>
 #include <assert.h>
 
+#ifndef __APPLE__
+
 /*
 * Appends src to string dst of size siz (unlike strncat, siz is the
 * full size of dst, not space left).  At most siz-1 characters
@@ -68,3 +70,5 @@ strlcat(char *dst, const char *src, size_t siz)
 
     return(dlen + (s - src));       /* count does not include NUL */
 }
+
+#endif /* __APPLE__ */
