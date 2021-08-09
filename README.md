@@ -13,8 +13,6 @@ My purpose is you could use UPDI to flash the new TinyAVR at any enviroment like
     If you have any question, please query Pater to mailbox atpboy444@hotmail.com
     If you like it please help to mark STAR at https://github.com/PitterL/cupdi.git
 
-
-
 Usage: Simple command line interface for UPDI programming:
    or: cupdi [options] [[--] args]
    or: Erase chip: cupdi -c COM2 -d tiny817 -e
@@ -26,6 +24,7 @@ A brief description of what the program does and how it works.
 
 Basic options
     -d, --device=<str>    Target device
+	
     -c, --comport=<str>   Com port to use (Windows: COMx | *nix: /dev/ttyX)
     -b, --baudrate=<int>  Baud rate, default=115200
     -f, --file=<str>      Intel HEX file to flash
@@ -72,7 +71,7 @@ Example:
     Save Flash content:
         cupdi.exe -c COM7 -d tiny817 -v 2 -s -f tiny817.hex     (The content will save to tiny817.hex.out)
 	
-	pack image with fuse and version number (with pack.h file in ../qtouch/pack.h):
+    Pack image with fuse and version number (with pack.h file in ../qtouch/pack.h):
 		cupdi.exe -d tiny817 --pack-build
 	
     
