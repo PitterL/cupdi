@@ -125,11 +125,13 @@ int SetPortState(void *ptr_ser, const SER_PORT_STATE_T *st) {
         return -6;
     }
 
+	/* Set timeout settings */
     if (!SetCommTimeouts(FD(ser), &timeouts)) {
         return -7;
     }
 
-    return 0;
+	/* Flush the port if any setting changed */
+	return FlushPort(ser);
 }
 
 int FlushPort(void *ptr_ser) 

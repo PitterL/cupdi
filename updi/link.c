@@ -43,9 +43,10 @@ typedef struct _upd_datalink {
     LINK object init
     @port: serial port name of Window or Linux
     @baud: baudrate
+	@gaurd: gaurd time of when the transmission direction switches
     @return LINK ptr, NULL if failed
 */
-void *updi_datalink_init(const char *port, int baud)
+void *updi_datalink_init(const char *port, int baud, int gaurd)
 {
     upd_datalink_t *link = NULL;
     void *phy;
@@ -53,14 +54,14 @@ void *updi_datalink_init(const char *port, int baud)
 
     DBG_INFO(LINK_DEBUG, "<LINK> init link");
     
-    phy = updi_physical_init(port, 115200);  //default baudrate first
+    phy = updi_physical_init(port, UPDI_BAUTRATE_DEFAULT /*dummy*/);
     if (phy) {
         link = (upd_datalink_t *)malloc(sizeof(*link));
         link->mgwd = UPD_DATALINK_MAGIC_WORD;
         link->phy = (void *)phy;
 
         do {
-          result = link_set_init(link, baud);
+          result = link_set_init(link, baud, gaurd);
           if (result) {
               DBG_INFO(LINK_DEBUG, "link_set_init failed %d, retry=%d", result, retry);
               phy_send_double_break(phy);
@@ -73,7 +74,7 @@ void *updi_datalink_init(const char *port, int baud)
               phy_send_double_break(phy);
               continue;
           }
-        }while(retry-- && result);
+        } while(retry-- && result);
 
         if (result) {
           updi_datalink_deinit(link);
@@ -104,51 +105,66 @@ void updi_datalink_deinit(void *link_ptr)
     LINK Set the inter-byte delay bit and disable collision detection
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @baud: baudrate to set
+	@gaurd: gaurd time of when the transmission direction switches
     @return 0 successful, other value if failed
 */
-int link_set_init(void *link_ptr, int baud)
+int link_set_init(void *link_ptr, int baud, int gaurd)
 {
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
-    u8 clksel, resp;
-    int result;
-
+    u8 clksel, resp, val;
+	int baud_first = baud;
+	int i, result;
+	
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
     DBG_INFO(LINK_DEBUG, "<LINK> link set init");
 
-    result = phy_set_baudrate(PHY(link), 115200);
+	if (baud > UPDI_BAUTRATE_IN_CLK_4M_MAX) {
+		baud_first = UPDI_BAUTRATE_DEFAULT;
+	}
+
+    result = phy_set_baudrate(PHY(link), baud_first);
     if (result) {
         DBG_INFO(LINK_DEBUG, "phy_set_baudrate default failed %d", result);
         return -2;
     }
 
-    // Disable collision detection
-    DBG_INFO(LINK_DEBUG, "<LINK> Disable collision detection");
-    result = link_stcs(link, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT);
-    if (result) {
-        DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
-        return -3;
-    }
+	// Disable collision detection
+	DBG_INFO(LINK_DEBUG, "<LINK> Disable collision detection");
+	result = link_stcs(link, UPDI_CS_CTRLB, 1 << UPDI_CTRLB_CCDETDIS_BIT);
+	if (result) {
+		DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLB failed %d", result);
+		return -3;
+	}
     
-    // Set the inter-byte delay bit
-#ifdef DISABLE_INTER_BYTE
-    DBG_INFO(LINK_DEBUG, "<LINK> Set the inter-byte delay bit");
-    result = link_stcs(link, UPDI_CS_CTRLA, 1 << UPDI_CTRLA_IBDLY_BIT);
+    // Set the inter-byte delay bit and Gaurd Delay time 
+	DBG_INFO(LINK_DEBUG, "<LINK> Set the inter-byte delay bit and Gaurd Delay time");
+	val = UPDI_CTRLA_GTVAL_16_CYCLES;
+	for (i = 0; i < UPDI_CTRLA_GTVAL_TYPES; i++) {
+		if (gaurd >= (1 << (UPDI_CTRLA_GTVAL_TYPES - i))) {
+			val = i;
+			break;
+		}
+	}
+#ifdef ENABLE_INTER_BYTE
+	// Enable inter byte
+	val |= (1 << UPDI_CTRLA_IBDLY_BIT);
+#endif
+    result = link_stcs(link, UPDI_CS_CTRLA, val);
     if (result) {
         DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
         return -4;
     }
-#endif
 
     // Set baudrate and clock
-    if (baud <= 225000) {
+    if (baud <= UPDI_BAUTRATE_IN_CLK_4M_MAX) {
         clksel = UPDI_ASI_CTRLA_CLKSEL_4M;
     }
-    else if (baud <= 450000) {
+    else if (baud <= UPDI_BAUTRATE_IN_CLK_8M_MAX) {
         clksel = UPDI_ASI_CTRLA_CLKSEL_8M;
     }
-    else if (baud <= 900000) {
+    else if (baud <= UPDI_BAUTRATE_IN_CLK_16M_MAX) {
         clksel = UPDI_ASI_CTRLA_CLKSEL_16M;
     }
     else {

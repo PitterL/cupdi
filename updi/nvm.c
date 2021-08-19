@@ -51,17 +51,18 @@ typedef struct _upd_nvm {
     NVM object init
     @port: serial port name of Window or Linux
     @baud: baudrate
+	@gaurd: gaurd time of when the transmission direction switches
     @dev: point chip dev object
     @return NVM ptr, NULL if failed
 */
-void *updi_nvm_init(const char *port, int baud, const void *dev)
+void *updi_nvm_init(const char *port, int baud, int gaurd, const void *dev)
 {
     upd_nvm_t *nvm = NULL;
     void *app;
 
     DBG_INFO(NVM_DEBUG, "<NVM> init nvm");
 
-    app = updi_application_init(port, baud, dev);
+    app = updi_application_init(port, baud, gaurd, dev);
     if (app) {
         nvm = (upd_nvm_t *)malloc(sizeof(*nvm));
         nvm->mgwd = UPD_NVM_MAGIC_WORD;
@@ -649,6 +650,7 @@ int nvm_write_fuse(void *nvm_ptr, u16 address, const u8 *data, int len)
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
     int i, result;
+	u8 val;
 
     result = nvm_get_block_info(nvm, NVM_FUSES, &info);
     if (result) {
@@ -657,11 +659,15 @@ int nvm_write_fuse(void *nvm_ptr, u16 address, const u8 *data, int len)
     }
 
     for (i = 0; i < len; i++) {
-        result = _nvm_write_fuse(nvm_ptr, &info, address + i, data[i]);
-        if (result) {
-            DBG_INFO(NVM_DEBUG, "_nvm_write_fuse fuse (%d) failed %d", i, result);
-            return -2;
-        }
+		// compare current value then write
+		result = _nvm_read_common(nvm_ptr, &info, address + i, &val, 1);
+		if (result || val != data[i]) {
+			result = _nvm_write_fuse(nvm_ptr, &info, address + i, data[i]);
+			if (result) {
+				DBG_INFO(NVM_DEBUG, "_nvm_write_fuse fuse (%d) failed %d", i, result);
+				return -2;
+			}
+		}
     }
 
     return 0;

@@ -48,17 +48,18 @@ typedef struct _upd_application {
     APP object init
     @port: serial port name of Window or Linux
     @baud: baudrate
+	@gaurd: gaurd time of when the transmission direction switches
     @dev: point chip dev object
     @return APP ptr, NULL if failed
 */
-void *updi_application_init(const char *port, int baud, const void *dev)
+void *updi_application_init(const char *port, int baud, int gaurd, const void *dev)
 {
     upd_application_t *app = NULL;
     void *link;
 
     DBG_INFO(APP_DEBUG, "<APP> init application");
 
-    link = updi_datalink_init(port, baud);
+    link = updi_datalink_init(port, baud, gaurd);
     if (link) {
         app = (upd_application_t *)malloc(sizeof(*app));
         app->mgwd = UPD_APPLICATION_MAGIC_WORD;

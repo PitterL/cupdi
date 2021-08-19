@@ -1,7 +1,7 @@
 #ifndef __UD_NVM_H
 #define __UD_NVM_H
 
-void *updi_nvm_init(const char *port, int baud, const void *dev);
+void *updi_nvm_init(const char *port, int baud, int gaurd, const void *dev);
 void updi_nvm_deinit(void *nvm_ptr);
 int nvm_get_device_info(void *nvm_ptr);
 int nvm_enter_progmode(void *nvm_ptr);

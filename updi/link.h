@@ -1,9 +1,9 @@
 #ifndef __UD_LINK_H
 #define __UD_LINK_H
 
-void *updi_datalink_init(const char *port, int baud);
+void *updi_datalink_init(const char *port, int baud, int gaurd);
 void updi_datalink_deinit(void *link_ptr);
-int link_set_init(void *link_ptr, int baud);
+int link_set_init(void *link_ptr, int baud, int gaurd);
 int link_check(void *link_ptr);
 int _link_ldcs(void *link_ptr, u8 address, u8 *val);
 u8 link_ldcs(void *link_ptr, u8 address);

@@ -62,11 +62,10 @@ void *updi_physical_init(const char *port, int baud)
         phy->mgwd = UPD_PHYSICAL_MAGIC_WORD;
         phy->ser = ser;
         phy->ibdly = 0;
-        stat.baudRate = baud;
         memcpy(&phy->stat, &stat, sizeof(stat));
         
         // Send an initial break as handshake
-        // Use double break whatever
+        // Use double break whatever. If we only send one break, the [Clock Recovery Error] in UPDI_CS_STATUSB will occurred
         result = phy_send_double_break(phy);
         if (result) {
             DBG_INFO(PHY_DEBUG, "<PHY> Init: send break failed %d", result);
@@ -133,9 +132,10 @@ int phy_set_baudrate(void *ptr_phy, int baud)
 /*
     PHY send doule break
     @ptr_phy: APP object pointer, acquired from updi_physical_init()
+	@baud: the break baudrate, if 0 that mean use current setting of the sercom port
     @return 0 successful, other value if failed
 */
-int _phy_send_break(void *ptr_phy, int count)
+int _phy_send_break(void *ptr_phy, int count, int baud)
 {
     /*
     Sends a double break to reset the UPDI port
@@ -155,16 +155,18 @@ int _phy_send_break(void *ptr_phy, int count)
         # Re - init at a lower baud
         # At 300 bauds, the break character will pull the line low for 30ms
         # Which is slightly above the recommended 24.6ms
-    */  
-    stat.baudRate = 300;
-    stat.byteSize = 8;
-    stat.stopBits = ONESTOPBIT;
-    stat.parity = EVENPARITY;
-    result = SetPortState(SER(phy), &stat);
-    if (result) {
-        DBG_INFO(PHY_DEBUG, "<PHY> D-Break: SetPortState failed %d", result);
-        return -2;
-    }
+    */ 
+	if (baud) {
+		stat.baudRate = baud;
+		stat.byteSize = 8;
+		stat.stopBits = ONESTOPBIT;
+		stat.parity = EVENPARITY;
+		result = SetPortState(SER(phy), &stat);
+		if (result) {
+			DBG_INFO(PHY_DEBUG, "<PHY> D-Break: SetPortState failed %d", result);
+			return -2;
+		}
+	}
 
     /*Send two break characters, with 1 stop bit in between */
     /*Send break characters, with 1 stop bit in between */
@@ -177,11 +179,13 @@ int _phy_send_break(void *ptr_phy, int count)
     }
 
     /*Re - init at the real baud*/
-    result = SetPortState(SER(phy), &phy->stat);
-    if (result) {
-        DBG_INFO(PHY_DEBUG, "<PHY> D-Break: re-SetPortState failed %d", result);
-        return -7;
-    }
+	if (baud) {
+		result = SetPortState(SER(phy), &phy->stat);
+		if (result) {
+			DBG_INFO(PHY_DEBUG, "<PHY> D-Break: re-SetPortState failed %d", result);
+			return -7;
+		}
+	}
 
     return 0;
 }
@@ -193,7 +197,7 @@ int _phy_send_break(void *ptr_phy, int count)
 */
 int phy_send_break(void *ptr_phy)
 {
-    return _phy_send_break(ptr_phy, 1);
+    return _phy_send_break(ptr_phy, 1, 0);
 }
 
 /*
@@ -203,7 +207,7 @@ int phy_send_break(void *ptr_phy)
 */
 int phy_send_double_break(void *ptr_phy)
 {
-    return _phy_send_break(ptr_phy, 2);
+    return _phy_send_break(ptr_phy, 2, UPDI_BAUTRATE_DOUBLE_BREAK);
 }
 
 /*
