@@ -1,7 +1,7 @@
 #ifndef __UD_APPLICATION_H
 #define __UD_APPLICATION_H
 
-void *updi_application_init(const char *port, int baud, int gaurd, const void *dev);
+void *updi_application_init(const char *port, int baud, int guard, const void *dev);
 void updi_application_deinit(void *app_ptr);
 int app_device_info(void *app_ptr);
 bool app_in_prog_mode(void *app_ptr);

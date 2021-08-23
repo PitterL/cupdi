@@ -32,6 +32,7 @@ typedef struct _upd_nvm {
 #define UPD_NVM_MAGIC_WORD 0xD2D2 //'unvm'
     unsigned int mgwd;  //magic word
     bool progmode;
+	bool erased;
     void *app;
     const device_info_t *dev;
 }upd_nvm_t;
@@ -51,18 +52,18 @@ typedef struct _upd_nvm {
     NVM object init
     @port: serial port name of Window or Linux
     @baud: baudrate
-	@gaurd: gaurd time of when the transmission direction switches
+	@guard: guard time of when the transmission direction switches
     @dev: point chip dev object
     @return NVM ptr, NULL if failed
 */
-void *updi_nvm_init(const char *port, int baud, int gaurd, const void *dev)
+void *updi_nvm_init(const char *port, int baud, int guard, const void *dev)
 {
     upd_nvm_t *nvm = NULL;
     void *app;
 
     DBG_INFO(NVM_DEBUG, "<NVM> init nvm");
 
-    app = updi_application_init(port, baud, gaurd, dev);
+    app = updi_application_init(port, baud, guard, dev);
     if (app) {
         nvm = (upd_nvm_t *)malloc(sizeof(*nvm));
         nvm->mgwd = UPD_NVM_MAGIC_WORD;
@@ -227,6 +228,7 @@ int nvm_unlock_device(void *nvm_ptr)
 
     // Unlock after using the NVM key results in prog mode.
     nvm->progmode = true;
+	nvm->erased = true;
 
     return 0;
 }
@@ -260,6 +262,8 @@ int nvm_chip_erase(void *nvm_ptr)
         return -3;
     }
 
+	nvm->erased = true;
+
     return 0;
 }
 
@@ -289,8 +293,9 @@ int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u16 address, u8 *dat
         return -2;
     }
 
-    if (address < info->nvm_start)
-        address += info->nvm_start;
+	if (address < info->nvm_start) {
+		address += info->nvm_start;
+	}
 
     if (address + len > info->nvm_start + info->nvm_size) {
         DBG_INFO(NVM_DEBUG, "nvm area address overflow, addr %hx, len %x.", address, len);
@@ -329,9 +334,10 @@ int nvm_read_flash(void *nvm_ptr, u16 address, u8 *data, int len)
     @address: target address
     @data: data buffer
     @len: data len
+	@erased: Has the chip been erased yet
     @return 0 successful, other value failed
 */
-int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
+int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len, bool erased)
 {
     /*
     Writes to flash
@@ -376,8 +382,13 @@ int nvm_write_flash(void *nvm_ptr, u16 address, const u8 *data, int len)
         if (size > page_size)
             size = page_size;
 
-        result = app_write_nvm(APP(nvm), address + off, data + off, size);
-        if (result) {
+		if (erased) {
+			result = app_write_nvm(APP(nvm), address + off, data + off, size);
+		} else {
+			result = app_erase_write_nvm(APP(nvm), address + off, data + off, size);
+		}
+
+		if (result) {
             DBG_INFO(NVM_DEBUG, "app_write_nvm failed %d", result);
             break;
         }
@@ -508,9 +519,10 @@ int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u16 address, const 
     @address: target address
     @data: data buffer
     @len: data len
+	#dummy: not used
     @return 0 successful, other value failed
 */
-int nvm_write_eeprom(void *nvm_ptr, u16 address, const u8 *data, int len)
+int nvm_write_eeprom(void *nvm_ptr, u16 address, const u8 *data, int len, bool dummy)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
@@ -531,9 +543,10 @@ int nvm_write_eeprom(void *nvm_ptr, u16 address, const u8 *data, int len)
     @address: target address
     @data: data buffer
     @len: data len
+	@dummy: not used
     @return 0 successful, other value failed
 */
-int nvm_write_userrow(void *nvm_ptr, u16 address, const u8 *data, int len)
+int nvm_write_userrow(void *nvm_ptr, u16 address, const u8 *data, int len, bool dummy)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
@@ -621,7 +634,7 @@ int _nvm_write_fuse(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8
     }
 
     data = value;
-    result = app_write_data_bytes(APP(nvm), nvmctrl_address + UPDI_NVMCTRL_DATAL, (u8 *)&data, 2);
+    result = app_write_data_bytes(APP(nvm), nvmctrl_address + UPDI_NVMCTRL_DATAL, (u8 *)&data, 1);
     if (result) {
         DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse data %02x failed %d", data, result);
         return -5;
@@ -643,9 +656,10 @@ int _nvm_write_fuse(void *nvm_ptr, const nvm_info_t *info, u16 address, const u8
     @address: target address
     @data: data buffer
     @len: data len
+	@dummy: not used
     @return 0 successful, other value failed
 */
-int nvm_write_fuse(void *nvm_ptr, u16 address, const u8 *data, int len)
+int nvm_write_fuse(void *nvm_ptr, u16 address, const u8 *data, int len, bool dummy)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
@@ -690,13 +704,14 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
     int size, off;
     int result;
 
-    if (!VALID_NVM(nvm))
-        return ERROR_PTR;
+	if (!VALID_NVM(nvm))
+		return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Read memory 0x%x size %d(0x%x)", address, len, len);
+    DBG_INFO(NVM_DEBUG, "<NVM> Read memory 0x%x size %d", address, len);
 
-    if (!nvm->progmode)
-        DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
+	if (!nvm->progmode) {
+		DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
+	}
 
     off = 0;
     do {
@@ -724,9 +739,10 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
     @address: target address
     @data: data buffer
     @len: data len
+	@dummy: not used
     @return 0 successful, other value failed
 */
-int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len)
+int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len, bool dummy)
 {
     /*
         Write Memory
@@ -775,8 +791,9 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    nvm_op op, nvm_ops[] = { nvm_write_flash, nvm_write_eeprom, nvm_write_userrow, nvm_write_fuse, nvm_write_mem };
-    int i, result;
+	_nvm_op op, nvm_ops[] = { nvm_write_flash, nvm_write_eeprom, nvm_write_userrow, nvm_write_fuse, nvm_write_mem };
+	bool chip_erased = nvm->erased;
+	int i, result;
 
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
@@ -793,8 +810,9 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
         if (address >= info.nvm_start && address < info.nvm_start + info.nvm_size) {
             if (address + len <= info.nvm_start + info.nvm_size) {
                 op = nvm_ops[i];
-                if (op && len)
-                    return op(nvm_ptr, address, data, len);
+				if (op && len) {
+					return op(nvm_ptr, address, data, len, chip_erased);
+				}
 
                 DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", op, len);
                 return -3;
@@ -806,7 +824,42 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
         }
     }
 
+	nvm->erased = false;
+
     return 0;
+}
+
+/*
+	NVM wait flash ready after operation
+	@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+	@return 0 successful, other value failed
+*/
+int nvm_wait(void *nvm_ptr)
+{
+	/*
+	Wait programming
+	*/
+	upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+	int result;
+
+	if (!VALID_NVM(nvm))
+		return ERROR_PTR;
+
+	DBG_INFO(NVM_DEBUG, "<NVM> Wait");
+
+	if (!nvm->progmode) {
+		// DBG_INFO(NVM_DEBUG, "Not in programming mode, skip");
+		return 0;
+	}
+
+	// Check that NVM controller is ready
+	result = app_wait_flash_ready(APP(nvm), TIMEOUT_WAIT_FLASH_READY);
+	if (result) {
+		DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout failed %d", result);
+		return -2;
+	}
+
+	return 0;
 }
 
 /*
@@ -833,16 +886,21 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
         return -2;
     }
 
-    if (delay_ms)
-        msleep(delay_ms);
+	if (delay_ms) {
+		msleep(delay_ms);
+	}
 
     if (nvm->progmode) {
         result = app_enter_progmode(APP(nvm));
         if (result) {
-            DBG_INFO(APP_DEBUG, "app_enter_progmode, faled result %d", result);
-            return -3;
-        }
-    }
+            DBG_INFO(APP_DEBUG, "app_enter_progmode after reset, failed result %d", result);
+		}
+		else {
+			nvm->progmode = false;
+		}
+	}
+
+	nvm->erased = false;
     
     return result;
 }

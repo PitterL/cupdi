@@ -48,18 +48,18 @@ typedef struct _upd_application {
     APP object init
     @port: serial port name of Window or Linux
     @baud: baudrate
-	@gaurd: gaurd time of when the transmission direction switches
+	@guard: guard time of when the transmission direction switches
     @dev: point chip dev object
     @return APP ptr, NULL if failed
 */
-void *updi_application_init(const char *port, int baud, int gaurd, const void *dev)
+void *updi_application_init(const char *port, int baud, int guard, const void *dev)
 {
     upd_application_t *app = NULL;
     void *link;
 
     DBG_INFO(APP_DEBUG, "<APP> init application");
 
-    link = updi_datalink_init(port, baud, gaurd);
+    link = updi_datalink_init(port, baud, guard);
     if (link) {
         app = (upd_application_t *)malloc(sizeof(*app));
         app->mgwd = UPD_APPLICATION_MAGIC_WORD;
@@ -829,35 +829,35 @@ int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
             DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -3;
         }
+	}
+	else {
 
-        return 0;
-    }
+		// Range check
+		if (len > ((UPDI_MAX_REPEAT_SIZE + 1) << 1)) {
+			DBG_INFO(APP_DEBUG, "Write words data length out of size %d", len);
+			return -3;
+		}
 
-    // Range check
-    if (len > ((UPDI_MAX_REPEAT_SIZE + 1) << 1)) {
-        DBG_INFO(APP_DEBUG, "Write words data length out of size %d", len);
-        return -3;
-    }
+		// Store the address
+		result = link_st_ptr(LINK(app), address);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
+			return -4;
+		}
 
-    // Store the address
-    result = link_st_ptr(LINK(app), address);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
-        return -4;
-    }
+		//Fire up the repeat
+		result = link_repeat16(LINK(app), (len >> 1) - 1);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "link_repeat16 failed %d", result);
+			return -5;
+		}
 
-    //Fire up the repeat
-    result = link_repeat16(LINK(app), (len >> 1) - 1);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_repeat16 failed %d", result);
-        return -5;
-    }
-
-    result = link_st_ptr_inc16(LINK(app), data, len);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_st_ptr_inc16 failed %d", result);
-        return -6;
-    }
+		result = link_st_ptr_inc16(LINK(app), data, len);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "link_st_ptr_inc16 failed %d", result);
+			return -6;
+		}
+	}
 
     return 0;
 }
@@ -890,33 +890,35 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
             DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -2;
         }
-    }
+	}
+	else {
 
-    // Range check
-    if (len > UPDI_MAX_REPEAT_SIZE + 1) {
-        DBG_INFO(APP_DEBUG, "Write data length out of size %d", len);
-        return -3;
-    }
+		// Range check
+		if (len > UPDI_MAX_REPEAT_SIZE + 1) {
+			DBG_INFO(APP_DEBUG, "Write data length out of size %d", len);
+			return -3;
+		}
 
-    // Store the address
-    result = link_st_ptr(LINK(app), address);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
-        return -4;
-    }
+		// Store the address
+		result = link_st_ptr(LINK(app), address);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
+			return -4;
+		}
 
-    //Fire up the repeat
-    result = link_repeat(LINK(app), len - 1);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
-        return -5;
-    }
- 
-    result = link_st_ptr_inc(LINK(app), data, len);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "link_st_ptr_inc16 failed %d", result);
-        return -6;
-    }
+		//Fire up the repeat
+		result = link_repeat(LINK(app), len - 1);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "link_repeat failed %d", result);
+			return -5;
+		}
+
+		result = link_st_ptr_inc(LINK(app), data, len);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "link_st_ptr_inc16 failed %d", result);
+			return -6;
+		}
+	}
 
     return 0;
 }
@@ -942,7 +944,7 @@ int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use
     if (!VALID_PTR(data) || len <= 0)
         return ERROR_PTR;
 
-    if (use_word_access)
+    if (use_word_access && !(len & 0x1))
         result = app_write_data_words(app_ptr, address, data, len);
     else
         result = app_write_data_bytes(app_ptr, address, data, len);
@@ -1032,9 +1034,7 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
 */
 int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
-    bool use_word_access = !(len & 0x1);
-
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE, use_word_access);
+    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE, true);
 }
 
 /*
@@ -1061,9 +1061,7 @@ int _app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, bo
 */
 int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
 {
-    bool use_word_access = !(len & 0x1);
-
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, use_word_access);
+    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, true);
 }
 
 /*

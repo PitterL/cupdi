@@ -444,10 +444,13 @@ int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
 
     DBG_INFO(PHY_DEBUG, "<PHY> Transfer: Write %d bytes, Read %d bytes", wlen, rlen);
 
-    result = FlushPort(SER(phy));
+/*
+	No need to flush each time for bring up the transfer speed
+	result = FlushPort(SER(phy));
     if (result) {
         DBG_INFO(PHY_DEBUG, "<PHY> Send: FlushPort failed %d", result);
     }
+*/
 
     do {
         result = phy_send(phy, wdata, wlen);
@@ -465,6 +468,9 @@ int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
                 break;
             }
         }
+
+		/* Flush if something wrong */
+		FlushPort(SER(phy));
 
         if (result < 0)
             retry--;

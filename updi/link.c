@@ -43,10 +43,10 @@ typedef struct _upd_datalink {
     LINK object init
     @port: serial port name of Window or Linux
     @baud: baudrate
-	@gaurd: gaurd time of when the transmission direction switches
+	@guard: guard time of when the transmission direction switches
     @return LINK ptr, NULL if failed
 */
-void *updi_datalink_init(const char *port, int baud, int gaurd)
+void *updi_datalink_init(const char *port, int baud, int guard)
 {
     upd_datalink_t *link = NULL;
     void *phy;
@@ -61,7 +61,7 @@ void *updi_datalink_init(const char *port, int baud, int gaurd)
         link->phy = (void *)phy;
 
         do {
-          result = link_set_init(link, baud, gaurd);
+          result = link_set_init(link, baud, guard);
           if (result) {
               DBG_INFO(LINK_DEBUG, "link_set_init failed %d, retry=%d", result, retry);
               phy_send_double_break(phy);
@@ -105,10 +105,10 @@ void updi_datalink_deinit(void *link_ptr)
     LINK Set the inter-byte delay bit and disable collision detection
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @baud: baudrate to set
-	@gaurd: gaurd time of when the transmission direction switches
+	@guard: guard time of when the transmission direction switches
     @return 0 successful, other value if failed
 */
-int link_set_init(void *link_ptr, int baud, int gaurd)
+int link_set_init(void *link_ptr, int baud, int guard)
 {
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
     u8 clksel, resp, val;
@@ -142,7 +142,7 @@ int link_set_init(void *link_ptr, int baud, int gaurd)
 	DBG_INFO(LINK_DEBUG, "<LINK> Set the inter-byte delay bit and Gaurd Delay time");
 	val = UPDI_CTRLA_GTVAL_16_CYCLES;
 	for (i = 0; i < UPDI_CTRLA_GTVAL_TYPES; i++) {
-		if (gaurd >= (1 << (UPDI_CTRLA_GTVAL_TYPES - i))) {
+		if (guard >= (1 << (UPDI_CTRLA_GTVAL_TYPES - i))) {
 			val = i;
 			break;
 		}
@@ -372,7 +372,7 @@ int _link_ld(void *link_ptr, u16 address, u8 *val)
     if (!VALID_LINK(link) || !val)
         return ERROR_PTR;
 
-    DBG_INFO(LINK_DEBUG, "<LINK> LD from %04X}", address);
+    DBG_INFO(LINK_DEBUG, "<LINK> LD from {%04X}", address);
   
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp)) {
