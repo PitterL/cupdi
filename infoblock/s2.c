@@ -117,6 +117,9 @@ void show_ib_element_s2(information_header_t *head)
 {
     information_block_s2_t *ib = (information_block_s2_t *)head;
 
+	DBG_INFO(UPDI_DEBUG, "");
+	DBG_INFO(UPDI_DEBUG, "==========================");
+
     DBG(UPDI_DEBUG, "Information Block Content:", (u8 *)ib, sizeof(*ib), "%02X ");
 
     DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c(%hhX) %hhX.%hhX",
@@ -135,8 +138,10 @@ void show_ib_element_s2(information_header_t *head)
         get_ib_element_s2(head, IB_REG_SR_SIGNAL),
         get_ib_element_s2(head, IB_REG_SR_REF));
 
-    DBG_INFO(UPDI_DEBUG, "fw_crc: 0x%06x",
+    DBG_INFO(UPDI_DEBUG, "fw_crc: 0x%06X",
         get_ib_element_s2(head, IB_CRC_FW));
+
+	DBG_INFO(UPDI_DEBUG, "==========================");
 }
 
 int create_information_block_s2(/*information_container_t*/void *info_ptr, int fw_crc24, int fw_size, int fw_version, int dsdr_addr)

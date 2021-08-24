@@ -67,7 +67,7 @@ char *trim_name_with_extesion(const char *name, const char a_delim, int order, c
 
 typedef int(*fn_search_defined_buf)(char *content, const char *pat_str, const char *pat_value, unsigned int *output, int outlen, unsigned int invalid);
 /*
-Get value content in source file, the format is: #define <varname> 0x12345678
+Get value content in source file, the format is: #define <varname> 0x12345678 (hex format, 32bit max)
 @buffer: data content buff to search (the content will be changed after function called)
 @pat_str: defined array regex trunk for search
 @pat_val: defined regex element in array trunk for search
@@ -79,7 +79,7 @@ Get value content in source file, the format is: #define <varname> 0x12345678
 int _search_defined_value_from_buf(char *content, const char *pat_str, const char *pat_value, unsigned int *output, int outlen, unsigned int invalid)
 {
     tre_comp tregex;
-    const char *st;
+    const char *st, *end = NULL;
 
     unsigned int val;
     int result = -2;
@@ -94,11 +94,13 @@ int _search_defined_value_from_buf(char *content, const char *pat_str, const cha
         result = 0;
 
         tre_compile(pat_value, &tregex);
-        st = tre_match(&tregex, st, NULL);
+        st = tre_match(&tregex, st, &end);
         if (st) {
-            val = (unsigned int)strtol(st, NULL, 16); // 0 is error
-            *output = val;
-            result++;
+			if (end > st && end - st <= 10) {	// 32bit hex number start with `0x`, so 10 chars max
+				val = (unsigned int)strtol(st, NULL, 16); // 0 is error
+				*output = val;
+				result++;
+			}
         }
     }
 

@@ -19,10 +19,11 @@ void _logv(verbose_t level, char *format, const unsigned char *data, int len, co
     if (level > g_verbose_level)
         return;
 
-    if (rowsize <= 0)
-        rowsize = DEFAULT_ROWDATA_SIZE;
+	if (rowsize <= 0) {
+		rowsize = DEFAULT_ROWDATA_SIZE;
+    }
 
-    if (format && format[0]) {
+    if (format) {
         size = _vscprintf(format, args) // _vscprintf doesn't count  
             + 1; // terminating '\0'  
 
@@ -35,12 +36,13 @@ void _logv(verbose_t level, char *format, const unsigned char *data, int len, co
         free(buffer);
     }
 
-    if (data && len) {
+    if (data) {
         for (int i = 0; i < len; i++) {
             if (len > rowsize) {
                 if (!(i % rowsize)) {
-                    if (i)
-                        puts("");
+					if (i) {
+						puts("");
+					}
                     printf("%04x:\t", i);
                 }
             }
