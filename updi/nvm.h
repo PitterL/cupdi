@@ -20,10 +20,10 @@ int nvm_write_fuse(void *nvm_ptr, u16 address, const u8 *data, int len, bool dum
 int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len);
 int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len, bool dummy);
 
-typedef int(*nvm_op)(void *nvm_ptr, u16 address, const u8 *data, int len);
-typedef int(*_nvm_op)(void *nvm_ptr, u16 address, const u8 *data, int len, bool erased);
+typedef int(*nvm_wop)(void *nvm_ptr, u16 address, const u8 *data, int len, bool /* some action */);
+typedef int(*nvm_rop)(void *nvm_ptr, u16 address, u8 *data, int len);
 
-int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len);
+int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len, bool verify);
 int nvm_reset(void *nvm_ptr, int delay_ms);
 int nvm_wait(void *nvm_ptr);
 int nvm_get_block_info(void *nvm_ptr, /*NVM_TYPE_T*/int type, nvm_info_t *info);

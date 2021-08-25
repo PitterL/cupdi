@@ -48,6 +48,7 @@ void *updi_physical_init(const char *port, int baud)
     void *ser;
     upd_physical_t *phy = NULL;
     SER_PORT_STATE_T stat;
+	size_t size;
     int result;
 
     DBG_INFO(PHY_DEBUG, "<PHY> Opening port %s, baudrate %d", port, baud);
@@ -58,7 +59,15 @@ void *updi_physical_init(const char *port, int baud)
     stat.parity = EVENPARITY;
     ser = (void *)OpenPort(port, &stat);
     if (ser) {
-        phy = (upd_physical_t *)malloc(sizeof(*phy));
+		size = sizeof(*phy);
+        phy = (upd_physical_t *)malloc(size);
+		if (!phy) {
+			DBG_INFO(PHY_DEBUG, "<PHY> phy malloc memory(%d) failed", size);
+			ClosePort(ser);
+			return NULL;
+		}
+
+		memset(phy, 0, size);
         phy->mgwd = UPD_PHYSICAL_MAGIC_WORD;
         phy->ser = ser;
         phy->ibdly = 0;

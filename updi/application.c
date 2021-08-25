@@ -55,16 +55,25 @@ typedef struct _upd_application {
 void *updi_application_init(const char *port, int baud, int guard, const void *dev)
 {
     upd_application_t *app = NULL;
+	size_t size;
     void *link;
 
     DBG_INFO(APP_DEBUG, "<APP> init application");
 
     link = updi_datalink_init(port, baud, guard);
     if (link) {
-        app = (upd_application_t *)malloc(sizeof(*app));
-        app->mgwd = UPD_APPLICATION_MAGIC_WORD;
-        app->link = (void *)link;
-        app->dev = (const device_info_t *)dev;
+		size = sizeof(*app);
+        app = (upd_application_t *)malloc(size);
+		if (!app) {
+			DBG_INFO(APP_DEBUG, "<APP> app malloc memory(%d) failed", size);
+			updi_datalink_deinit(link);
+			return NULL;
+		}
+
+		memset(app, 0, size);
+		app->mgwd = UPD_APPLICATION_MAGIC_WORD;
+		app->link = (void *)link;
+		app->dev = (const device_info_t *)dev;
     }
 
     return app;

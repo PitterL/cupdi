@@ -2,15 +2,15 @@
 #define __CUPDI_H
 
 int updi_erase(void *nvm_ptr);
-int updi_program(void *nvm_ptr, const char *file);
+int updi_program(void *nvm_ptr, const char *file, bool check);
 int updi_compare(void *nvm_ptr, const char *file);
 int updi_verifiy_infoblock(void *nvm_ptr);
-int updi_update(void *nvm_ptr, const char *file);
+int updi_update(void *nvm_ptr, const char *file, bool check);
 int updi_save(void *nvm_ptr, const char *file);
 int updi_dump(void *nvm_ptr, const char *file);
 int updi_read(void *nvm_ptr, char *cmd);
-int updi_write(void *nvm_ptr, char *cmd);
-int updi_write_fuse(void *nvm_ptr, char *cmd);
+int updi_write(void *nvm_ptr, char *cmd, bool check);
+int updi_write_fuse(void *nvm_ptr, char *cmd, bool check);
 int updi_show_infoblock(void *nvm_ptr);
 int updi_verifiy_infoblock(void *nvm_ptr);
 int updi_reset(void *nvm_ptr);

@@ -35,6 +35,7 @@ typedef struct _upd_sercom {
 
 HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *st) {
     upd_sercom_t *ser;
+	size_t size;
     HANDLE fd = NULL;
     char comport[16] = "\\\\.\\";
 
@@ -46,12 +47,14 @@ HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *st) {
         return NULL;
     }
 
-    ser = (upd_sercom_t *)malloc(sizeof(*ser));
+	size = sizeof(*ser);
+    ser = (upd_sercom_t *)malloc(size);
     if (!ser) {
         CloseHandle(fd);
         return NULL;
     }
 
+	memset(ser, 0, size);
     ser->mgwd = UPD_SERCOM_MAGIC_WORD;
     ser->fd = fd;
 

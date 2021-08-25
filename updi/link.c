@@ -50,13 +50,22 @@ void *updi_datalink_init(const char *port, int baud, int guard)
 {
     upd_datalink_t *link = NULL;
     void *phy;
+	size_t size;
     int result, retry = 3;
 
     DBG_INFO(LINK_DEBUG, "<LINK> init link");
     
     phy = updi_physical_init(port, UPDI_BAUTRATE_DEFAULT /*dummy*/);
     if (phy) {
-        link = (upd_datalink_t *)malloc(sizeof(*link));
+		size = sizeof(sizeof(*link));
+        link = (upd_datalink_t *)malloc(size);
+		if (!link) {
+			DBG_INFO(LINK_DEBUG, "<LINK> link malloc memory(%d) failed", size);
+			updi_physical_deinit(phy);
+			return NULL;
+		}
+
+		memset(link, 0, size);
         link->mgwd = UPD_DATALINK_MAGIC_WORD;
         link->phy = (void *)phy;
 
@@ -147,29 +156,30 @@ int link_set_init(void *link_ptr, int baud, int guard)
 			break;
 		}
 	}
-#ifdef ENABLE_INTER_BYTE
-	// Enable inter byte
-	val |= (1 << UPDI_CTRLA_IBDLY_BIT);
+
+	// Set baudrate and clock
+	if (baud <= UPDI_BAUTRATE_IN_CLK_4M_MAX) {
+		clksel = UPDI_ASI_CTRLA_CLKSEL_4M;
+	}
+	else if (baud <= UPDI_BAUTRATE_IN_CLK_8M_MAX) {
+		clksel = UPDI_ASI_CTRLA_CLKSEL_8M;
+	}
+	else if (baud <= UPDI_BAUTRATE_IN_CLK_16M_MAX) {
+		clksel = UPDI_ASI_CTRLA_CLKSEL_16M;
+#ifdef UPDI_CTRLA_ENABLE_INTER_BYTE
+		// Enable inter byte
+		val |= (1 << UPDI_CTRLA_IBDLY_BIT);
 #endif
+	}
+	else {
+		DBG_INFO(LINK_DEBUG, "Unsupported baudrate for UPDI clk %d, max 0.9Mhz", baud);
+		return -6;
+	}
+
     result = link_stcs(link, UPDI_CS_CTRLA, val);
     if (result) {
         DBG_INFO(LINK_DEBUG, "link_stcs UPDI_CS_CTRLA failed %d", result);
         return -4;
-    }
-
-    // Set baudrate and clock
-    if (baud <= UPDI_BAUTRATE_IN_CLK_4M_MAX) {
-        clksel = UPDI_ASI_CTRLA_CLKSEL_4M;
-    }
-    else if (baud <= UPDI_BAUTRATE_IN_CLK_8M_MAX) {
-        clksel = UPDI_ASI_CTRLA_CLKSEL_8M;
-    }
-    else if (baud <= UPDI_BAUTRATE_IN_CLK_16M_MAX) {
-        clksel = UPDI_ASI_CTRLA_CLKSEL_16M;
-    }
-    else {
-        DBG_INFO(LINK_DEBUG, "Unsupported baudrate for UPDI clk %d, max 0.9Mhz", baud);
-        return -6;
     }
 
     // Set clock source

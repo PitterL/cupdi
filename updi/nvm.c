@@ -59,17 +59,27 @@ typedef struct _upd_nvm {
 void *updi_nvm_init(const char *port, int baud, int guard, const void *dev)
 {
     upd_nvm_t *nvm = NULL;
+	size_t size;
     void *app;
 
     DBG_INFO(NVM_DEBUG, "<NVM> init nvm");
 
     app = updi_application_init(port, baud, guard, dev);
     if (app) {
-        nvm = (upd_nvm_t *)malloc(sizeof(*nvm));
-        nvm->mgwd = UPD_NVM_MAGIC_WORD;
-        nvm->progmode = false;
-        nvm->dev = (const device_info_t *)dev;
-        nvm->app = (void *)app;
+		size = sizeof(*nvm);
+        nvm = (upd_nvm_t *)malloc(size);
+		if (!nvm) {
+			DBG_INFO(NVM_DEBUG, "<NVM> nvm malloc memory(%d) failed", size);
+			updi_application_deinit(app);
+			return NULL;
+		}
+
+		memset(nvm, 0, size);
+		nvm->mgwd = UPD_NVM_MAGIC_WORD;
+		nvm->progmode = false;
+		nvm->erased = false;
+		nvm->dev = (const device_info_t *)dev;
+		nvm->app = (void *)app;
     }
 
     return nvm;
@@ -785,20 +795,23 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len, bool dumm
     @address: target address
     @data: data buffer
     @len: data len
+	@check: whether readback data for double checking
     @return 0 successful, other value failed
 */
-int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
+int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len, bool check)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-	_nvm_op op, nvm_ops[] = { nvm_write_flash, nvm_write_eeprom, nvm_write_userrow, nvm_write_fuse, nvm_write_mem };
+	nvm_wop wop, nvm_wops[] = { nvm_write_flash, nvm_write_eeprom, nvm_write_userrow, nvm_write_fuse, nvm_write_mem };
+	nvm_rop rop, nvm_rops[] = { nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem };
 	bool chip_erased = nvm->erased;
+	char *buf = NULL;
 	int i, result;
 
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Write Auto");
+    DBG_INFO(NVM_DEBUG, "<NVM> Write Auto chip_erased %d", chip_erased);
 
     for (i = 0; i < NUM_NVM_TYPES; i++) {
         result = nvm_get_block_info(nvm_ptr, i, &info);
@@ -809,17 +822,50 @@ int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len)
 
         if (address >= info.nvm_start && address < info.nvm_start + info.nvm_size) {
             if (address + len <= info.nvm_start + info.nvm_size) {
-                op = nvm_ops[i];
-				if (op && len) {
-					return op(nvm_ptr, address, data, len, chip_erased);
-				}
+				wop = nvm_wops[i];
+				if (wop && len) {
+					result = wop(nvm_ptr, address, data, len, chip_erased);
+					// Read back the data and do data check
+					if (result == 0) {
+						rop = nvm_rops[i];
+						if (rop && check) {
+							buf = malloc(len);
+							if (buf) {
+								result = rop(nvm_ptr, address, buf, len);
+								if (result == 0) {
+									result = memcmp(data, buf, len);
+									if (result) {
+										DBG_INFO(NVM_DEBUG, "<NVM> Data verified compare failed %d", result);
+									}
+								}
+								else {
+									DBG_INFO(NVM_DEBUG, "<NVM> Data readback for verification return failed %d", result);
+								}
+								free(buf);
+							}
+							else {
+								DBG_INFO(NVM_DEBUG, "<NVM> Malloc data checking buffer failed");
+							}
+						}
+					}
+					else {
+						DBG_INFO(NVM_DEBUG, "<NVM> NVM write data return failed %d", result);
+					}
 
-                DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", op, len);
-                return -3;
+					if (result) {
+						DBG_INFO(NVM_DEBUG, "<NVM> Malloc data write faield");
+						return -3;
+					}
+				}
+				else {
+
+					DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", wop, len);
+					return -4;
+				}
             }
             else {
                 DBG_INFO(NVM_DEBUG, "<NVM> write auto - block overflow (addr, len): target(%x, %x) / memory(%x, %x) ", address, len, info.nvm_start, info.nvm_size);
-                return -4;
+                return -5;
             }
         }
     }
