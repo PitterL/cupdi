@@ -22,6 +22,7 @@
 
 #define UPDI_DATA_8  0x00
 #define UPDI_DATA_16  0x01
+#define UPDI_DATA_24  0x02
 
 #define UPDI_KEY_SIB  0x04
 #define UPDI_KEY_KEY  0x00
@@ -38,7 +39,8 @@
 #define UPDI_PHY_SYNC  0x55
 #define UPDI_PHY_ACK  0x40
 
-#define UPDI_MAX_REPEAT_SIZE  0xFF
+#define UPDI_MAX_REPEAT_BYTE_SIZE 256
+#define UPDI_MAX_REPEAT_WORD_SIZE 512
 
 // CS and ASI Register Address map
 #define UPDI_CS_STATUSA  0x00

@@ -12,7 +12,7 @@
 /* dev_name | {flash_start | flash_size | flash_pagesize} | {syscfg_address | nvmctrl_address | sigrow_address } | {fuses} | {userrow} | {eeprom} {sram} */
 const chip_info_t device_tiny_321x = {
     //  tiny3217/tiny3216
-    "tiny321x",{ 0x8000, 32 * 1024, 128 },{ 0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 64, 32 },{ 0x1400, 256, 64}, {0x3800, 2 * 1024, 1024/*dummy*/}
+    "tiny321x",{ 0x8000, 32 * 1024, 128 },{ 0x0F00, 0x1000, 0x1100 },{ 0x1280, 11, 1 },{ 0x1300, 64, 64 },{ 0x1400, 256, 64}, {0x3800, 2 * 1024, 1024/*dummy*/}
 };
 
 const chip_info_t device_tiny_161x = {

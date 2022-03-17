@@ -103,7 +103,7 @@ void updi_application_deinit(void *app_ptr)
 int app_device_info(void *app_ptr)
 {
     /*
-        Reads out device information from various sources
+        Read out device information from various sources
     */
     upd_application_t *app = (upd_application_t *)app_ptr;
     u8 sib[16];
@@ -634,10 +634,10 @@ int app_chip_erase(void *app_ptr)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
+int _app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
 {
     /*
-    Reads a number of words of data from UPDI
+    Read a number of words of data from UPDI
     */
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
@@ -659,7 +659,7 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     }
 
     // Range check
-    if (len > (UPDI_MAX_REPEAT_SIZE >> 1) + 1) {
+    if (len > UPDI_MAX_REPEAT_WORD_SIZE) {
         DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
         return -3;
     }
@@ -689,6 +689,44 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
 }
 
 /*
+	APP read data in 16bit mode
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@address: target address
+	@data: data output buffer
+	@len: data len
+	@return 0 successful, other value if failed
+*/
+int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
+{
+	/*
+	Read a number of words of data from UPDI
+	*/
+	int size, off, result;
+
+	DBG_INFO(APP_DEBUG, "<APP> Read words data(%d) addr: %hX", len, address);
+
+	off = 0;
+	do {
+		size = len - off;
+		if (size > UPDI_MAX_REPEAT_WORD_SIZE) {
+			size = UPDI_MAX_REPEAT_WORD_SIZE;
+		}
+
+		DBG_INFO(APP_DEBUG, "Reading Memory %d bytes(Word mode) at off 0x%x", size, off);
+
+		result = _app_read_data_words(app_ptr, address + off, data + off, size);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "_app_read_data_words at off %d(0x%x) size %d failed(%d)", off, off, size, result);
+			break;
+		}
+
+		off += size;
+	} while (off < len);
+
+	return result;
+}
+
+/*
     APP read data in 8bit mode
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
@@ -696,10 +734,10 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
+int _app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
 {
     /*
-    Reads a number of bytes of data from UPDI
+    Read a number of bytes of data from UPDI
     */
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
@@ -721,7 +759,7 @@ int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
     }
 
     // Range check
-    if (len > UPDI_MAX_REPEAT_SIZE + 1) {
+    if (len > UPDI_MAX_REPEAT_BYTE_SIZE) {
         DBG_INFO(APP_DEBUG, "Read data length out of size %d", len);
         return -3;
     }
@@ -751,6 +789,44 @@ int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
 }
 
 /*
+	APP read data in 8bit mode
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@address: target address
+	@data: data output buffer
+	@len: data len
+	@return 0 successful, other value if failed
+*/
+int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
+{
+	/*
+	Read a number of bytes of data from UPDI
+	*/
+	int size, off, result;
+
+	DBG_INFO(APP_DEBUG, "<APP> Read bytes data(%d) addr: %hX", len, address);
+
+	off = 0;
+	do {
+		size = len - off;
+		if (size > UPDI_MAX_REPEAT_BYTE_SIZE) {
+			size = UPDI_MAX_REPEAT_BYTE_SIZE;
+		}
+
+		DBG_INFO(APP_DEBUG, "Reading Memory %d bytes at off 0x%x", size, off);
+
+		result = _app_read_data_bytes(app_ptr, address + off, data + off, size);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "_app_read_data_bytes at off %d(0x%x) size %d failed(%d)", off, off, size, result);
+			break;
+		}
+
+		off += size;
+	} while (off < len);
+
+	return result;
+}
+
+/*
     APP read data with 8/16 bit auto select by len
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
@@ -761,7 +837,7 @@ int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
 int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
 {
     /*
-    Reads a number of bytes of data from UPDI
+    Read a number of bytes of data from UPDI
     */
     bool use_word_access = !(len & 0x1);
     int result;
@@ -818,10 +894,10 @@ int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
+int _app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
-        Writes a number of words to memory
+        Write a number of words to memory
     */
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
@@ -842,7 +918,7 @@ int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
 	else {
 
 		// Range check
-		if (len > ((UPDI_MAX_REPEAT_SIZE + 1) << 1)) {
+		if (len > UPDI_MAX_REPEAT_WORD_SIZE) {
 			DBG_INFO(APP_DEBUG, "Write words data length out of size %d", len);
 			return -3;
 		}
@@ -872,6 +948,44 @@ int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
+	APP write data in 16bit mode
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@address: target address
+	@data: data buffer
+	@len: data len
+	@return 0 successful, other value if failed
+*/
+int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
+{
+	/*
+	Write a number of words of data from UPDI
+	*/
+	int size, off, result;
+
+	DBG_INFO(APP_DEBUG, "<APP> Write words data(%d) addr: %hX", len, address);
+
+	off = 0;
+	do {
+		size = len - off;
+		if (size > UPDI_MAX_REPEAT_WORD_SIZE) {
+			size = UPDI_MAX_REPEAT_WORD_SIZE;
+		}
+
+		DBG_INFO(APP_DEBUG, "Writing Memory %d bytes(Word mode) at off 0x%x", size, off);
+
+		result = _app_write_data_words(app_ptr, address + off, data + off, size);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "_app_write_data_words at off %d(0x%x) size %d failed(%d)", off, off, size, result);
+			break;
+		}
+
+		off += size;
+	} while (off < len);
+
+	return result;
+}
+
+/*
     APP write data in 8bit mode
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
@@ -879,10 +993,10 @@ int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
+int _app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 {
     /*
-    Writes a number of bytes to memory
+    Write a number of bytes to memory
     */
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
@@ -903,7 +1017,7 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 	else {
 
 		// Range check
-		if (len > UPDI_MAX_REPEAT_SIZE + 1) {
+		if (len > UPDI_MAX_REPEAT_BYTE_SIZE) {
 			DBG_INFO(APP_DEBUG, "Write data length out of size %d", len);
 			return -3;
 		}
@@ -933,6 +1047,44 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 }
 
 /*
+	APP write data in 8bit mode
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@address: target address
+	@data: data buffer
+	@len: data len
+	@return 0 successful, other value if failed
+*/
+int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
+{
+	/*
+	Write a number of bytes of data from UPDI
+	*/
+	int size, off, result;
+
+	DBG_INFO(APP_DEBUG, "<APP> Write bytes data(%d) addr: %hX", len, address);
+
+	off = 0;
+	do {
+		size = len - off;
+		if (size > UPDI_MAX_REPEAT_BYTE_SIZE) {
+			size = UPDI_MAX_REPEAT_BYTE_SIZE;
+		}
+
+		DBG_INFO(APP_DEBUG, "Writing Memory %d bytes at off 0x%x", size, off);
+
+		result = _app_write_data_bytes(app_ptr, address + off, data + off, size);
+		if (result) {
+			DBG_INFO(APP_DEBUG, "_app_write_data_bytes at off %d(0x%x) size %d failed(%d)", off, off, size, result);
+			break;
+		}
+
+		off += size;
+	} while (off < len);
+
+	return result;
+}
+
+/*
     APP write data with 8/16 bit auto select by len
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
@@ -944,7 +1096,7 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access)
 {
     /*
-    Writes a number of data to memory
+    Write a number of data to memory
     */
     int result;
 
@@ -973,7 +1125,7 @@ int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use
 int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_command, bool use_word_access)
 {
     /*
-        Writes a page of data to NVM.
+        Write a page of data to NVM.
         By default the PAGE_WRITE command is used, which requires that the page is already erased.
     */
     upd_application_t *app = (upd_application_t *)app_ptr;

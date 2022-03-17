@@ -508,7 +508,7 @@ int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u16 address, const 
 
         result = _app_erase_write_nvm(APP(nvm), address + off, data + off, size, false);
         if (result) {
-            DBG_INFO(NVM_DEBUG, "app_write_nvm failed %d", result);
+            DBG_INFO(NVM_DEBUG, "_app_erase_write_nvm(byte mode) failed %d", result);
             break;
         }
 
@@ -711,34 +711,23 @@ int nvm_read_mem(void *nvm_ptr, u16 address, u8 *data, int len)
         Read Memory
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    int size, off;
     int result;
 
 	if (!VALID_NVM(nvm))
 		return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Read memory 0x%x size %d", address, len);
+    DBG_INFO(NVM_DEBUG, "<NVM> Read memory");
 
 	if (!nvm->progmode) {
 		DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
 	}
 
-    off = 0;
-    do {
-        size = len - off;
-        if (size > UPDI_MAX_TRANSFER_SIZE)
-            size = UPDI_MAX_TRANSFER_SIZE;
-    
-        //DBG_INFO(NVM_DEBUG, "Reading Memory %d bytes at address 0x%x", size, address + off);
+    DBG_INFO(NVM_DEBUG, "Reading Memory %d(0x%x) bytes at address 0x%x", len, len, address);
 
-        result = app_read_data_bytes(APP(nvm), address + off, data + off, size);
-        if (result) {
-            DBG_INFO(NVM_DEBUG, "app_read_data_bytes failed %d at 0x%x, size %d", result, address + off, size);
-            break;
-        }
-
-        off += size;
-    } while (off < len);
+    result = app_read_data_bytes(APP(nvm), address, data, len);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_read_data_bytes failed %d at 0x%x, size %d", result, address, len);
+    }
 
     return result;
 }
@@ -758,7 +747,6 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len, bool dumm
         Write Memory
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    int size, off;
     int result;
 
     if (!VALID_NVM(nvm))
@@ -766,25 +754,16 @@ int nvm_write_mem(void *nvm_ptr, u16 address, const u8 *data, int len, bool dumm
 
     DBG_INFO(NVM_DEBUG, "<NVM> Write Memory");
 
-    if (!nvm->progmode)
-        DBG_INFO(NVM_DEBUG, "Memory write at locked mode");
+	if (!nvm->progmode) {
+		DBG_INFO(NVM_DEBUG, "Memory write at locked mode");
+	}
 
-    off = 0;
-    do {
-        size = len - off;
-        if (size > UPDI_MAX_TRANSFER_SIZE)
-            size = UPDI_MAX_TRANSFER_SIZE;
+    DBG_INFO(NVM_DEBUG, "Writing Memory %d(0x%x) bytes at address 0x%x", len, len, address);
 
-        DBG_INFO(NVM_DEBUG, "Writing Memory %d bytes at address 0x%x", size, address + off);
-
-        result = app_write_data_bytes(APP(nvm), address + off, data + off, size);
-        if (result) {
-            DBG_INFO(NVM_DEBUG, "app_write_data_bytes failed %d", result);
-            break;
-        }
-
-        off += size;
-    } while (off < len);
+    result = app_write_data_bytes(APP(nvm), address, data, len);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_write_data_bytes failed %d", result);
+    }
 
     return result;
 }

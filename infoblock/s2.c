@@ -116,17 +116,23 @@ uint32_t get_ib_element_s2(information_header_t *head, int type)
 void show_ib_element_s2(information_header_t *head)
 {
     information_block_s2_t *ib = (information_block_s2_t *)head;
+	char n, n0, n1, n2;
 
 	DBG_INFO(UPDI_DEBUG, "");
 	DBG_INFO(UPDI_DEBUG, "==========================");
 
     DBG(UPDI_DEBUG, "Information Block Content:", (u8 *)ib, sizeof(*ib), "%02X ");
 
-    DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c(%hhX) %hhX.%hhX",
-        (char)get_ib_element_s2(head, IB_FW_VER_NAME_N0),
-        (char)get_ib_element_s2(head, IB_FW_VER_NAME_N1),
-        (char)get_ib_element_s2(head, IB_FW_VER_NAME_N2),
-        (unsigned char)get_ib_element_s2(head, IB_FW_VER_NAME_N2) & 0xFF,
+	n = (char)get_ib_element_s2(head, IB_FW_VER_NAME_N0);
+	n0 = n >= ' ' && n <= '~' ? n : ' ';
+	n = (char)get_ib_element_s2(head, IB_FW_VER_NAME_N1);
+	n1 = n >= ' ' && n <= '~' ? n : ' ';
+	n2 = (char)get_ib_element_s2(head, IB_FW_VER_NAME_N2);
+	
+    DBG_INFO(UPDI_DEBUG, "fw_version: <%c%c%02hhX> %hhX.%hhX",
+        n0,
+        n1,
+        n2,
         (unsigned char)get_ib_element_s2(head, IB_FW_VER_NAME_BUILD_MAJOR) & 0xF,
         (unsigned char)get_ib_element_s2(head, IB_FW_VER_NAME_BUILD_MINOR) & 0xF);
 
@@ -140,6 +146,9 @@ void show_ib_element_s2(information_header_t *head)
 
     DBG_INFO(UPDI_DEBUG, "fw_crc: 0x%06X",
         get_ib_element_s2(head, IB_CRC_FW));
+
+	DBG_INFO(UPDI_DEBUG, "info_crc: 0x%06X",
+		get_ib_element_s2(head, IB_CRC_INFO));
 
 	DBG_INFO(UPDI_DEBUG, "==========================");
 }
