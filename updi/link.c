@@ -57,7 +57,7 @@ void *updi_datalink_init(const char *port, int baud, int guard)
     
     phy = updi_physical_init(port, UPDI_BAUTRATE_DEFAULT /*dummy*/);
     if (phy) {
-		size = sizeof(sizeof(*link));
+		size = sizeof(*link);
         link = (upd_datalink_t *)malloc(size);
 		if (!link) {
 			DBG_INFO(LINK_DEBUG, "<LINK> link malloc memory(%d) failed", size);
