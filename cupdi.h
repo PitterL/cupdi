@@ -36,4 +36,7 @@ Info block length
 #define INFO_BLOCK_STORAGE_TYPE   /* NVM_EEPROM */ NVM_USERROW
 #define INFO_BLOCK_ADDRESS_OFFSET   0
 
+
+#define CFG_BLOCK_STORAGE_TYPE   NVM_EEPROM
+
 #endif

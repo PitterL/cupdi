@@ -255,7 +255,7 @@ int app_unlock(void *app_ptr)
     }
 
     //Toggle reset
-    result = app_toggle_reset(app_ptr, 1);
+    result = app_toggle_reset(app_ptr, true);
     if (result) {
         DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -4;
@@ -313,7 +313,7 @@ int app_enter_progmode(void *app_ptr)
     }
 
     //Toggle reset
-    result = app_toggle_reset(app_ptr, 1);
+    result = app_toggle_reset(app_ptr, true);
     if (result) {
         DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -4;
@@ -353,7 +353,7 @@ int app_leave_progmode(void *app_ptr)
 
     DBG_INFO(APP_DEBUG, "<APP> Leaving program mode");
 
-    result = app_toggle_reset(app_ptr, 1);
+    result = app_toggle_reset(app_ptr, true);
     if (result) {
         DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -2;
@@ -434,10 +434,10 @@ int app_reset(void *app_ptr, bool apply_reset)
 /*
     APP toggle a chip reset
     @app_ptr: APP object pointer, acquired from updi_application_init()
-    @delay: Reset keep time before clear
+    @reset_or_halt: set true to reset or set false to halt the mcu
     @return 0 successful, other value if failed
 */
-int app_toggle_reset(void *app_ptr, int delay)
+int app_toggle_reset(void *app_ptr, bool reset_or_halt)
 {
     /*
     Toggle an UPDI reset condition
@@ -457,12 +457,14 @@ int app_toggle_reset(void *app_ptr, int delay)
         return -2;
     }
 
-    msleep(delay);
+    msleep(1);
 
-    result = app_reset(app, false);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_reset failed %d", result);
-        return -3;
+    if (reset_or_halt) {
+        result = app_reset(app, false);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "app_reset failed %d", result);
+            return -3;
+        }
     }
 
     return 0;

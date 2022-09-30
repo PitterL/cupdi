@@ -25,6 +25,7 @@ typedef int(*nvm_rop)(void *nvm_ptr, u16 address, u8 *data, int len);
 
 int nvm_write_auto(void *nvm_ptr, u16 address, const u8 *data, int len, bool verify);
 int nvm_reset(void *nvm_ptr, int delay_ms);
+int nvm_halt(void *nvm_ptr);
 int nvm_wait(void *nvm_ptr);
 int nvm_get_block_info(void *nvm_ptr, /*NVM_TYPE_T*/int type, nvm_info_t *info);
 

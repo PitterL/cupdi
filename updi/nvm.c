@@ -905,7 +905,7 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
 
     DBG_INFO(NVM_DEBUG, "<NVM> Reset");
 
-    result = app_toggle_reset(APP(nvm), 1);
+    result = app_toggle_reset(APP(nvm), true);
     if (result) {
         DBG_INFO(NVM_DEBUG, "app_toggle_reset failed %d", result);
         return -2;
@@ -927,6 +927,33 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
 
 	nvm->erased = false;
     
+    return result;
+}
+
+/*
+    NVM halt
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
+int nvm_halt(void *nvm_ptr)
+{
+    /*
+        Halt
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    int result;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Halt");
+
+    result = app_toggle_reset(APP(nvm), false);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_toggle_reset failed %d", result);
+        return -2;
+    }
+
     return result;
 }
 
