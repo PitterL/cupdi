@@ -11,7 +11,7 @@ int app_enter_progmode(void *app_ptr);
 int app_leave_progmode(void *app_ptr);
 int app_reset(void *app_ptr, bool apply_reset);
 int app_disable(void *app_ptr);
-int app_toggle_reset(void *app_ptr, int delay);
+int app_toggle_reset(void *app_ptr, bool reset_or_halt);
 int app_wait_flash_ready(void *app_ptr, int timeout);
 int app_execute_nvm_command(void *app_ptr, u8 command);
 int app_chip_erase(void *app_ptr);
