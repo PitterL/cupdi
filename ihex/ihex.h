@@ -21,7 +21,8 @@ typedef struct _segment_buffer {
 typedef struct _hex_data {
     segment_buffer_t segment[MAX_SEGMENT_COUNT_IN_RECORDS]; //index 0 for record without segment id(address)
 
-#define SEG_ALLOC_MEMORY (1 << 0)
+#define SEG_INIT_SEGMENT (1 << 0)
+#define SEG_ALLOC_MEMORY (1 << 1)
     int flag;
 }hex_data_t;
 

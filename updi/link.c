@@ -366,25 +366,36 @@ int link_stcs(void *link_ptr, u8 address, u8 value)
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @address: target address
     @val: output buffer
+	@is24bit: whether 24bit address mode
     @return 0 successful, other value if failed
 */
-int _link_ld(void *link_ptr, u16 address, u8 *val)
+int _link_ld(void *link_ptr, u32 address, u8 *val, bool is24bit)
 {
     /*
         Load a single byte direct from a 16 - bit address
         return 0 if error
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
-    const u8 cmd[] = { UPDI_PHY_SYNC, UPDI_LDS | UPDI_ADDRESS_16 | UPDI_DATA_8, address & 0xFF, (address >> 8) & 0xFF};
+	const u8 *cmd, command24[] = { UPDI_PHY_SYNC, UPDI_LDS | UPDI_ADDRESS_24 | UPDI_DATA_8, address & 0xFF, (address >> 8) & 0xFF, (address >> 16) & 0xFF };
+    const u8 command16[] = { UPDI_PHY_SYNC, UPDI_LDS | UPDI_ADDRESS_16 | UPDI_DATA_8, address & 0xFF, (address >> 8) & 0xFF};
     u8 resp;
-    int result;
+    int cmdlen, result;
 
     if (!VALID_LINK(link) || !val)
         return ERROR_PTR;
 
     DBG_INFO(LINK_DEBUG, "<LINK> LD from {%04X}", address);
   
-    result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
+	if (is24bit) {
+		cmd = command24;
+		cmdlen = sizeof(command24);
+	}
+	else {
+		cmd = command16;
+		cmdlen = sizeof(command16);
+	}
+
+    result = phy_transfer(PHY(link), cmd, cmdlen, &resp, sizeof(resp));
     if (result != sizeof(resp)) {
         DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
         return -2;
@@ -399,13 +410,14 @@ int _link_ld(void *link_ptr, u16 address, u8 *val)
     LINK read 8bit data register by direct mode, capsule
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @address: target address
+	@is24bit: whether 24bit address mode
     @return target data if successful, zero if not accessiable(this will confict with target data zero)
 */
-u8 link_ld(void *link_ptr, u16 address)
+u8 link_ld(void *link_ptr, u32 address, bool is24bit)
 {
     u8 resp = 0;
 
-    _link_ld(link_ptr, address, &resp);
+    _link_ld(link_ptr, address, &resp, is24bit);
 
     return resp;
 }
@@ -415,24 +427,35 @@ u8 link_ld(void *link_ptr, u16 address)
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @address: target address
     @val: output buffer
+	@is24bit: whether 24bit address mode
     @return 0 successful, other value if failed
 */
-int _link_ld16(void *link_ptr, u16 address, u16 *val)
+int _link_ld16(void *link_ptr, u32 address, u16 *val, bool is24bit)
 {
     /*
     Load a 2 byte direct from a 16 - bit address
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
-    const u8 cmd[] = { UPDI_PHY_SYNC , UPDI_LDS | UPDI_ADDRESS_16 | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF};
+    const u8 *cmd, command24[] = { UPDI_PHY_SYNC , UPDI_LDS | UPDI_ADDRESS_24 | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF, (address >> 16) & 0xFF };
+	const u8 command16[] = { UPDI_PHY_SYNC , UPDI_LDS | UPDI_ADDRESS_16 | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF };
     u8 resp[2];
-    int result;
+    int cmdlen, result;
 
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
     DBG_INFO(LINK_DEBUG, "<LINK> LD from %04X}", address);
 
-    result = phy_transfer(PHY(link), cmd, sizeof(cmd), resp, sizeof(resp));
+	if (is24bit) {
+		cmd = command24;
+		cmdlen = sizeof(command24);
+	}
+	else {
+		cmd = command16;
+		cmdlen = sizeof(command16);
+	}
+
+    result = phy_transfer(PHY(link), cmd, cmdlen, resp, sizeof(resp));
     if (result != sizeof(resp)) {
         DBG_INFO(LINK_DEBUG, "phy_transfer failed %d", result);
         return -2;
@@ -447,14 +470,15 @@ int _link_ld16(void *link_ptr, u16 address, u16 *val)
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @address: reg address
     @val: output buffer
+	@is24bit: whether 24bit address mode
     @return 0 successful, other value if failed
 */
-u16 link_ld16(void *link_ptr, u16 address)
+u16 link_ld16(void *link_ptr, u32 address, bool is24bit)
 {
     u16 val = 0;
     int result;
 
-    result = _link_ld16(link_ptr, address, &val);
+    result = _link_ld16(link_ptr, address, &val, is24bit);
     if (result){
         DBG_INFO(LINK_DEBUG, "_link_ld16 failed %d", result);
     }
@@ -467,25 +491,36 @@ u16 link_ld16(void *link_ptr, u16 address)
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @address: target address
     @value: target value
+	@is24bit: whether 24bit address mode
     @return 0 successful, other value if failed
 */
-int link_st(void *link_ptr, u16 address, u8 value)
+int link_st(void *link_ptr, u32 address, u8 value, bool is24bit)
 {
     /*
         Store a single byte value directly to a 16 - bit address
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
-    const u8 cmd[] = { UPDI_PHY_SYNC, UPDI_STS | UPDI_ADDRESS_16 | UPDI_DATA_8, address & 0xFF, (address >> 8) & 0xFF};
+	const u8 *cmd, command24[] = { UPDI_PHY_SYNC, UPDI_STS | UPDI_ADDRESS_24 | UPDI_DATA_8, address & 0xFF, (address >> 8) & 0xFF, (address >> 16) & 0xFF };
+    const u8 command16[] = { UPDI_PHY_SYNC, UPDI_STS | UPDI_ADDRESS_16 | UPDI_DATA_8, address & 0xFF, (address >> 8) & 0xFF};
     const u8 val[] = { value };
     u8 resp = 0xff;
-    int result;
+    int cmdlen, result;
 
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
     DBG_INFO(LINK_DEBUG, "<LINK> ST to 0x04X: %02x", address, value);
 
-    result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
+	if (is24bit) {
+		cmd = command24;
+		cmdlen = sizeof(command24);
+	}
+	else {
+		cmd = command16;
+		cmdlen = sizeof(command16);
+	}
+
+    result = phy_transfer(PHY(link), cmd, cmdlen, &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
         DBG_INFO(LINK_DEBUG, "phy_transfer failed %d ack %02x", result, resp);
         return -2;
@@ -505,25 +540,36 @@ int link_st(void *link_ptr, u16 address, u8 value)
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @address: target address
     @value: target value
+	@is24bit: whether 24bit address mode
     @return 0 successful, other value if failed
 */
-int link_st16(void *link_ptr, u16 address, u16 value)
+int link_st16(void *link_ptr, u32 address, u16 value, bool is24bit)
 {
     /*
         Store a 16 - bit word value directly to a 16 - bit address
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
-    const u8 cmd[] = { UPDI_PHY_SYNC, UPDI_STS | UPDI_ADDRESS_16 | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF };
-    const u8 val[] = { value & 0xFF, (value >> 8) & 0xFF };
-    u8 resp = 0xff;
-    int result;
+    const u8 *cmd, command24[] = { UPDI_PHY_SYNC, UPDI_STS | UPDI_ADDRESS_24 | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF, (address >> 16) & 0xFF };
+	const u8 command16[] = { UPDI_PHY_SYNC, UPDI_STS | UPDI_ADDRESS_16 | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF };
+	const u8 val[] = { value & 0xFF, (value >> 8) & 0xFF };
+	u8 resp = 0xff;
+    int cmdlen, result;
 
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
     DBG_INFO(LINK_DEBUG, "<LINK> ST16 to 0x04X: %04x", address, value);
 
-    result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
+	if (is24bit) {
+		cmd = command24;
+		cmdlen = sizeof(command24);
+	}
+	else {
+		cmd = command16;
+		cmdlen = sizeof(command16);
+	}
+
+    result = phy_transfer(PHY(link), cmd, cmdlen, &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
         DBG_INFO(LINK_DEBUG, "phy_transfer failed %d ack %02x", result, resp);
         return -2;
@@ -604,24 +650,35 @@ int link_ld_ptr_inc16(void *link_ptr, u8 *data, int len)
     LINK set st/ld command address
     @link_ptr: APP object pointer, acquired from updi_datalink_init()
     @address: the address to be set
+	@is24bit: whether 24bit address mode
     @return 0 successful, other value if failed
 */
-int link_st_ptr(void *link_ptr, u16 address)
+int link_st_ptr(void *link_ptr, u32 address, bool is24bit)
 {
     /*
         Set the pointer location
     */
     upd_datalink_t *link = (upd_datalink_t *)link_ptr;
-    const u8 cmd[] = { UPDI_PHY_SYNC, UPDI_ST | UPDI_PTR_ADDRESS | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF };
-    u8 resp = 0xFF;
-    int result;
+	const u8 *cmd, command24[] = { UPDI_PHY_SYNC, UPDI_ST | UPDI_PTR_ADDRESS | UPDI_DATA_24, address & 0xFF, (address >> 8) & 0xFF, (address >> 16) & 0xFF };
+	const u8 command16[] = { UPDI_PHY_SYNC, UPDI_ST | UPDI_PTR_ADDRESS | UPDI_DATA_16, address & 0xFF, (address >> 8) & 0xFF };
+	u8 resp = 0xFF;
+    int cmdlen, result;
 
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
     DBG_INFO(LINK_DEBUG, "<LINK> ST ptr %x", address);
 
-    result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
+	if (is24bit) {
+		cmd = command24;
+		cmdlen = sizeof(command24);
+	}
+	else {
+		cmd = command16;
+		cmdlen = sizeof(command16);
+	}
+
+    result = phy_transfer(PHY(link), cmd, cmdlen, &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
         DBG_INFO(LINK_DEBUG, "phy_transfer failed %d resp = 0x%02x", result, resp);
         return -2;

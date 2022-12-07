@@ -3,7 +3,7 @@
 
 typedef struct _nvm_info{
     unsigned short nvm_start;
-    unsigned short nvm_size;
+    unsigned int nvm_size;
     unsigned short nvm_pagesize;
 }nvm_info_t;
 
@@ -32,5 +32,6 @@ const device_info_t * get_chip_info(const char *dev_name);
 
 typedef enum _NVM_TYPE { NVM_FLASH, NVM_EEPROM, NVM_USERROW, NVM_FUSES, MEM_SRAM, NUM_NVM_TYPES } NVM_TYPE_T;
 int dev_get_nvm_info(const void *dev, NVM_TYPE_T type, nvm_info_t * info);
+int dev_get_nvm_info_ext(const void *dev_ptr, NVM_TYPE_T type, nvm_info_t * info, const char **pname);
 
 #endif

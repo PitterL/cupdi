@@ -27,12 +27,20 @@ limitations under the License.
     @link: pointer to link object
     @dev: point chip dev object
 */
+typedef enum { 
+    APP_VERSION_V0,     // 16 bit address
+    APP_VERSION_V1  // 24bit address
+} APP_VERSION_T;
+
 typedef struct _upd_application {
 #define UPD_APPLICATION_MAGIC_WORD 0xB4B4 //'uapp'
     unsigned int mgwd;  //magic word
     void *link;
+	APP_VERSION_T version;
     const device_info_t *dev;
 }upd_application_t;
+
+#define APP_V1(_app) ((_app)->version == APP_VERSION_V1)
 
 /*
     Macro definition of APP level
@@ -73,6 +81,7 @@ void *updi_application_init(const char *port, int baud, int guard, const void *d
 		memset(app, 0, size);
 		app->mgwd = UPD_APPLICATION_MAGIC_WORD;
 		app->link = (void *)link;
+		app->version = APP_VERSION_V0;
 		app->dev = (const device_info_t *)dev;
     }
 
@@ -126,6 +135,11 @@ int app_device_info(void *app_ptr)
     DBG(APP_DEBUG, "[SIB]", sib, sizeof(sib), "%02x ");
     DBG(APP_DEBUG, "[Family ID]", sib, 7, "%c");
     DBG(APP_DEBUG, "[NVM revision]", sib + 8, 3, "%c");
+	if (!strncmp(sib + 8, "P:2", 3)) {
+		// 24bit link address
+		DBG_INFO(APP_DEBUG, "[NVM Version P2, Using 24bit address mode]");
+		app->version = APP_VERSION_V1;
+	}
     DBG(APP_DEBUG, "[OCD revision]", sib + 11, 3, "%c");
     DBG_INFO(APP_DEBUG, "[PDI OSC] is %cMHz", sib[15]);
 
@@ -491,7 +505,7 @@ int app_wait_flash_ready(void *app_ptr, int timeout)
     DBG_INFO(APP_DEBUG, "<APP> Wait flash ready");
 
     do {
-        result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_STATUS, &status);
+        result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_STATUS, &status, false);
         if (result) {
             DBG_INFO(APP_DEBUG, "_link_ld failed %d", result);
             result = -2;
@@ -536,52 +550,7 @@ int app_execute_nvm_command(void *app_ptr, u8 command)
 
     DBG_INFO(APP_DEBUG, "<APP> NVMCMD %d executing", command);
 
-    return link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLA, command);
-}
-
-/*
-    APP erase page
-    @app_ptr: APP object pointer, acquired from updi_application_init()
-    @page: page address to be erased
-    @return 0 successful, other value if failed
-*/
-int app_page_erase(void *app_ptr, u16 address)
-{
-    /*
-    Does a chip erase using the NVM controller
-    Note that on locked devices this it not possible and the ERASE KEY has to be used instead
-    */
-
-    upd_application_t *app = (upd_application_t *)app_ptr;
-    int result;
-
-    if (!VALID_APP(app))
-        return ERROR_PTR;
-
-    DBG_INFO(APP_DEBUG, "<APP> page erase using NVM CTRL");
-
-    //Wait until NVM CTRL is ready to erase
-    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout before erase failed %d", result);
-        return -2;
-    }
-
-    //Erase
-    result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_CHIP_ERASE);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", result);
-        return -3;
-    }
-
-    // And wait for it
-    result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after erase failed %d", result);
-        return -2;
-    }
-
-    return 0;
+    return link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLA, command, false);
 }
 
 /*
@@ -597,6 +566,7 @@ int app_chip_erase(void *app_ptr)
     */
 
     upd_application_t *app = (upd_application_t *)app_ptr;
+	u8 command;
     int result;
 
     if (!VALID_APP(app))
@@ -612,7 +582,14 @@ int app_chip_erase(void *app_ptr)
     }
 
     //Erase
-    result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_CHIP_ERASE);
+	if (APP_V1(app)) {
+		command = UPDI_V1_NVMCTRL_CTRLA_CHIP_ERASE;
+	}
+	else {
+		command = UPDI_NVMCTRL_CTRLA_CHIP_ERASE;
+	}
+
+    result = app_execute_nvm_command(app, command);
     if (result) {
         DBG_INFO(APP_DEBUG, "app_execute_nvm_command failed %d", result);
         return -3;
@@ -636,7 +613,7 @@ int app_chip_erase(void *app_ptr)
     @len: data len
     @return 0 successful, other value if failed
 */
-int _app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
+int _app_read_data_words(void *app_ptr, u32 address, u8 *data, int len)
 {
     /*
     Read a number of words of data from UPDI
@@ -651,7 +628,7 @@ int _app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
 
     // Special-case of 1 word
     if (len == 2) {
-        result = _link_ld16(LINK(app), address, (u16 *)data);
+        result = _link_ld16(LINK(app), address, (u16 *)data, APP_V1(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "_link_ld16 failed %d", result);
             return -2;
@@ -667,7 +644,7 @@ int _app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     }
 
     // Store the address
-    result = link_st_ptr(LINK(app), address);
+    result = link_st_ptr(LINK(app), address, APP_V1(app));
     if (result) {
         DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -4;
@@ -698,7 +675,7 @@ int _app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
 	@len: data len
 	@return 0 successful, other value if failed
 */
-int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
+int app_read_data_words(void *app_ptr, u32 address, u8 *data, int len)
 {
 	/*
 	Read a number of words of data from UPDI
@@ -736,7 +713,7 @@ int app_read_data_words(void *app_ptr, u16 address, u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int _app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
+int _app_read_data_bytes(void *app_ptr, u32 address, u8 *data, int len)
 {
     /*
     Read a number of bytes of data from UPDI
@@ -751,7 +728,7 @@ int _app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
 
     // Special-case of 1 byte
     if (len == 1) {
-        result = _link_ld(LINK(app), address, data);
+        result = _link_ld(LINK(app), address, data, APP_V1(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "_link_ld failed %d", result);
             return -2;
@@ -767,7 +744,7 @@ int _app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
     }
 
     // Store the address
-    result = link_st_ptr(LINK(app), address);
+    result = link_st_ptr(LINK(app), address, APP_V1(app));
     if (result) {
         DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -4;
@@ -798,7 +775,7 @@ int _app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
 	@len: data len
 	@return 0 successful, other value if failed
 */
-int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
+int app_read_data_bytes(void *app_ptr, u32 address, u8 *data, int len)
 {
 	/*
 	Read a number of bytes of data from UPDI
@@ -836,7 +813,7 @@ int app_read_data_bytes(void *app_ptr, u16 address, u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
+int app_read_data(void *app_ptr, u32 address, u8 *data, int len)
 {
     /*
     Read a number of bytes of data from UPDI
@@ -865,7 +842,7 @@ int app_read_data(void *app_ptr, u16 address, u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len)
+int app_read_nvm(void *app_ptr, u32 address, u8 *data, int len)
 {
     /*
     Read data from NVM.
@@ -896,7 +873,7 @@ int app_read_nvm(void *app_ptr, u16 address, u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int _app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
+int _app_write_data_words(void *app_ptr, u32 address, const u8 *data, int len)
 {
     /*
         Write a number of words to memory
@@ -911,7 +888,7 @@ int _app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
     
     // Special-case of 1 word
     if (len == 2) {
-        result = link_st16(LINK(app), address, data[0] + (data[1] << 8));
+        result = link_st16(LINK(app), address, data[0] + (data[1] << 8), APP_V1(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -3;
@@ -926,7 +903,7 @@ int _app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
 		}
 
 		// Store the address
-		result = link_st_ptr(LINK(app), address);
+		result = link_st_ptr(LINK(app), address, APP_V1(app));
 		if (result) {
 			DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
 			return -4;
@@ -957,7 +934,7 @@ int _app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
 	@len: data len
 	@return 0 successful, other value if failed
 */
-int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
+int app_write_data_words(void *app_ptr, u32 address, const u8 *data, int len)
 {
 	/*
 	Write a number of words of data from UPDI
@@ -995,7 +972,7 @@ int app_write_data_words(void *app_ptr, u16 address, const u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int _app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
+int _app_write_data_bytes(void *app_ptr, u32 address, const u8 *data, int len)
 {
     /*
     Write a number of bytes to memory
@@ -1010,7 +987,7 @@ int _app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 
     // Special-case of 1 byte
     if (len == 1) {
-        result = link_st(LINK(app), address, data[0]);
+        result = link_st(LINK(app), address, data[0], APP_V1(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -2;
@@ -1025,7 +1002,7 @@ int _app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 		}
 
 		// Store the address
-		result = link_st_ptr(LINK(app), address);
+		result = link_st_ptr(LINK(app), address, APP_V1(app));
 		if (result) {
 			DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
 			return -4;
@@ -1056,7 +1033,7 @@ int _app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
 	@len: data len
 	@return 0 successful, other value if failed
 */
-int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
+int app_write_data_bytes(void *app_ptr, u32 address, const u8 *data, int len)
 {
 	/*
 	Write a number of bytes of data from UPDI
@@ -1095,7 +1072,7 @@ int app_write_data_bytes(void *app_ptr, u16 address, const u8 *data, int len)
     @use_word_access: whether use 2 bytes mode for writing
     @return 0 successful, other value if failed
 */
-int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access)
+int app_write_data(void *app_ptr, u32 address, const u8 *data, int len, bool use_word_access)
 {
     /*
     Write a number of data to memory
@@ -1116,7 +1093,7 @@ int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use
 }
 
 /*
-    APP write nvm
+    APP write nvm v0
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
     @data: data buffer
@@ -1124,7 +1101,7 @@ int app_write_data(void *app_ptr, u16 address, const u8 *data, int len, bool use
     @nvm_command: programming command
     @return 0 successful, other value if failed
 */
-int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_command, bool use_word_access)
+int _app_write_nvm_v0(void *app_ptr, u32 address, const u8 *data, int len, u8 nvm_command, bool use_word_access)
 {
     /*
         Write a page of data to NVM.
@@ -1188,16 +1165,90 @@ int _app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, u8 nvm_c
 }
 
 /*
+	APP write nvm v1
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@address: target address
+	@data: data buffer
+	@len: data len
+	@nvm_command: programming command
+	@return 0 successful, other value if failed
+*/
+int _app_write_nvm_v1(void *app_ptr, u32 address, const u8 *data, int len, u8 nvm_command, bool use_word_access)
+{
+	/*
+		Write a page of data to NVM.
+		This version of the NVM block has no page buffer, so words are written directly.
+	*/
+	upd_application_t *app = (upd_application_t *)app_ptr;
+	int result;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	DBG_INFO(APP_DEBUG, "<APP> Chip write nvm");
+
+	// Check that NVM controller is ready
+	result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
+	if (result) {
+		DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout before page buffer clear failed %d", result);
+		return -2;
+	}
+
+	// Write the command to the NVM controller
+	DBG_INFO(APP_DEBUG, "NVM write command");
+	result = app_execute_nvm_command(app, nvm_command);
+	if (result) {
+		DBG_INFO(APP_DEBUG, "app_execute_nvm_command(%d) failed %d", nvm_command, result);
+		return -6;
+	}
+
+	// Write the data
+	result = app_write_data(app, address, data, len, use_word_access);
+	if (result) {
+		DBG_INFO(APP_DEBUG, "app_write_data failed %d", result);
+		return -5;
+	}
+
+	// Waif for NVM controller to be ready again
+	result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
+	if (result) {
+		DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout after page write failed %d", result);
+		return -7;
+	}
+
+	// Remove command from NVM controller
+	DBG_INFO(APP_DEBUG, "Clear NVM command");
+	result = app_execute_nvm_command(app, UPDI_V1_NVMCTRL_CTRLA_NOCMD);
+	if (result) {
+		DBG_INFO(APP_DEBUG, "app_execute_nvm_command(NOCMD) failed %d", result);
+		return -6;
+	}
+
+	return 0;
+}
+
+/*
     APP write nvm capsule with UPDI_NVMCTRL_CTRLA_WRITE_PAGE command
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
     @data: data buffer
     @len: data len
+    @use_word_access: 2 bytes mode for writting
     @return 0 successful, other value if failed
 */
-int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
+int app_write_flash(void *app_ptr, u32 address, const u8 *data, int len, bool use_word_access)
 {
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE, true);
+	upd_application_t *app = (upd_application_t *)app_ptr;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	if (APP_V1(app)) {
+		return _app_write_nvm_v1(app_ptr, address, data, len, UPDI_V1_NVMCTRL_CTRLA_FLASH_WRITE, use_word_access);
+	}
+	else {
+		return _app_write_nvm_v0(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_WRITE_PAGE, use_word_access);
+	}
 }
 
 /*
@@ -1209,22 +1260,192 @@ int app_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
     @use_word_access: 2 bytes mode for writting
     @return 0 successful, other value if failed
 */
-int _app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len, bool use_word_access)
+int app_erase_write_flash(void *app_ptr, u32 address, const u8 *data, int len, bool use_word_access)
 {
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, use_word_access);
+	upd_application_t *app = (upd_application_t *)app_ptr;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	if (APP_V1(app)) {
+		// DBG_INFO(APP_DEBUG, "app_erase_write_flash P2 version not support Erase Write Command");
+		return _app_write_nvm_v1(app_ptr, address, data, len, UPDI_V1_NVMCTRL_CTRLA_FLASH_WRITE, use_word_access);
+	}
+	else {
+		return _app_write_nvm_v0(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, use_word_access);
+	}
 }
 
 /*
-    APP write flash capsule with UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE command, and determine whether use 2 byte for writting
+    APP erase flash page capsule with UPDI_V1_NVMCTRL_CTRLA_FLASH_PAGE_EARSE command
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @address: target address
-    @data: data buffer
-    @len: data len
     @return 0 successful, other value if failed
 */
-int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
+int app_erase_flash_page(void *app_ptr, u32 address)
 {
-    return _app_write_nvm(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, true);
+	upd_application_t *app = (upd_application_t *)app_ptr;
+    u8 value = 0xFF;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	if (APP_V1(app)) {
+		// DBG_INFO(APP_DEBUG, "app_erase_write_flash P2 version not support Erase Write Command");
+		return _app_write_nvm_v1(app_ptr, address, &value, sizeof(value), UPDI_V1_NVMCTRL_CTRLA_FLASH_PAGE_EARSE, false);
+	}
+	else {
+		return _app_write_nvm_v0(app_ptr, address, &value, sizeof(value), UPDI_NVMCTRL_CTRLA_ERASE_PAGE, false);
+	}
+}
+
+/*
+    APP erase eeprom capsule with UPDI_V1_NVMCTRL_CTRLA_EEPROM_BYTE_ERASE command
+    @app_ptr: APP object pointer, acquired from updi_application_init()
+    @address: target address
+    @size: the eeprom size
+    @return 0 successful, other value if failed
+*/
+int app_erase_eeprom(void *app_ptr, u32 address, int size)
+{
+	upd_application_t *app = (upd_application_t *)app_ptr;
+    int i;
+    u8 value = 0xFF;
+    int result;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	if (APP_V1(app)) {
+		for (i = 0; i < size % 32; i += 32) {
+		    result = _app_write_nvm_v1(app_ptr, address, &value, sizeof(value), UPDI_V1_NVMCTRL_CTRLA_EEPROM_BYTE32_ERASE, false);
+            if (result) {
+                return -2;
+            }
+        }
+        return result;
+	}
+	else {
+		return _app_write_nvm_v0(app_ptr, address, &value, sizeof(value), UPDI_NVMCTRL_CTRLA_ERASE_EEPROM, false);
+	}
+}
+
+/*
+	APP erase write eeprom command, use 1 byte for writting
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@address: target address
+	@data: data buffer
+	@len: data len
+	@return 0 successful, other value if failed
+*/
+int app_erase_write_eeprom(void *app_ptr, u32 address, const u8 *data, int len)
+{
+	upd_application_t *app = (upd_application_t *)app_ptr;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	if (APP_V1(app)) {
+		return _app_write_nvm_v1(app_ptr, address, data, len, UPDI_V1_NVMCTRL_CTRLA_EEPROM_ERASE_WRITE, false);
+	}
+	else {
+		return _app_write_nvm_v0(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, false);
+	}
+}
+
+/*
+	APP erase write user command, use 2 byte for writting
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@address: target address
+	@data: data buffer
+	@len: data len
+	@return 0 successful, other value if failed
+*/
+int app_erase_write_userrow(void *app_ptr, u32 address, const u8 *data, int len)
+{
+	upd_application_t *app = (upd_application_t *)app_ptr;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	if (APP_V1(app)) {
+		return _app_write_nvm_v1(app_ptr, address, data, len, UPDI_V1_NVMCTRL_CTRLA_EEPROM_ERASE_WRITE, false);
+	}
+	else {
+		return _app_write_nvm_v0(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, false);
+	}
+}
+
+/*
+	APP write fuse
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@info: Fuse memory info
+	@address: target address
+	@value: fuse value
+	@return 0 successful, other value failed
+*/
+int _app_write_fuse_v0(void *app_ptr, u32 address, const u8 value)
+{
+	/*
+	Writes to fuse
+	*/
+	upd_application_t *app = (upd_application_t *)app_ptr;
+	int result;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	DBG_INFO(APP_DEBUG, "<APP> Chip write fuse");
+
+	// Check that NVM controller is ready
+	result = app_wait_flash_ready(app, TIMEOUT_WAIT_FLASH_READY);
+	if (result) {
+		DBG_INFO(APP_DEBUG, "app_wait_flash_ready timeout before page buffer clear failed %d", result);
+		return -2;
+	}
+
+	result = link_st16(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_ADDRL, (u16)address, false);
+	if (result) {
+		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse address %04x failed %d", address, result);
+		return -3;
+	}
+
+	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_DATAL, value, false);
+	if (result) {
+		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse data %02x failed %d", value, result);
+		return -4;
+	}
+
+	result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_WRITE_FUSE);
+	if (result) {
+		DBG_INFO(NVM_DEBUG, "app_execute_nvm_command fuse command failed %d", result);
+		return -5;
+	}
+
+	return 0;
+}
+
+/*
+	APP write fuse
+	@app_ptr: APP object pointer, acquired from updi_application_init()
+	@info: Fuse memory info
+	@address: target address
+	@value: fuse value
+	@return 0 successful, other value failed
+*/
+int app_write_fuse(void *app_ptr, u32 address, const u8 value)
+{
+	upd_application_t *app = (upd_application_t *)app_ptr;
+
+	if (!VALID_APP(app))
+		return ERROR_PTR;
+
+	if (APP_V1(app)) {
+		return _app_write_nvm_v1(app_ptr, address, &value, 1, UPDI_V1_NVMCTRL_CTRLA_EEPROM_ERASE_WRITE, false);
+	}
+	else {
+		return _app_write_fuse_v0(app_ptr, address, value);
+	}
 }
 
 /*
@@ -1235,7 +1456,7 @@ int app_erase_write_nvm(void *app_ptr, u16 address, const u8 *data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_ld_reg(void *app_ptr, u16 address, u8* data, int len)
+int app_ld_reg(void *app_ptr, u32 address, u8* data, int len)
 {
     /*
         Load reg data
@@ -1244,7 +1465,7 @@ int app_ld_reg(void *app_ptr, u16 address, u8* data, int len)
     int i, result;
 
     for (i = 0; i < len; i++) {
-        result = _link_ld(LINK(app), address + i, data + i);
+        result = _link_ld(LINK(app), address + i, data + i, APP_V1(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "_link_ld(%x) +%d failed %d", address, i, result);
             return -2;
@@ -1262,7 +1483,7 @@ int app_ld_reg(void *app_ptr, u16 address, u8* data, int len)
     @len: data len
     @return 0 successful, other value if failed
 */
-int app_st_reg(void *app_ptr, u16 address, const u8 *data, int len)
+int app_st_reg(void *app_ptr, u32 address, const u8 *data, int len)
 {
     /*
         Set reg data
@@ -1272,7 +1493,7 @@ int app_st_reg(void *app_ptr, u16 address, const u8 *data, int len)
     int i, result;
 
     for (i = 0; i < len; i++) {
-        result = link_st(LINK(app), address + i, data[i]);
+        result = link_st(LINK(app), address + i, data[i], APP_V1(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "link_st(%x) +%d failed %d", address, i, result);
             return -2;

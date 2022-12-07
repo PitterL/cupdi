@@ -13,7 +13,8 @@ typedef enum {
     APP_DEBUG, 
     LINK_DEBUG, 
     PHY_DEBUG, 
-    SER_DEBUG
+    SER_DEBUG,
+	OTHER_DEBUG
 } verbose_t;
 
 typedef enum {

@@ -221,10 +221,20 @@ create segment informantion by sgmentid, addr, len, and data,
 */
 segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, char *data, int flag)
 {
-    if (flag & SEG_ALLOC_MEMORY)
-        return _set_segment_data_by_id_addr(dhex, segmentid, addr, len, data);
-    else
-        return _set_segment_range_by_id_addr(dhex, segmentid, addr, len);
+	segment_buffer_t * seg = NULL;
+
+	if (flag & SEG_INIT_SEGMENT) {
+		seg = _set_segment_range_by_id_addr(dhex, segmentid, addr, len);
+		if (!seg) {
+			return NULL;
+		}
+	}
+
+	if (flag & SEG_ALLOC_MEMORY) {
+		seg = _set_segment_data_by_id_addr(dhex, segmentid, addr, len, data);
+	}
+
+	return seg;
 }
 
 /*

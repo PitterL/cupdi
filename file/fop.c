@@ -153,7 +153,7 @@ int _search_defined_array_from_buf(char *content, const char *pat_str, const cha
         }
 
         //*end = '\0';    //replace '}' to terminate
-        trunk = strndup(st + 1, end - st - 1);
+        trunk = strndup(st + 1, end - st - 2);
 
         tk_s = str_split(trunk, array_delim);
         if (!tk_s) {
@@ -247,7 +247,7 @@ int search_defined_array_int_from_file(const char *file, const char *varname, un
 {
     char pat_str[TRE_MAX_BUFLEN];
     const char *pat_raw[] = { "^#define", varname, "\\{[\\w\\s,]*\\}" };
-    const char *pat_value = "0x[0-9a-fA-F]{2,}";
+    const char *pat_value = "0x[0-9a-fA-F]{1,8}";
     const char *space_delims = "\\s+";
 
     //create pattern to search
