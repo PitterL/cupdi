@@ -289,14 +289,14 @@ int nvm_chip_erase(void *nvm_ptr)
 int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u32 address, u8 *data, int len)
 {
     /*
-    Read from nvm area
+    Read from common area
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
 
     if (!VALID_NVM(nvm) || !data)
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Read from nvm area");
+    DBG_INFO(OTHER_DEBUG, "<NVM> Read from common area");
 
     if (!nvm->progmode) {
         DBG_INFO(NVM_DEBUG, "NVM area read at locked mode");
@@ -327,6 +327,9 @@ int nvm_read_flash(void *nvm_ptr, u32 address, u8 *data, int len)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
+    int flash_size, block_size, size, block_mask, mapped_start, block_start, block_end;
+    u8 bid, bid_end;
+    u32 mapped_address;
     int result;
 
     result = nvm_get_block_info(nvm, NVM_FLASH, &info);
@@ -335,7 +338,45 @@ int nvm_read_flash(void *nvm_ptr, u32 address, u8 *data, int len)
         return -2;
     }
 
-    return _nvm_read_common(nvm_ptr, &info, address, data, len);
+    flash_size = info.nvm_size;
+    block_size = info.nvm_blocksize;
+    block_mask = block_size - 1;
+    mapped_start = info.nvm_mapped_start;
+
+    do {
+        if (mapped_start) {        
+            bid = address / block_size;
+            bid_end = (address + len - 1) / block_size;
+            block_start = address & block_mask;
+            block_end = (address + len - 1) & block_mask;
+
+            if (bid_end > bid) {
+                size = block_size - block_start;
+            } else {
+                size = block_end - block_start + 1;
+            }
+            mapped_address = block_start + mapped_start;
+        } else {
+            bid = bid_end = 0;
+            size = len;
+            mapped_address = address;
+        }
+
+        DBG_INFO(NVM_DEBUG, "Reading flash block %d at 0x%x(@0x%x) size %d", bid, mapped_address, address, size);
+
+        result = app_read_nvm(APP(nvm), bid, mapped_address, data, size);
+		if (result) {
+            DBG_INFO(NVM_DEBUG, "app_read_nvm failed %d", result);
+            return -3;
+        }
+
+        data += size;
+        address += size;
+		len -= size;
+
+    } while (bid_end > bid);
+
+    return 0;
 }
 
 /*
@@ -347,14 +388,16 @@ int nvm_read_flash(void *nvm_ptr, u32 address, u8 *data, int len)
 	@erased: Has the chip been erased yet
     @return 0 successful, other value failed
 */
-int _nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool erased)
+int nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool erased)
 {
     /*
     Writes to flash
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    int i, off, size, flash_address, flash_size, pages, page_size;
+    int i, off, size, flash_address, flash_size, pages, page_size, block_size, block_mask, mapped_start;
+    u32 mapped_address;
+    u8 bid;
     int result = 0;
 
     if (!VALID_NVM(nvm) || !data)
@@ -375,8 +418,9 @@ int _nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool e
 
     flash_address = info.nvm_start;
     flash_size = info.nvm_size;
-    if (address < (u32)flash_address)
+    if (address < (u32)flash_address) {
         address += flash_address;
+    }
 
     if (address + len > (u32)(flash_address + flash_size)) {
         DBG_INFO(NVM_DEBUG, "flash address overflow, addr %hx, len %x.", address, len);
@@ -384,22 +428,29 @@ int _nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool e
     }
 
     page_size = info.nvm_pagesize;
+    block_size = info.nvm_blocksize;
+    block_mask = block_size -1;
+    mapped_start = info.nvm_mapped_start;
     pages = (len + page_size - 1) / page_size;
     for (i = 0, off = 0; i < pages; i++) {
-        DBG_INFO(NVM_DEBUG, "Writing flash page(%d/%d) at 0x%x", i, pages, address + off);
-
         size = len - off;
         if (size > page_size)
             size = page_size;
 
-		if (off == 0x7fff) {
-			DBG_INFO(NVM_DEBUG, "Debugging 0x8000");
-		}
+        if (mapped_start) {
+            bid = (address + off) / block_size;
+            mapped_address = ((address + off) & block_mask) + mapped_start;
+        } else {
+            bid = 0;
+            mapped_address = address + off;
+        }
+
+        DBG_INFO(NVM_DEBUG, "Writing flash block %d page(%d/%d) at 0x%x(@0x%x)", bid, i, pages, mapped_address, address + off);
 
 		if (erased) {
-			result = app_write_flash(APP(nvm), address + off, data + off, size, true);
+			result = app_write_flash(APP(nvm), bid, mapped_address, data + off, size, true);
 		} else {
-			result = app_erase_write_flash(APP(nvm), address + off, data + off, size, true);
+			result = app_erase_write_flash(APP(nvm), bid, mapped_address, data + off, size, true);
 		}
 
 		if (result) {
@@ -407,7 +458,7 @@ int _nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool e
             break;
         }
 
-        off += page_size;
+        off += size;
     }
 
 
@@ -417,20 +468,6 @@ int _nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool e
     }
 
     return 0;
-}
-
-/*
-	NVM write flash
-	@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-	@address: target address
-	@data: data buffer
-	@len: data len
-	@erased: Has the chip been erased yet
-	@return 0 successful, other value failed
-*/
-int nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool erased)
-{
-	return _nvm_write_flash(nvm_ptr, address, data, len, erased);
 }
 
 /*
@@ -705,7 +742,7 @@ int nvm_read_mem(void *nvm_ptr, u32 address, u8 *data, int len)
 	if (!VALID_NVM(nvm))
 		return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Read memory");
+    DBG_INFO(OTHER_DEBUG, "<NVM> Read memory");
 
 	if (!nvm->progmode) {
 		DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
@@ -719,6 +756,58 @@ int nvm_read_mem(void *nvm_ptr, u32 address, u8 *data, int len)
     }
 
     return result;
+}
+
+/*
+    NVM read auto selec which part to be operated
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
+int nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    nvm_info_t info;
+	nvm_rop rop, nvm_rops[NUM_NVM_TYPES] = { nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem };
+	int i, result;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    DBG_INFO(NVM_DEBUG, "<NVM> Read Auto addr 0x%x len 0x%x(%d)", address, len, len);
+
+    for (i = 0; i < NUM_NVM_TYPES; i++) {
+        result = nvm_get_block_info(nvm_ptr, i, &info);
+        if (result) {
+            DBG_INFO(NVM_DEBUG, "<NVM> nvm_get_block_info %d failed", i);
+            return -2;
+        }
+
+        if (address >= info.nvm_start && address < info.nvm_start + info.nvm_size) {
+            if (address + len <= info.nvm_start + info.nvm_size) {
+                rop = nvm_rops[i];
+                if (rop) {
+                    result = rop(nvm_ptr, address, data, len);
+                    if (result) {
+                        DBG_INFO(NVM_DEBUG, "<NVM> NVM rop return failed %d", result);
+                        return -3;
+                    }
+                }
+				else {
+					DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", rop, len);
+					return -4;
+				}
+            }
+            else {
+                DBG_INFO(NVM_DEBUG, "<NVM> read auto - block overflow (addr, len): target(%x, %x) / memory(%x, %x) ", address, len, info.nvm_start, info.nvm_size);
+                return -5;
+            }
+        }
+    }
+
+    return 0;
 }
 
 /*
@@ -779,7 +868,7 @@ int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool che
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Write Auto (chip_erase %d)", chip_erased);
+    DBG_INFO(NVM_DEBUG, "<NVM> Write Auto addr 0x%x len 0x%x(%d) (chip_erase %d)", address, len, len, chip_erased);
 
     for (i = 0; i < NUM_NVM_TYPES; i++) {
         result = nvm_get_block_info(nvm_ptr, i, &info);
@@ -822,7 +911,7 @@ int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool che
 					}
 
 					if (result) {
-						DBG_INFO(NVM_DEBUG, "<NVM> Malloc data write faield");
+						DBG_INFO(NVM_DEBUG, "<NVM> data write faield");
 						return -3;
 					}
 				}
@@ -858,7 +947,8 @@ int nvm_erase_flash_page(void *nvm_ptr, u32 address, int count)
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    int i, off, flash_address, flash_size, page_size;
+    int flash_address, flash_size, block_size;
+    u8 bid = 0;
     int result = 0;
 
     if (!VALID_NVM(nvm))
@@ -879,32 +969,19 @@ int nvm_erase_flash_page(void *nvm_ptr, u32 address, int count)
 
     flash_address = info.nvm_start;
     flash_size = info.nvm_size;
-    if (address < (u32)flash_address)
+    if (address < (u32)flash_address) {
         address += flash_address;
-
-    page_size = info.nvm_pagesize;
-    for (i = 0, off = 0; i < count; i++) {
-        DBG_INFO(NVM_DEBUG, "Erase flash page(%d/%d) at 0x%x", i, count, address + off);
-
-        result = app_erase_flash_page(APP(nvm), address + off);
-		if (result) {
-            DBG_INFO(NVM_DEBUG, "app_write_flash failed %d", result);
-            break;
-        }
-
-        off += page_size;
-
-        if (address + off > (u32)(flash_address + flash_size)) {
-            DBG_INFO(NVM_DEBUG, "Erase address overflow, addr %hx, count %x.", address, count);
-            result = -4;
-            break;
-        }
     }
 
+    block_size = info.nvm_blocksize;
+    if (flash_size > block_size) {
+        bid = (address - flash_address) / block_size;
+    }
 
-    if (i < count || result) {
-        DBG_INFO(NVM_DEBUG, "Erase flash page %d failed %d", i, result);
-        return -6;
+    result = app_erase_flash_page(APP(nvm), bid, address, count);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "app_write_flash failed %d", result);
+        return -4;
     }
 
     return 0;
@@ -1152,7 +1229,6 @@ int nvm_get_block_info_ext(void *nvm_ptr, int type, nvm_info_t *info, char **pna
         get block info
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    int result;
 
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
@@ -1198,9 +1274,9 @@ void *nvm_get_content(void *nvm_ptr, int type, int *req_size)
         return NULL;
     }
 
-    result = nvm_read_mem(nvm_ptr, iblock.nvm_start, (u8 *)buf, size);
+    result = nvm_read_auto(nvm_ptr, iblock.nvm_start, (u8 *)buf, size);
     if (result) {
-        DBG_INFO(UPDI_DEBUG, "nvm_read_mem failed %d", result);
+        DBG_INFO(UPDI_DEBUG, "nvm_read_auto failed %d", result);
         free(buf);
         return NULL;
     }

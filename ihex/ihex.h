@@ -5,6 +5,7 @@
 #include "kk_ihex_write.h"
 
 #define MAX_SEGMENT_COUNT_IN_RECORDS 64
+#define MAX_DATA_IN_ONE_SEGMENT 0x10000 //16 bits address of hex data record
 
 typedef struct _segment_buffer {
 #define DEFAULT_SID_WITHOUT_SEGMENT_RECORD 0
@@ -31,7 +32,7 @@ typedef struct _hex_data {
 
 segment_buffer_t *get_segment_by_id(hex_data_t *dhex, ihex_segment_t segmentid);
 segment_buffer_t *get_segment_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr);
-int set_default_segment_id(hex_data_t *dhex, ihex_segment_t segmentid);
+int set_default_segment_id(hex_data_t *dhex, ihex_segment_t source,  ihex_segment_t target);
 
 int load_segments_from_file(const char *file, hex_data_t *dhex);
 void unload_segment_by_sid(hex_data_t *dhex, ihex_segment_t segmentid);

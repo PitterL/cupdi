@@ -5,6 +5,8 @@ typedef struct _nvm_info{
     unsigned short nvm_start;
     unsigned int nvm_size;
     unsigned short nvm_pagesize;
+    unsigned int nvm_blocksize;
+    unsigned int nvm_mapped_start;
 }nvm_info_t;
 
 typedef struct _reg_info {

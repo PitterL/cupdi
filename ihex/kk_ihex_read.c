@@ -36,7 +36,7 @@ void
 ihex_begin_read (struct ihex_state * ihex, cb_ihex_data_read_t cb_func, void *args) {
     ihex->address = 0;
 #ifndef IHEX_DISABLE_SEGMENTS
-    ihex->segment = 0;
+    ihex->segment = INITIALIZED_SEGMENT_VALUE;
 #endif
     ihex->flags = 0;
     ihex->line_length = 0;

@@ -25,6 +25,7 @@ typedef int(*nvm_wop)(void *nvm_ptr, u32 address, const u8 *data, int len, bool 
 typedef int(*nvm_rop)(void *nvm_ptr, u32 address, u8 *data, int len);
 typedef int(*nvm_eop)(void *nvm_ptr, u32 address, int count);
 
+int nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len);
 int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool verify);
 int nvm_erase_auto(void *nvm_ptr, u32 address, int count);
 int nvm_reset(void *nvm_ptr, int delay_ms);

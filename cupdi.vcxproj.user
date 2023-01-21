@@ -12,11 +12,11 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>-d avr128da -c com14 -f "D:\Users\a41450\atmel studio\AVR128DA48_Touch_MPT3\AVR128DA48_Touch_MPT3\Debug\AVR128DA48_Touch_MPT3.hex" --programm -v 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-d avr128da -c com14 -f "D:\Users\a41450\atmel studio\AVR128DA48_Touch_MPT3\AVR128DA48_Touch_MPT3\Debug\AVR128DA48_Touch_MPT3.hex" --dump -v 2</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>-d avr128da -c com14 -f "D:\Users\a41450\atmel studio\AVR128DA48_Touch_MPT3\AVR128DA48_Touch_MPT3\Debug\AVR128DA48_Touch_MPT3.hex" --programm -v 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-d avr128da -c com14 -f "D:\Users\a41450\atmel studio\AVR128DA48_Touch_MPT3\AVR128DA48_Touch_MPT3\Debug\AVR128DA48_Touch_MPT3.hex" --dump -v 2</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

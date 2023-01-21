@@ -750,7 +750,7 @@ int link_st_ptr_inc16(void *link_ptr, const u8 *data, int len)
     if (!VALID_LINK(link))
         return ERROR_PTR;
 
-    DBG_INFO(LINK_DEBUG, "<LINK> ST16 to *ptr++");
+    DBG_INFO(LINK_DEBUG, "<LINK> ST16 to *ptr++, len %d", len);
 
     result = phy_transfer(PHY(link), cmd, sizeof(cmd), &resp, sizeof(resp));
     if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
@@ -761,7 +761,7 @@ int link_st_ptr_inc16(void *link_ptr, const u8 *data, int len)
     for (i = 2; i < len; i += 2) {
         result = phy_transfer(PHY(link), &data[i], 2, &resp, sizeof(resp));
         if (result != sizeof(resp) || resp != UPDI_PHY_ACK) {
-            DBG_INFO(LINK_DEBUG, "phy_transfer failed %d i %d resp 0x%02x", result, i, resp);
+            DBG_INFO(LINK_DEBUG, "phy_transfer failed(%d) i %d resp 0x%02x", result, i, resp);
             return -3;
         }
     }

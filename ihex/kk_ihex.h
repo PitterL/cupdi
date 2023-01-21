@@ -121,6 +121,13 @@ typedef uint_least32_t ihex_address_t;
 typedef uint_least16_t ihex_segment_t;
 typedef int ihex_count_t;
 
+#ifndef IHEX_SEGMENT_VALUE_MAX
+#define IHEX_SEGMENT_VALUE_MAX (uint_least16_t)(-1)
+#endif
+
+#define INITIALIZED_SEGMENT_VALUE   IHEX_SEGMENT_VALUE_MAX
+#define INVALID_SEGMENT_VAL(_sid) ((_sid) == IHEX_SEGMENT_VALUE_MAX)
+
 // Maximum number of data bytes per line (applies to both reading and
 // writing!); specify 255 to support reading all possible lengths. Less
 // can be used to limit memory footprint on embedded systems, e.g.,

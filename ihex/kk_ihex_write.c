@@ -15,6 +15,9 @@
 #define ADDRESS_HIGH_MASK ((ihex_address_t) 0xFFFF0000U)
 #define ADDRESS_HIGH_BYTES(addr) ((addr) >> 16)
 
+#define ADDRESS_SEGMENT_MASK ((ihex_address_t) 0xFFFFFFF0U)
+#define ADDRESS_SEGMENT_BYTES(addr) ((addr) >> 4)
+
 #define HEX_DIGIT(n) ((char)((n) + (((n) < 10) ? '0' : ('A' - 10))))
 
 #ifndef IHEX_EXTERNAL_WRITE_BUFFER
@@ -29,7 +32,7 @@ void
 ihex_init (struct ihex_state * ihex, cb_ihex_flush_buffer_t cb_flush, void *args) {
     ihex->address = 0;
 #ifndef IHEX_DISABLE_SEGMENTS
-    ihex->segment = 0;
+    ihex->segment = INITIALIZED_SEGMENT_VALUE;
 #endif
     ihex->flags = 0;
     ihex->line_length = IHEX_DEFAULT_OUTPUT_LINE_LENGTH;
@@ -121,8 +124,14 @@ ihex_write_data (struct ihex_state * const ihex) {
     }
 
     if (ihex->flags & IHEX_FLAG_ADDRESS_OVERFLOW) {
+#ifdef IHEX_SEGMENTS_LINEAR_EXTENDED
         ihex_write_extended_address(ihex, ADDRESS_HIGH_BYTES(ihex->address),
                                     IHEX_EXTENDED_LINEAR_ADDRESS_RECORD);
+#endif
+#ifdef IHEX_SEGMENTS_SEGMENT_EXTENDED
+        ihex_write_extended_address(ihex, ADDRESS_SEGMENT_BYTES(ihex->address),
+                                    IHEX_EXTENDED_SEGMENT_ADDRESS_RECORD);
+#endif
         ihex->flags &= ~IHEX_FLAG_ADDRESS_OVERFLOW;
     }
 
@@ -204,11 +213,14 @@ ihex_write_at_segment (struct ihex_state * ihex,
                        ihex_segment_t segment,
                        ihex_address_t address) {
     ihex_write_at_address(ihex, address);
-    if (ihex->segment != segment) {
-        // clear segment
+    // force write the segment
+    //if (ihex->segment != segment) {
+        // whatever wrtie the segment infomation
         ihex_write_extended_address(ihex, (ihex->segment = segment),
                                     IHEX_EXTENDED_SEGMENT_ADDRESS_RECORD);
-    }
+        // clear the overflow tage if the new segement is assigned
+        ihex->flags &= ~IHEX_FLAG_ADDRESS_OVERFLOW;
+    //}
 }
 #endif
 
