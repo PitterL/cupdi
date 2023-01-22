@@ -53,6 +53,8 @@ typedef struct _upd_application {
 #define LINK(_app) ((_app)->link)
 #define APP_REG(_app, _name) ((_app)->dev->mmap->reg._name)
 
+#define VALID_BLOCK_ID(_id) ((u8)(_id) < UPDI_V1_NVMCTRL_CTRLB_FLMAP_MASK)
+
 /*
     APP object init
     @port: serial port name of Window or Linux
@@ -600,27 +602,32 @@ int app_set_nvm_flashmap(void *app_ptr, u8 blockid)
 
     DBG_INFO(APP_DEBUG, "<APP> NVM Select block %d", blockid);
 
+    if (!VALID_BLOCK_ID(blockid)) {
+        return -2;
+    }
+
     result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLB, &val, APP_V1(app));
     if (result) {
         DBG_INFO(APP_DEBUG, "Read NVM ctrl B _link_ld() failed(%d)", result);
-        result = -2;
+        result = -3;
     }
     else {
         if (val & UPDI_V1_NVMCTRL_CTRLB_FLMAPLOCK) {
             DBG_INFO(APP_DEBUG, "Read NVM ctrl B flash map locked (0x%02)", val);
-            result = -3;
+            result = -4;
         } else {
             val_set = val & ~(UPDI_V1_NVMCTRL_CTRLB_FLMAP_MASK << UPDI_V1_NVMCTRL_CTRLB_FLMAP_SHIFT);
             val_set |= blockid << UPDI_V1_NVMCTRL_CTRLB_FLMAP_SHIFT;
             if (val != val_set) {
-                result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLB, val, true);
+                result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLB, val_set, true);
                 if (result) {
-                    DBG_INFO(APP_DEBUG, "Read NVM ctrl B link_st() failed(%d)", result);
-                    result = -4;
+                    DBG_INFO(APP_DEBUG, "Set NVM ctrl B from 0x%x to 0x%x, link_st() failed(%d)", val, val_set, result);
+                    result = -5;
                 }
             }
         }
     }
+
     return result;
 }
 
@@ -936,12 +943,14 @@ int app_read_nvm(void *app_ptr, u8 blockid, u32 address, u8 *data, int len)
     DBG_INFO(APP_DEBUG, "<APP> Chip read nvm");
 
     // Set flash map to the NVM controller
-	DBG_INFO(APP_DEBUG, "NVM set flash map %d", blockid);
-	result = app_set_nvm_flashmap(app, blockid);
-	if (result) {
-		DBG_INFO(APP_DEBUG, "_app_set_nvm_flashmap(%d) failed %d", blockid, result);
-		return -2;
-	}
+	if (VALID_BLOCK_ID(blockid)) {
+        DBG_INFO(APP_DEBUG, "NVM set flash map %d", blockid);
+        result = app_set_nvm_flashmap(app, blockid);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "_app_set_nvm_flashmap(%d) failed %d", blockid, result);
+            return -2;
+        }
+    }
 
     // Load to buffer by reading directly to location
     result = app_read_data(app, address, data, len);
@@ -1284,12 +1293,14 @@ int _app_write_nvm_v1(void *app_ptr, u8 blockid, u32 address, const u8 *data, in
 	}
 
     // Set flash map to the NVM controller
-	DBG_INFO(APP_DEBUG, "NVM set flash map %d", blockid);
-	result = app_set_nvm_flashmap(app, blockid);
-	if (result) {
-		DBG_INFO(APP_DEBUG, "_app_set_nvm_flashmap(%d) failed %d", blockid, result);
-		return -3;
-	}
+    if (VALID_BLOCK_ID(blockid)) {
+        DBG_INFO(APP_DEBUG, "NVM set flash map %d", blockid);
+        result = app_set_nvm_flashmap(app, blockid);
+        if (result) {
+            DBG_INFO(APP_DEBUG, "_app_set_nvm_flashmap(%d) failed %d", blockid, result);
+            return -3;
+        }
+    }
 
 	// Write the command to the NVM controller
 	DBG_INFO(APP_DEBUG, "NVM write command");
@@ -1508,7 +1519,7 @@ int app_erase_write_userrow(void *app_ptr, u32 address, const u8 *data, int len)
 		return ERROR_PTR;
 
 	if (APP_V1(app)) {
-		return _app_write_nvm_v1(app_ptr, 0, address, data, len, UPDI_V1_NVMCTRL_CTRLA_EEPROM_ERASE_WRITE, false);
+        return app_erase_write_flash(app_ptr, BLOCK_ID_NA, address, data, len, true);
 	}
 	else {
 		return _app_write_nvm_v0(app_ptr, address, data, len, UPDI_NVMCTRL_CTRLA_ERASE_WRITE_PAGE, false);

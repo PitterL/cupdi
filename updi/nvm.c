@@ -344,7 +344,7 @@ int nvm_read_flash(void *nvm_ptr, u32 address, u8 *data, int len)
     mapped_start = info.nvm_mapped_start;
 
     do {
-        if (mapped_start) {        
+        if (mapped_start) {
             bid = address / block_size;
             bid_end = (address + len - 1) / block_size;
             block_start = address & block_mask;
@@ -357,7 +357,7 @@ int nvm_read_flash(void *nvm_ptr, u32 address, u8 *data, int len)
             }
             mapped_address = block_start + mapped_start;
         } else {
-            bid = bid_end = 0;
+            bid = bid_end = BLOCK_ID_NA;
             size = len;
             mapped_address = address;
         }
@@ -441,7 +441,7 @@ int nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool er
             bid = (address + off) / block_size;
             mapped_address = ((address + off) & block_mask) + mapped_start;
         } else {
-            bid = 0;
+            bid = BLOCK_ID_NA;
             mapped_address = address + off;
         }
 
@@ -519,51 +519,65 @@ int nvm_read_userrow(void *nvm_ptr, u32 address, u8 *data, int len)
 /*
 NVM write eeprom (compatible with userrow)
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
-    @info: EEPROM memory info
+    @type: memory type
     @address: target address
     @data: data buffer
     @len: data len
     @return 0 successful, other value failed
 */
-int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u32 address, const u8 *data, int len)
+int _nvm_write_user_eeprom(void *nvm_ptr, int type, u32 address, const u8 *data, int len)
 {
     /*
-    Writes to eeprom
+    Writes to user/eeprom
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    nvm_info_t info;
     int i, off, size, pages, page_size;
     int result = 0;
 
     if (!VALID_NVM(nvm) || !data)
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Writes to eeprom");
+    DBG_INFO(NVM_DEBUG, "<NVM> Writes to user/eeprom");
 
     if (!nvm->progmode) {
         DBG_INFO(NVM_DEBUG, "Enter progmode first!");
         return -2;
     }
 
-    if (address < info->nvm_start)
-        address += info->nvm_start;
-
-	if ((u32)(address + len) > info->nvm_start + info->nvm_size) {
-        DBG_INFO(NVM_DEBUG, "eeprom address overflow, addr %hx, len %x.", address, len);
+    result = nvm_get_block_info(nvm, type, &info);
+    if (result) {
+        DBG_INFO(NVM_DEBUG, "nvm_get_block_info failed");
         return -3;
     }
 
-    page_size = info->nvm_pagesize;
+    if (address < info.nvm_start)
+        address += info.nvm_start;
+
+	if ((u32)(address + len) > info.nvm_start + info.nvm_size) {
+        DBG_INFO(NVM_DEBUG, "User/eeprom address overflow, addr %hx, len %x.", address, len);
+        return -4;
+    }
+
+    page_size = info.nvm_pagesize;
     pages = (len + page_size - 1) / page_size;
     for (i = 0, off = 0; i < pages; i++) {
-        DBG_INFO(NVM_DEBUG, "Writing eeprom page(%d/%d) at 0x%x", i, pages, address + off);
+        DBG_INFO(NVM_DEBUG, "Writing user/eeprom page(%d/%d) at 0x%x", i, pages, address + off);
 
         size = len - off;
         if (size > page_size)
             size = page_size;
 
-        result = app_erase_write_eeprom(APP(nvm), address + off, data + off, size);
+        if (type == NVM_EEPROM) {
+            result = app_erase_write_eeprom(APP(nvm), address + off, data + off, size);
+        } else if (type == NVM_USERROW) {
+            result = app_erase_write_userrow(APP(nvm), address + off, data + off, size);
+        } else {
+            DBG_INFO(NVM_DEBUG, "Writing user/eeprom unsupport type %d", type);
+            result = -5;
+        }
         if (result) {
-            DBG_INFO(NVM_DEBUG, "app_erase_write_eeprom(byte mode) failed %d", result);
+            DBG_INFO(NVM_DEBUG, "app_erase_write_user/eeprom(byte mode) failed %d", result);
             break;
         }
 
@@ -571,8 +585,8 @@ int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u32 address, const 
     }
 
     if (i < pages || result) {
-        DBG_INFO(NVM_DEBUG, "Write eeprom page %d failed %d", i, result);
-        return -5;
+        DBG_INFO(NVM_DEBUG, "Write user/eeprom page %d failed %d", i, result);
+        return -6;
     }
 
     return 0;
@@ -589,17 +603,7 @@ int _nvm_write_eeprom(void *nvm_ptr, const nvm_info_t *info, u32 address, const 
 */
 int nvm_write_eeprom(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy)
 {
-    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    nvm_info_t info;
-    int result;
-
-    result = nvm_get_block_info(nvm, NVM_EEPROM, &info);
-    if (result) {
-        DBG_INFO(NVM_DEBUG, "nvm_get_block_info failed");
-        return -2;
-    }
-
-    return _nvm_write_eeprom(nvm_ptr, &info, address, data, len);
+    return _nvm_write_user_eeprom(nvm_ptr, NVM_EEPROM, address, data, len);
 }
 
 /*
@@ -613,17 +617,7 @@ int nvm_write_eeprom(void *nvm_ptr, u32 address, const u8 *data, int len, bool d
 */
 int nvm_write_userrow(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy)
 {
-    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
-    nvm_info_t info;
-    int result;
-
-    result = nvm_get_block_info(nvm, NVM_USERROW, &info);
-    if (result) {
-        DBG_INFO(NVM_DEBUG, "nvm_get_block_info failed");
-        return -2;
-    }
-
-    return _nvm_write_eeprom(nvm_ptr, &info, address, data, len);
+    return _nvm_write_user_eeprom(nvm_ptr, NVM_USERROW, address, data, len);
 }
 
 /*
@@ -764,14 +758,21 @@ int nvm_read_mem(void *nvm_ptr, u32 address, u8 *data, int len)
     @address: target address
     @data: data buffer
     @len: data len
-    @return 0 successful, other value failed
+	@flag: mapped or real address flag
+    @return 0 successful, negative value failed, positive value continue
 */
-int nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len)
+enum {
+    FLAG_ADDR_REAL = (1 << 0), 
+    FLAG_ADDR_MAPPED = (1 << 1),
+    FLAG_DATA_READBACK = (1 << 7)
+};
+
+int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 flag)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
 	nvm_rop rop, nvm_rops[NUM_NVM_TYPES] = { nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem };
-	int i, result;
+	int i, result = 1;
 
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
@@ -779,11 +780,16 @@ int nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len)
     DBG_INFO(NVM_DEBUG, "<NVM> Read Auto addr 0x%x len 0x%x(%d)", address, len, len);
 
     for (i = 0; i < NUM_NVM_TYPES; i++) {
-        result = nvm_get_block_info(nvm_ptr, i, &info);
-        if (result) {
+        if (nvm_get_block_info(nvm_ptr, i, &info)) {
             DBG_INFO(NVM_DEBUG, "<NVM> nvm_get_block_info %d failed", i);
             return -2;
         }
+
+		if (flag & FLAG_ADDR_REAL) {
+			if (info.nvm_mapped_start) {	// it's mapped address
+				continue;
+			}
+		}
 
         if (address >= info.nvm_start && address < info.nvm_start + info.nvm_size) {
             if (address + len <= info.nvm_start + info.nvm_size) {
@@ -792,11 +798,12 @@ int nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len)
                     result = rop(nvm_ptr, address, data, len);
                     if (result) {
                         DBG_INFO(NVM_DEBUG, "<NVM> NVM rop return failed %d", result);
-                        return -3;
+                        result = -3;
                     }
+					break;
                 }
 				else {
-					DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", rop, len);
+					DBG_INFO(NVM_DEBUG, "<NVM> Not support nvm op %d size %d", i, len);
 					return -4;
 				}
             }
@@ -807,7 +814,27 @@ int nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len)
         }
     }
 
-    return 0;
+    return result;
+}
+
+/*
+	NVM read auto selec which part to be operated, real address first to check, if not found then use mapped address
+	@nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+	@address: target address
+	@data: data buffer
+	@len: data len
+	@return 0 successful, other value failed
+*/
+int nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len)
+{
+	int result;
+
+	result = _nvm_read_auto(nvm_ptr, address, data, len, FLAG_ADDR_REAL);
+	if (result > 0) {
+		result = _nvm_read_auto(nvm_ptr, address, data, len, FLAG_ADDR_MAPPED);
+	}
+
+	return result;
 }
 
 /*
@@ -852,10 +879,10 @@ int nvm_write_mem(void *nvm_ptr, u32 address, const u8 *data, int len, bool dumm
     @address: target address
     @data: data buffer
     @len: data len
-	@check: whether readback data for double checking
+	@flag: real address or mapped; whether readback
     @return 0 successful, other value failed
 */
-int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool check)
+int _nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, u8 flag)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
@@ -863,7 +890,7 @@ int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool che
 	nvm_rop rop, nvm_rops[NUM_NVM_TYPES] = { nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem };
 	bool chip_erased = nvm->erased;
 	char *buf = NULL;
-	int i, result;
+	int i, result = 1;
 
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
@@ -871,11 +898,16 @@ int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool che
     DBG_INFO(NVM_DEBUG, "<NVM> Write Auto addr 0x%x len 0x%x(%d) (chip_erase %d)", address, len, len, chip_erased);
 
     for (i = 0; i < NUM_NVM_TYPES; i++) {
-        result = nvm_get_block_info(nvm_ptr, i, &info);
-        if (result) {
+        if (nvm_get_block_info(nvm_ptr, i, &info)) {
             DBG_INFO(NVM_DEBUG, "<NVM> nvm_get_block_info %d failed", i);
             return -2;
         }
+
+        if (flag & FLAG_ADDR_REAL) {
+			if (info.nvm_mapped_start) {	// it's mapped address
+				continue;
+			}
+		}
 
         if (address >= info.nvm_start && address < info.nvm_start + info.nvm_size) {
             if (address + len <= info.nvm_start + info.nvm_size) {
@@ -885,7 +917,7 @@ int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool che
 					// Read back the data and do data check
 					if (result == 0) {
 						rop = nvm_rops[i];
-						if (rop && check) {
+						if (rop && (flag & FLAG_DATA_READBACK)) {
 							buf = malloc(len);
 							if (buf) {
 								result = rop(nvm_ptr, address, buf, len);
@@ -893,10 +925,12 @@ int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool che
 									result = memcmp(data, buf, len);
 									if (result) {
 										DBG_INFO(NVM_DEBUG, "<NVM> Data verified compare failed %d", result);
-									}
+                                        result = -3;
+                                    }
 								}
 								else {
 									DBG_INFO(NVM_DEBUG, "<NVM> Data readback for verification return failed %d", result);
+                                    result = -4;
 								}
 								free(buf);
 							}
@@ -912,25 +946,47 @@ int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool che
 
 					if (result) {
 						DBG_INFO(NVM_DEBUG, "<NVM> data write faield");
-						return -3;
+						return -5;
 					}
 				}
 				else {
 
 					DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", wop, len);
-					return -4;
+					return -6;
 				}
             }
             else {
                 DBG_INFO(NVM_DEBUG, "<NVM> write auto - block overflow (addr, len): target(%x, %x) / memory(%x, %x) ", address, len, info.nvm_start, info.nvm_size);
-                return -5;
+                return -7;
             }
         }
     }
 
 	nvm->erased = false;
 
-    return 0;
+    return result;
+}
+
+/*
+    NVM write auto selec which part to be operated
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+	@check: whether readback data for double checking
+    @return 0 successful, other value failed
+*/
+int nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, bool check)
+{
+	int result;
+	u8 flag = check ? FLAG_DATA_READBACK : 0;
+
+	result = _nvm_write_auto(nvm_ptr, address, data, len, flag | FLAG_ADDR_REAL);
+	if (result > 0) {
+		result = _nvm_write_auto(nvm_ptr, address, data, len, flag | FLAG_ADDR_MAPPED);
+	}
+
+	return result;
 }
 
 /*
@@ -948,7 +1004,8 @@ int nvm_erase_flash_page(void *nvm_ptr, u32 address, int count)
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
     int flash_address, flash_size, block_size;
-    u8 bid = 0;
+    unsigned int mapped_start;
+    u8 bid = BLOCK_ID_NA;
     int result = 0;
 
     if (!VALID_NVM(nvm))
@@ -974,7 +1031,8 @@ int nvm_erase_flash_page(void *nvm_ptr, u32 address, int count)
     }
 
     block_size = info.nvm_blocksize;
-    if (flash_size > block_size) {
+    mapped_start = info.nvm_mapped_start;
+    if (mapped_start) {
         bid = (address - flash_address) / block_size;
     }
 

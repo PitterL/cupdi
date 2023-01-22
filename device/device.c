@@ -9,7 +9,7 @@
 */
 
 /* {device name} 
-    | {flash_start | flash_size | flash_pagesize | flash_blocksize} 
+    | {flash_start | flash_size | flash_pagesize | flash_blocksize | mapped_start} 
     | {syscfg_address | nvmctrl_address | sigrow_address}
     | {fuses} 
     | {userrow} 
