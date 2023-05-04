@@ -42,8 +42,17 @@ segment_buffer_t *get_segment_by_id_addr(hex_data_t *dhex, ihex_segment_t segmen
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
         seg = &dhex->segment[i];
-        if (seg->sid == segmentid && addr >= seg->addr_from && addr < seg->addr_to)
-            return seg;
+        if (seg->sid == segmentid) {
+            if (segmentid == IHEX_SEGMENT_VALUE_MAX) {
+                if (seg->addr_from || seg->addr_to) {
+                    return seg;
+                }
+            } else {
+                 if (addr >= seg->addr_from && addr < seg->addr_to) {
+                    return seg;
+                 }
+            }
+        }
     }
 
     return NULL;

@@ -518,13 +518,13 @@ int app_wait_flash_ready(void *app_ptr, int timeout)
             if (APP_V0(app)) {
                 // V0
                 if (status & (1 << UPDI_NVM_V0_STATUS_WRITE_ERROR)) {
-                    DBG_INFO(APP_DEBUG, "Waiting for flash ready Error, status = 0x%x", status);
+                    DBG_INFO(APP_DEBUG, "Waiting for flash ready Write Error, status = 0x%x", status);
                     result = -3;
                     break;
                 }
             } else if (APP_V1(app)) {
                 if (status & (UPDI_NVM_V1_STATUS_WRITE_ERROR_MASK << UPDI_NVM_V1_STATUS_WRITE_ERROR_SHIFT)) {
-                    DBG_INFO(APP_DEBUG, "Waiting for flash ready Error, status = 0x%x", status);
+                    DBG_INFO(APP_DEBUG, "Waiting for flash ready Write Error, status = 0x%x", status);
                     result = -4;
                     break;
                 }
@@ -1554,22 +1554,28 @@ int _app_write_fuse_v0(void *app_ptr, u32 address, const u8 value)
 		return -2;
 	}
 
-	result = link_st16(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_ADDRL, (u16)address, false);
+	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_ADDRL, (u8)address, false);
 	if (result) {
-		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse address %04x failed %d", address, result);
+		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse address L %04x failed %d", address, result);
 		return -3;
+	}
+
+	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_ADDRM, (u8)(address >> 8), false);
+	if (result) {
+		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse address M %04x failed %d", (u8)(address >> 8), result);
+		return -4;
 	}
 
 	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_DATAL, value, false);
 	if (result) {
 		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse data %02x failed %d", value, result);
-		return -4;
+		return -5;
 	}
 
 	result = app_execute_nvm_command(app, UPDI_NVMCTRL_CTRLA_WRITE_FUSE);
 	if (result) {
 		DBG_INFO(NVM_DEBUG, "app_execute_nvm_command fuse command failed %d", result);
-		return -5;
+		return -6;
 	}
 
 	return 0;

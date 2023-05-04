@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-d tiny3217 -c com14 -t -v 6</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-d tiny1616 -c com14 -f "D:\Users\a41450\atmel studio\Flex_Volcano_Attiny1616_2x2surface_Lowpower\Flex_Volcano_Attiny1616_2x2surface_Lowpower\Debug\Flex_Volcano_Attiny1616_2x2surface_Lowpower.hex" --pack-build -v 5</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
