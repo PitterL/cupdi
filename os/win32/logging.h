@@ -24,7 +24,8 @@ typedef enum {
     APP_ERROR = 1,
     LINK_ERROR = 1,
     PHY_ERROR = 1,
-    SER_ERROR = 1
+    SER_ERROR = 1,
+    OTHER_ERROR = 2,
 } verbose_e_t;
 
 void set_verbose_level(verbose_t level);

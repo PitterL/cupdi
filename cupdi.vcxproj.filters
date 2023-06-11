@@ -57,15 +57,6 @@
     <ClInclude Include="ihex\kk_ihex_write.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="infoblock\ib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="infoblock\s1.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="infoblock\s2.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="os\win32\delay.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -100,6 +91,33 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="updi\physical.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\cfgblock\c1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\cfgblock\cb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\include\blk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\infoblock\ib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\infoblock\s1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\infoblock\s2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\ext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\infoblock\s3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ext\include\vardef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -143,15 +161,6 @@
     <ClCompile Include="ihex\kk_ihex_write.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="infoblock\ib_router.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="infoblock\s1.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="infoblock\s2.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="os\win32\delay.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -177,6 +186,27 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="updi\physical.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\cfgblock\c1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\cfgblock\cb_router.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\infoblock\ib_router.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\infoblock\s1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\infoblock\s2.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\ext.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ext\infoblock\s3.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

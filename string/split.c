@@ -39,12 +39,17 @@ char** str_split(char* a_str, const char a_delim)
         size_t idx = 0;
         char* token = strtok(a_str, delim);
 
-        while (token)
-        {
-            assert(idx < count);
-            *(result + idx++) = __strndup(token, 255);
-            token = strtok(0, delim);
-        }
+		if (token) {
+			while (token)
+			{
+				assert(idx < count);
+				*(result + idx++) = __strndup(token, 255);
+				token = strtok(0, delim);
+			}
+		}
+		else {
+			*(result + idx++) = __strndup(a_str, 255);
+		}
         assert(idx == count - 1);
         *(result + idx) = 0;
     }

@@ -20,17 +20,23 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="argparse\argparse.h" />
+    <ClInclude Include="ext\ext.h" />
+    <ClInclude Include="ext\cfgblock\c1.h" />
+    <ClInclude Include="ext\cfgblock\cb.h" />
+    <ClInclude Include="ext\include\blk.h" />
     <ClInclude Include="crc\crc.h" />
     <ClInclude Include="cupdi.h" />
     <ClInclude Include="device\device.h" />
+    <ClInclude Include="ext\include\vardef.h" />
+    <ClInclude Include="ext\infoblock\s3.h" />
     <ClInclude Include="file\fop.h" />
     <ClInclude Include="ihex\ihex.h" />
     <ClInclude Include="ihex\kk_ihex.h" />
     <ClInclude Include="ihex\kk_ihex_read.h" />
     <ClInclude Include="ihex\kk_ihex_write.h" />
-    <ClInclude Include="infoblock\ib.h" />
-    <ClInclude Include="infoblock\s1.h" />
-    <ClInclude Include="infoblock\s2.h" />
+    <ClInclude Include="ext\infoblock\ib.h" />
+    <ClInclude Include="ext\infoblock\s1.h" />
+    <ClInclude Include="ext\infoblock\s2.h" />
     <ClInclude Include="os\platform.h" />
     <ClInclude Include="os\win32\delay.h" />
     <ClInclude Include="os\win32\error.h" />
@@ -51,16 +57,20 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="argparse\argparse.c" />
+    <ClCompile Include="ext\ext.c" />
+    <ClCompile Include="ext\cfgblock\c1.c" />
+    <ClCompile Include="ext\cfgblock\cb_router.c" />
     <ClCompile Include="crc\crc.c" />
     <ClCompile Include="cupdi.c" />
     <ClCompile Include="device\device.c" />
+    <ClCompile Include="ext\infoblock\s3.c" />
     <ClCompile Include="file\fop.c" />
     <ClCompile Include="ihex\ihex.c" />
     <ClCompile Include="ihex\kk_ihex_read.c" />
     <ClCompile Include="ihex\kk_ihex_write.c" />
-    <ClCompile Include="infoblock\ib_router.c" />
-    <ClCompile Include="infoblock\s1.c" />
-    <ClCompile Include="infoblock\s2.c" />
+    <ClCompile Include="ext\infoblock\ib_router.c" />
+    <ClCompile Include="ext\infoblock\s1.c" />
+    <ClCompile Include="ext\infoblock\s2.c" />
     <ClCompile Include="os\win32\delay.c" />
     <ClCompile Include="os\win32\logging.c" />
     <ClCompile Include="os\win32\serial.c" />
@@ -81,13 +91,13 @@
     <ProjectGuid>{7914573E-06D1-4CB1-975B-EDE94C43C9BA}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>cupdi</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v140_xp</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -100,13 +110,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140_xp</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140_xp</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -175,7 +185,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
-      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS /D xUPDI_CTRLA_ENABLE_INTER_BYTE %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS /D xUPDI_CTRLA_ENABLE_INTER_BYTE /D xINFO_STORAGE_EEPROM %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -215,7 +225,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
-      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS /D xUPDI_CTRLA_ENABLE_INTER_BYTE %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D _CRT_SECURE_NO_WARNINGS /D xUPDI_CTRLA_ENABLE_INTER_BYTE /D INFO_STORAGE_EEPROM %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

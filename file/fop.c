@@ -12,6 +12,7 @@
 #include <string/strndup.h>
 #include <os/platform.h>
 
+#include "fop.h"
 /*
 Combine the input <main name> + <ext name>, user should release the memory after use.
 @name: original name
@@ -97,7 +98,7 @@ int _search_defined_value_from_buf(char *content, const char *pat_str, const cha
         st = tre_match(&tregex, st, &end);
         if (st) {
 			if (end > st && end - st <= 10) {	// 32bit hex number start with `0x`, so 10 chars max
-				val = (unsigned int)strtol(st, NULL, 16); // 0 is error
+				val = (unsigned int)strtol(st, NULL, 0); // 0 is error
 				*output = val;
 				result++;
 			}
@@ -166,7 +167,7 @@ int _search_defined_array_from_buf(char *content, const char *pat_str, const cha
         for (i = 0; tk_s[i]; i++) {
             if (i < outlen) {
                 if (tre_match(&tregex, tk_s[i], NULL)) {
-                    val = (unsigned int)strtol(tk_s[i], NULL, 16); // 0 is error
+                    val = (unsigned int)strtol(tk_s[i], NULL, 0); // 0 is error
                     output[i] = val;
                 }
                 else {
@@ -243,12 +244,20 @@ Get int array content in source file, the format is: #define <varname> {NULL, 0x
 @invalid: if var in array not valid, filled to this value
 @return how many varibles get, negative mean error occur
 */
-int search_defined_array_int_from_file(const char *file, const char *varname, unsigned int *output, int outlen, unsigned int invalid)
+int search_defined_array_int_from_file(const char *file, const char *varname, unsigned int *output, int outlen, unsigned int invalid, datatype_t type)
 {
     char pat_str[TRE_MAX_BUFLEN];
     const char *pat_raw[] = { "^#define", varname, "\\{[\\w\\s,]*\\}" };
-    const char *pat_value = "0x[0-9a-fA-F]{1,8}";
     const char *space_delims = "\\s+";
+    const char *pat_value;
+    
+    if (type == HEX_FORMAT) {
+        pat_value = "0x[0-9a-fA-F]{1,8}";
+    } else if (type == DEC_FORMAT) {
+        pat_value = "[0-9]{1,}";
+    } else {
+        return -2;
+    }
 
     //create pattern to search
     pat_str[0] = '\0';
@@ -266,12 +275,20 @@ Get value content in source file, the format is: #define <varname> 0x123456
 @invalid: if var in array not valid, filled to this value
 @return how many varibles get, negative mean error occur
 */
-int search_defined_value_int_from_file(const char *file, const char *varname, unsigned int *output)
+int search_defined_value_int_from_file(const char *file, const char *varname, unsigned int *output, datatype_t type)
 {
     char pat_str[TRE_MAX_BUFLEN];
     const char *pat_raw[] = { "^#define", varname, "[\\w]{4,}" };
-    const char *pat_value = "0x[0-9a-fA-F]{2,}";
     const char *space_delims = "\\s+";
+    const char *pat_value;
+    
+    if (type == HEX_FORMAT) {
+        pat_value = "0x[0-9a-fA-F]{1,8}";
+    } else if (type == DEC_FORMAT) {
+        pat_value = "[0-9]{1,}";
+    } else {
+        return -2;
+    }
 
     //create pattern to search
     pat_str[0] = '\0';
