@@ -12,7 +12,6 @@ typedef union {
     unsigned int value;
 } config_header_t;
 
-
 typedef struct {
     void *buf;
     unsigned short size;

@@ -121,7 +121,7 @@ int nvm_get_device_info(void *nvm_ptr)
 }
 
 /*
-    NVM set chip into Unlocked Mode with UPDI_KEY_NVM command
+    NVM set chip into Program Mode with UPDI_KEY_NVM command
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @return 0 successful, other value failed
 */
@@ -150,11 +150,12 @@ int nvm_enter_progmode(void *nvm_ptr)
 }
 
 /*
-    NVM chip leave Locked Mode
+    NVM chip leave Program Mode
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @reset_or_halt: reset mcu or halt mcu
     @return 0 successful, other value failed
 */
-int nvm_leave_progmode(void *nvm_ptr)
+int nvm_leave_progmode(void *nvm_ptr, bool reset_or_halt)
 {
     /*
         Leave programming mode
@@ -170,7 +171,7 @@ int nvm_leave_progmode(void *nvm_ptr)
 
     DBG_INFO(NVM_DEBUG, "<NVM> Leaving NVM programming mode");
 
-    result = app_leave_progmode(APP(nvm));
+    result = app_leave_progmode(APP(nvm), reset_or_halt);
     if (result) {
         DBG_INFO(NVM_DEBUG, "app_leave_progmode failed %d", result);
         return -2;
@@ -179,6 +180,21 @@ int nvm_leave_progmode(void *nvm_ptr)
     nvm->progmode = false;
 
     return 0;
+}
+
+/*
+    Check NVM chip whether is in progmode 
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
+bool nvm_in_progmode(void *nvm_ptr)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    
+    if (!VALID_NVM(nvm))
+        return false;
+
+    return nvm->progmode;
 }
 
 /*
@@ -204,6 +220,8 @@ int nvm_disable(void *nvm_ptr)
         DBG_INFO(NVM_DEBUG, "app_disable failed %d", result);
         return -2;
     }
+
+    nvm->progmode = false;
 
     return 0;
 }
@@ -299,7 +317,7 @@ int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u32 address, u8 *dat
     DBG_INFO(OTHER_DEBUG, "<NVM> Read from common area");
 
     if (!nvm->progmode) {
-        DBG_INFO(NVM_DEBUG, "NVM area read at locked mode");
+        DBG_INFO(NVM_ERROR, "NVM area read at locked mode, denied");
         return -2;
     }
 
@@ -1184,9 +1202,10 @@ int nvm_wait(void *nvm_ptr)
 /*
     NVM reset
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @reset_or_halt: rest mcu or halt mcu
     @return 0 successful, other value failed
 */
-int nvm_reset(void *nvm_ptr, int delay_ms)
+int nvm_reset(void *nvm_ptr, int delay_ms, bool reset_or_halt)
 {
     /*
         Reset
@@ -1199,7 +1218,7 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
 
     DBG_INFO(NVM_DEBUG, "<NVM> Reset");
 
-    result = app_toggle_reset(APP(nvm), true);
+    result = app_toggle_reset(APP(nvm), reset_or_halt);
     if (result) {
         DBG_INFO(NVM_DEBUG, "app_toggle_reset failed %d", result);
         return -2;
@@ -1209,6 +1228,7 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
 		msleep(delay_ms);
 	}
 
+/*
     if (nvm->progmode) {
         result = app_enter_progmode(APP(nvm));
         if (result) {
@@ -1218,7 +1238,7 @@ int nvm_reset(void *nvm_ptr, int delay_ms)
 			nvm->progmode = false;
 		}
 	}
-
+*/
 	nvm->erased = false;
     
     return result;

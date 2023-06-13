@@ -10,9 +10,10 @@ Layout:
     [header]
         0-3:    Tag='c'(1)    Ver='1'(1)    block size(2)
     [data content]
-        4-[4+n]:    data content
+        4-[4 + sizeof(signal_limit_t)]:    data content[n]: `signal_limit_t`
+        ....
     [tail]
-        [5+n] - [9+n]:  Fw crc(3)   rsv(1)
+        [last 4bytes]:  Fw crc(3)   rsv(1)
 */
 
 bool cb_test_element_c1(int type)
@@ -119,6 +120,8 @@ static void cb_show_element_c1(/*config_container_t*/void *cfg_ptr)
     config_body_elem_c1_t *elem;
     int i, start;
 
+	DBG_INFO(UPDI_DEBUG, "==========================");
+    
     DBG(UPDI_DEBUG, "Config Block Content(c1):", (u8 *)cfg->head, cfg->head->data.size, "%02X ");
 
     DBG_INFO(UPDI_DEBUG, "Signal Limit: ");

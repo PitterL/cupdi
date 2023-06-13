@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-d tiny816 -c com14 --info "" -f "D:\Users\a41450\atmel studio\ATtiny816-PowerButton-Project\ATtiny816-PowerButton-Project\Debug\ATtiny816-PowerButton-Project.ihex"</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-d tiny816 -c com14 --info</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

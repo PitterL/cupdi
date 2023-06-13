@@ -21,6 +21,10 @@ typedef struct {
 
 enum { B_HEAD_ST=SUB_OP_START(B_HEAD), B_HEAD_VER_N0, B_HEAD_VER_N1, B_HEAD_SIZE };
 
+#define _VER(_h, _n) (_h).version.ver[(_n)]
+#define VALID_HEADER(_h) ((_VER(_h, 0) >= 'A' && _VER(_h, 0) <= 'z') && (_VER(_h, 1) >= '0' && _VER(_h, 1) <= '9'))
+#define HEADER_MINOR(_h, _m0) ((_VER(_h, 0) >= 'A' && _VER(_h, 0) <= 'z') && (_VER(_h, 1) >= (_m0) && _VER(_h, 1) <= '9'))
+
 /*
     head memory type
     MEM_ALLOC: alloc new memory and copy data

@@ -7,7 +7,7 @@ InfoBlock:  This is infomation block of storage in eeprom or userdata
 address:    `INFO_BLOCK_ADDRESS_OFFSET` offset from storage
 Layout:
     [header]
-        0-3:    Major='s'(1)    Minor='2'(1)    info block size(2)
+        0-3:    Major='s'(1)    Minor='3'(1)    info block size(2)
     [firmware version]
         4-7:    Fw version(3)   Fw Build number(1)
     [firmware size]
@@ -180,8 +180,6 @@ void ib_show_element_s3(information_header_t *head)
 
 	DBG_INFO(UPDI_DEBUG, "info_crc: 0x%06X",
 		ib_get_element_s3(head, IB_CRC_INFO));
-
-	DBG_INFO(UPDI_DEBUG, "==========================");
 }
 
 int ib_create_information_block_s3(information_container_t *info, information_content_params_t *param, int len)
@@ -203,7 +201,7 @@ int ib_create_information_block_s3(information_container_t *info, information_co
     ib->header.data.version.ver[1] = INFO_BLOCK_S3_VER_MINOR;
     ib->header.data.size = size;
 
-    ib->fw_version.value = param->fw_crc24;
+    ib->fw_version.value = param->fw_version;
     ib->fw_size.value = param->fw_size;//len;
     memcpy(&ib->var_addr, &param->var_addr, sizeof(ib->var_addr));
 

@@ -328,7 +328,8 @@ int app_enter_progmode(void *app_ptr)
         DBG_INFO(APP_DEBUG, "_link_ldcs Nvm Key not accepted(%d), status 0x%02x", result, status);
         return -3;
     }
-
+	
+	/* Note: after the key issued, the next reset will stop the MCU running; and then execute reset again will make MCU to run */
     //Toggle reset
     result = app_toggle_reset(app_ptr, true);
     if (result) {
@@ -355,9 +356,10 @@ int app_enter_progmode(void *app_ptr)
 /*
     APP Leave Unlocked mode and re-lock it
     @app_ptr: APP object pointer, acquired from updi_application_init()
+    @reset_or_halt: reset mcu or halt mcu
     @return 0 successful, other value if failed
 */
-int app_leave_progmode(void *app_ptr)
+int app_leave_progmode(void *app_ptr, bool reset_or_halt)
 {
     /*
         Disables UPDI which releases any keys enabled
@@ -370,7 +372,7 @@ int app_leave_progmode(void *app_ptr)
 
     DBG_INFO(APP_DEBUG, "<APP> Leaving program mode");
 
-    result = app_toggle_reset(app_ptr, true);
+    result = app_toggle_reset(app_ptr, reset_or_halt);
     if (result) {
         DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -2;

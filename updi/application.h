@@ -10,7 +10,7 @@ bool app_in_prog_mode(void *app_ptr);
 int app_wait_unlocked(void *app_ptr, int timeout);
 int app_unlock(void *app_ptr);
 int app_enter_progmode(void *app_ptr);
-int app_leave_progmode(void *app_ptr);
+int app_leave_progmode(void *app_ptr, bool reset_or_halt);
 int app_reset(void *app_ptr, bool apply_reset);
 int app_disable(void *app_ptr);
 int app_toggle_reset(void *app_ptr, bool reset_or_halt);
