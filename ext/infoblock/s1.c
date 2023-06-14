@@ -166,7 +166,7 @@ int ib_create_information_block_s1(information_container_t *info, int fw_crc24, 
     ib->crc.data.info = calc_crc8((unsigned char *)ib, sizeof(*ib) - 1);
 
     info->head = (information_header_t *)ib;
-    info->type = BIT_MASK(MEM_ALLOC);
+    info->type = BIT_MASK(MEM_ALLOC) | BIT_MASK(BLOCK_INFO);
     info->intf.test = ib_test_element_s1;
     info->intf.get = ib_get_element_s1;
     info->intf.show = ib_show_element_s1;
@@ -198,7 +198,7 @@ int ib_set_infoblock_data_ptr_s1(information_container_t *info, char *data, int 
     else
         return -5;
 
-    info->type = flag;
+    info->type = flag | BIT_MASK(BLOCK_INFO);
     info->intf.test = ib_test_element_s1;
     info->intf.get = ib_get_element_s1;
     info->intf.show = ib_show_element_s1;

@@ -3,7 +3,7 @@
 
 #include "../include/blk.h"
 
-typedef enum { IB_HEAD = B_HEAD, IB_FW_VER, IB_FW_SIZE, IB_CRC, IB_REG, IB_DATA_TYPES } IB_DTYPE;
+typedef enum { IB_HEAD = B_HEAD, IB_FW_VER, IB_FW_SIZE, IB_FUSE, IB_CFG, IB_CRC, IB_REG, IB_DATA_TYPES } IB_DTYPE;
 
 typedef ext_header_t info_header_t;
 
@@ -32,8 +32,7 @@ enum { IB_FW_VER_ST=SUB_OP_START(IB_FW_VER), IB_FW_VER_NAME_N0 = IB_FW_VER_ST, I
 
 #pragma pack(1)
     typedef struct _fw_size {
-    unsigned short size;
-    char rsv[2];
+    unsigned int size;
 } fw_size_t;
 #pragma pack()
 
@@ -42,6 +41,26 @@ typedef union _firmware_size {
     unsigned int value;
 }firmware_size_t;
 enum {IB_FW_SIZE_ST = SUB_OP_START(IB_FW_SIZE)};
+
+typedef ext_header_t config_info_t;
+
+typedef union {
+    config_info_t data;
+    unsigned int value;
+}config_information_t;
+enum { IB_CFG_ST = SUB_OP_START(IB_CFG), IB_CFG_VER = IB_CFG_ST, IB_CFG_SIZE };
+
+typedef struct {
+    header_version_t version;
+    unsigned char size;
+    unsigned char crc;
+}fuse_info_t;
+
+typedef union {
+    fuse_info_t data;
+    unsigned int value;
+}fuse_information_t;
+enum { IB_FUSE_ST = SUB_OP_START(IB_FUSE), IB_FUSE_VER = IB_FUSE_ST, IB_FUSE_SIZE, IB_FUSE_CRC };
 
 typedef struct _info_crc {
     unsigned int fw : 24;
@@ -111,6 +130,8 @@ typedef struct {
     int fw_size;
     int fw_version;
     varible_address_t var_addr;
+    fuse_information_t fuse;
+    config_information_t config;
 }information_content_params_t;
 
 int ib_create_information_block(information_container_t *info, information_content_params_t *param, int len);

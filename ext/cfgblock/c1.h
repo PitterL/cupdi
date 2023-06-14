@@ -15,7 +15,7 @@ typedef struct {
     s_elem_t siglo;
     // Cap value High limit, unit 1/10 pf
     s_elem_t sighi;
-    // reference error with stand base line (without gain)
+    // reference error with stand base line (with digital gain 1x)
     s_elem_t range;
 } signal_limit_t;
 #pragma pack()

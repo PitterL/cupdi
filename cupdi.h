@@ -4,7 +4,7 @@
 int updi_erase(void *nvm_ptr);
 int updi_program(void *nvm_ptr, const char *file, bool check);
 int updi_compare(void *nvm_ptr, const char *file);
-int updi_verifiy_infoblock(void *nvm_ptr);
+int updi_check(void *nvm_ptr);
 int updi_update(void *nvm_ptr, const char *file, bool check);
 int updi_save(void *nvm_ptr, const char *file);
 int updi_dump(void *nvm_ptr, const char *file);
@@ -19,7 +19,7 @@ int updi_reset(void *nvm_ptr);
 int updi_debugview(void *nvm_ptr, char *cmd);
 int updi_selftest(void *nvm_ptr, char *cmd);
 
-int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file);
+int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file, int pack);
 int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file);
 
 

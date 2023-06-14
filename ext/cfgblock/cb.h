@@ -64,6 +64,7 @@ int cb_get(config_container_t *cfg, CB_DTYPE type);
 void *cb_read(config_container_t *cfg, CB_DTYPE type, int param);
 void cb_show(config_container_t *cfg);
 
+#include "c0.h"
 #include "c1.h"
 
 #endif

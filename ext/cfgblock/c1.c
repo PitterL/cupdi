@@ -167,7 +167,7 @@ int cb_create_configure_block_c1(config_container_t *cfg, char *data, int len)
     cfg->body_info.size = (unsigned short)len;
     cfg->body_info.elem_count = (unsigned short)(len / sizeof(config_body_elem_c1_t));
     cfg->tail = (config_tail_t *)tail;
-    cfg->type = BIT_MASK(MEM_ALLOC);
+    cfg->type = BIT_MASK(MEM_ALLOC) | BIT_MASK(BLOCK_CFG);
     cfg->intf.test = cb_test_element_c1;
     cfg->intf.get = cb_get_element_c1;
     cfg->intf.read = cb_read_data_c1;
@@ -203,7 +203,7 @@ int cb_set_configure_block_ptr_c1(config_container_t *cfg, char *data, int len, 
     cfg->body_info.size = (unsigned short)(len - sizeof(config_header_t) - sizeof(config_tail_t));
     cfg->body_info.elem_count = (unsigned short)(cfg->body_info.size / sizeof(config_body_elem_c1_t));
     cfg->tail = (config_tail_t *)((uint8_t *)cfg->body_info.buf + cfg->body_info.size);
-    cfg->type = flag;
+    cfg->type = flag | BIT_MASK(BLOCK_CFG);
     cfg->intf.test = cb_test_element_c1;
     cfg->intf.get = cb_get_element_c1;
     cfg->intf.read = cb_read_data_c1;

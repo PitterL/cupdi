@@ -7,7 +7,7 @@ InfoBlock:  This is infomation block of storage in eeprom or userdata
 address:    `INFO_BLOCK_ADDRESS_OFFSET` offset from storage
 Layout:
     [header]
-        0-3:    Major='s'(1)    Minor='3'(1)    info block size(2)
+        0-3:    Major='s'(1)    Minor='3'(1)    size(2)
     [firmware version]
         4-7:    Fw version(3)   Fw Build number(1)
     [firmware size]
@@ -15,10 +15,18 @@ Layout:
     [dsdr]:
         12-15:  ds pointer addr(2)   dr pointer addr(2)  
     [acqnode]:
-        16-19   acq pointer addr(2)  node pointer addr(2)
+        16-19:  acq pointer addr(2)  node pointer addr(2)
+    [cfg]:
+        20-23:  Major(1)    Minor(1)    size(2)
+    [fuse]:
+        24-27:  Major='f'(1)    Minor='1'(1)   size(1)  crc(1)
     [crc]
-        20-23:  Fw crc(3)   Info crc(1)
+        28-31:  Fw crc(3)   Info crc(1)
 */
+
+enum {
+    CRC_CFG_FUSE, CRC_FW_INFO, NUM_CRC_ZONE
+};
 
 PACK(
     typedef struct _information_block_s3 {
@@ -26,6 +34,8 @@ PACK(
     firmware_version_t fw_version;
     firmware_size_t fw_size;
     varible_address_t var_addr;
+    config_information_t conf;
+    fuse_information_t fuse;
     information_crc_t crc;
 })information_block_s3_t;
 
@@ -39,6 +49,8 @@ bool ib_test_element_s3(int type)
     case IB_FW_VER:
     case IB_FW_SIZE:
     case IB_REG:
+    case IB_CFG:
+    case IB_FUSE:
     case IB_CRC:
         break;
     default:
@@ -101,6 +113,32 @@ static uint32_t get_reg_addr_value(const varible_address_t *vaddr, int type)
     }
 }
 
+static uint32_t get_config_value(const config_information_t *cfg, int type)
+{
+    switch (type) {
+    case IB_CFG_VER:
+        return cfg->data.version.value;
+    case IB_CFG_SIZE:
+        return cfg->data.size;
+    default:
+        return cfg->value;
+    }
+}
+
+static uint32_t get_fuse_value(const fuse_information_t *fs, int type)
+{
+    switch (type) {
+    case IB_FUSE_VER:
+        return fs->data.version.value;
+    case IB_FUSE_SIZE:
+        return fs->data.size;
+    case IB_FUSE_CRC:
+        return fs->data.crc;
+    default:
+        return fs->value;
+    }
+}
+
 static uint32_t get_crc_value(const information_crc_t *crc, int type)
 {
     switch (type) {
@@ -130,6 +168,10 @@ uint32_t ib_get_element_s3(information_header_t *head, int type)
         return get_fw_size_value(&ib->fw_size, type);
     case IB_REG:
         return get_reg_addr_value(&ib->var_addr, type);
+    case IB_CFG:
+        return get_config_value(&ib->conf, type);
+    case IB_FUSE:
+        return get_fuse_value(&ib->fuse, type);
     case IB_CRC:
         return get_crc_value(&ib->crc, type);
     default:
@@ -175,11 +217,17 @@ void ib_show_element_s3(information_header_t *head)
         ib_get_element_s3(head, IB_REG_AN_ACQ),
         ib_get_element_s3(head, IB_REG_AN_NODE));
 
-    DBG_INFO(UPDI_DEBUG, "fw_crc: 0x%06X",
-        ib_get_element_s3(head, IB_CRC_FW));
+    DBG_INFO(UPDI_DEBUG, "cfg: ver %02x size %04x",
+        ib_get_element_s3(head, IB_CFG_VER),
+        ib_get_element_s3(head, IB_CFG_SIZE));
 
-	DBG_INFO(UPDI_DEBUG, "info_crc: 0x%06X",
-		ib_get_element_s3(head, IB_CRC_INFO));
+    DBG_INFO(UPDI_DEBUG, "fuse: size %02x crc %02x",
+        ib_get_element_s3(head, IB_FUSE_SIZE),
+        ib_get_element_s3(head, IB_FUSE_CRC));
+
+    DBG_INFO(UPDI_DEBUG, "crc : fw 0x%06x info %02x",
+        ib_get_element_s3(head, IB_CRC_FW),
+        ib_get_element_s3(head, IB_CRC_INFO));
 }
 
 int ib_create_information_block_s3(information_container_t *info, information_content_params_t *param, int len)
@@ -205,11 +253,19 @@ int ib_create_information_block_s3(information_container_t *info, information_co
     ib->fw_size.value = param->fw_size;//len;
     memcpy(&ib->var_addr, &param->var_addr, sizeof(ib->var_addr));
 
+    ib->conf.value = param->config.value;
+
+    ib->fuse.data.version.ver[0] = 'f';
+    ib->fuse.data.version.ver[1] = '1';
+    ib->fuse.data.size = param->fuse.data.size;
+    ib->fuse.data.crc = param->fuse.data.crc;
+
     ib->crc.data.fw = param->fw_crc24;//calc_crc24(data, len);
     ib->crc.data.info = calc_crc8((unsigned char *)ib, sizeof(*ib) - 1);
 
     info->head = (information_header_t *)ib;
-    info->type = BIT_MASK(MEM_ALLOC);
+    info->type = BIT_MASK(MEM_ALLOC) | BIT_MASK(BLOCK_INFO);
+
     info->intf.test = ib_test_element_s3;
     info->intf.get = ib_get_element_s3;
     info->intf.show = ib_show_element_s3;
@@ -241,7 +297,7 @@ int ib_set_infoblock_data_ptr_s3(information_container_t *info, char *data, int 
     else
         return -5;
 
-    info->type = flag;
+    info->type = flag  | BIT_MASK(BLOCK_INFO);
     info->intf.test = ib_test_element_s3;
     info->intf.get = ib_get_element_s3;
     info->intf.show = ib_show_element_s3;
