@@ -152,8 +152,7 @@ int cb_create_configure_block_c1(config_container_t *cfg, char *data, int len)
 
     memset(hdr, 0, size);
 
-    hdr->data.version.ver[0] = CONFIG_BLOCK_C1_VER_MAJOR;
-    hdr->data.version.ver[1] = CONFIG_BLOCK_C1_VER_MINOR;
+    hdr->data.version.value = CONFIG_BLOCK_C1_VERSION;
     hdr->data.size = size;
 
     body = (unsigned char *)(hdr + 1);
@@ -167,7 +166,8 @@ int cb_create_configure_block_c1(config_container_t *cfg, char *data, int len)
     cfg->body_info.size = (unsigned short)len;
     cfg->body_info.elem_count = (unsigned short)(len / sizeof(config_body_elem_c1_t));
     cfg->tail = (config_tail_t *)tail;
-    cfg->type = BIT_MASK(MEM_ALLOC) | BIT_MASK(BLOCK_CFG);
+    cfg->tag.version.value = hdr->data.version.value;
+    cfg->tag.type = BIT_MASK(MEM_ALLOC);
     cfg->intf.test = cb_test_element_c1;
     cfg->intf.get = cb_get_element_c1;
     cfg->intf.read = cb_read_data_c1;
@@ -176,7 +176,7 @@ int cb_create_configure_block_c1(config_container_t *cfg, char *data, int len)
     return 0;
 }
 
-int cb_set_configure_block_ptr_c1(config_container_t *cfg, char *data, int len, int flag)
+int cb_set_configure_block_ptr_c1(config_container_t *cfg, char *data, int len, unsigned short flag)
 {
     //config_container_t *cfg = (config_container_t *)info_ptr;
     config_header_t * head = (config_header_t *)data;
@@ -203,7 +203,8 @@ int cb_set_configure_block_ptr_c1(config_container_t *cfg, char *data, int len, 
     cfg->body_info.size = (unsigned short)(len - sizeof(config_header_t) - sizeof(config_tail_t));
     cfg->body_info.elem_count = (unsigned short)(cfg->body_info.size / sizeof(config_body_elem_c1_t));
     cfg->tail = (config_tail_t *)((uint8_t *)cfg->body_info.buf + cfg->body_info.size);
-    cfg->type = flag | BIT_MASK(BLOCK_CFG);
+    cfg->tag.version.value = cfg->head->data.version.value;
+    cfg->tag.type = flag;
     cfg->intf.test = cb_test_element_c1;
     cfg->intf.get = cb_get_element_c1;
     cfg->intf.read = cb_read_data_c1;
@@ -217,11 +218,11 @@ void cb_destory_c1(void *cfg_ptr)
     config_container_t *cfg = (config_container_t *)cfg_ptr;
     config_header_t * head = cfg->head;
 
-    if (TEST_BIT(cfg->type, MEM_ALLOC) || TEST_BIT(cfg->type, MEM_SHARE_RELEASE)) {
+    if (TEST_BIT(cfg->tag.type, MEM_ALLOC) || TEST_BIT(cfg->tag.type, MEM_SHARE_RELEASE)) {
         free(cfg->head);
     }
 
-    memset(cfg, 0, sizeof(cfg));
+    memset(cfg, 0, sizeof(*cfg));
 }
 
 int cb_max_block_size_c1(void)

@@ -191,8 +191,7 @@ int ib_create_information_block_s2(information_container_t *info, int fw_crc24, 
 
     memset(ib, 0, size);
 
-    ib->header.data.version.ver[0] = INFO_BLOCK_S2_VER_MAJOR;
-    ib->header.data.version.ver[1] = INFO_BLOCK_S2_VER_MINOR;
+    ib->header.data.version.value = INFO_BLOCK_S2_VERSION;
     ib->header.data.size = size;
 
     ib->fw_version.value = fw_version;
@@ -204,7 +203,9 @@ int ib_create_information_block_s2(information_container_t *info, int fw_crc24, 
     ib->crc.data.info = calc_crc8((unsigned char *)ib, sizeof(*ib) - 1);
 
     info->head = (information_header_t *)ib;
-    info->type = BIT_MASK(MEM_ALLOC) | BIT_MASK(BLOCK_INFO);
+    info->header.type = BIT_MASK(MEM_ALLOC);
+    info->header.version.value = ib->header.data.version.value;
+
     info->intf.test = ib_test_element_s2;
     info->intf.get = ib_get_element_s2;
     info->intf.show = ib_show_element_s2;
@@ -212,7 +213,7 @@ int ib_create_information_block_s2(information_container_t *info, int fw_crc24, 
     return 0;
 }
 
-int ib_set_infoblock_data_ptr_s2(information_container_t *info, char *data, int len, int flag)
+int ib_set_infoblock_data_ptr_s2(information_container_t *info, char *data, int len, unsigned short flag)
 {
     // information_container_t *info = (information_container_t *)info_ptr;
     information_header_t * head = (information_header_t *)data;
@@ -237,7 +238,9 @@ int ib_set_infoblock_data_ptr_s2(information_container_t *info, char *data, int 
     else
         return -5;
 
-    info->type = flag | BIT_MASK(BLOCK_INFO);
+    info->header.type = flag;
+    info->header.version.value = head->data.version.value;
+
     info->intf.test = ib_test_element_s2;
     info->intf.get = ib_get_element_s2;
     info->intf.show = ib_show_element_s2;
@@ -257,10 +260,10 @@ void ib_destory_s2(void *info_ptr)
     if (head->data.version.value != INFO_BLOCK_S2_VERSION)
         return;
 
-    if (TEST_BIT(info->type, MEM_ALLOC) || TEST_BIT(info->type, MEM_SHARE_RELEASE))
+    if (TEST_BIT(info->header.type, MEM_ALLOC) || TEST_BIT(info->header.type, MEM_SHARE_RELEASE))
         free(info->head);
 
-    memset(info, 0, sizeof(info));
+    memset(info, 0, sizeof(*info));
 }
 
 int ib_max_block_size_s2(void)

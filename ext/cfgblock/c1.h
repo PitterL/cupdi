@@ -1,7 +1,7 @@
 #ifndef __CB_C1_H
 #define __CB_C1_H
 
-#define CONFIG_BLOCK_C1_VER_MAJOR 'c'
+#define CONFIG_BLOCK_C1_VER_MAJOR CONFIG_BLOCK_C_VER_MAJOR
 #define CONFIG_BLOCK_C1_VER_MINOR '1'
 #define CONFIG_BLOCK_C1_VERSION L8_TO_LT16(CONFIG_BLOCK_C1_VER_MAJOR, CONFIG_BLOCK_C1_VER_MINOR)
 
@@ -33,7 +33,7 @@ typedef struct {
 } config_body_c1_t;
 
 int cb_create_configure_block_c1(config_container_t *info, char *data, int len);
-int cb_set_configure_block_ptr_c1(config_container_t *info, char *data, int len, int flag);
+int cb_set_configure_block_ptr_c1(config_container_t *info, char *data, int len, unsigned short flag);
 int cb_max_block_size_c1(void);
 void cb_destory_c1(void *info_ptr);
 #endif

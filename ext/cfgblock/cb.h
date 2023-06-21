@@ -3,7 +3,7 @@
 
 #include "../include/blk.h"
 
-typedef enum { CB_HEAD = B_HEAD, CB_BODY, CB_CRC, CB_DATA_TYPES } CB_DTYPE;
+#define CONFIG_BLOCK_C_VER_MAJOR 'c'
 
 typedef ext_header_t cfg_header_t;
 
@@ -46,23 +46,25 @@ typedef struct {
 } cb_interface_t;
 
 typedef struct config_container {
+    container_header_t tag;
     cb_interface_t intf;
     config_header_t *head;
     config_body_info_t body_info;
     config_tail_t *tail;
-    int type;
 } config_container_t;
 
 #define CB_HEAD_AND_TAIL_SIZE (sizeof(config_header_t) + sizeof(config_tail_t))
 
 int cb_create_configure_block(config_container_t *cfg, void *data, int len);
-int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len, int type);
+int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len, unsigned short flag);
 void cb_destory(config_container_t *cfg);
 int cb_max_block_size(void);
 bool cb_test(config_container_t *cfg, CB_DTYPE type);
 int cb_get(config_container_t *cfg, CB_DTYPE type);
 void *cb_read(config_container_t *cfg, CB_DTYPE type, int param);
 void cb_show(config_container_t *cfg);
+bool cb_is_container(container_header_t *ct);
+bool cb_is_head(cfg_header_t *head);
 
 #include "c0.h"
 #include "c1.h"

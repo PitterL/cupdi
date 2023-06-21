@@ -7,11 +7,14 @@ int cb_create_configure_block(config_container_t *cfg, char *data, int len)
     return cb_create_configure_block_c1(cfg, data, len);
 }
 
-int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len, int flag)
+int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len, unsigned short flag)
 {
     config_header_t * head;
     config_tail_t *tail;
     unsigned int crc24;
+
+    if (!TEST_BIT(flag, BLOCK_CFG))
+        return -1;
 
     if (!cfg || !data)
         return -2;
@@ -24,13 +27,17 @@ int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len
 
     crc24 = calc_crc24((unsigned char *)data, head->data.size - sizeof(config_tail_t));
     if (crc24 != tail->data.cfg)
-        return -4;
+        return -5;
 
     switch (head->data.version.value) {
+    /*
+    case CONFIG_BLOCK_C0_VERSION:
+        return 0;
+    */
     case CONFIG_BLOCK_C1_VERSION:
         return cb_set_configure_block_ptr_c1(cfg, data, head->data.size, flag);
     default:
-        return -5;
+        return -6;
     }
 }
 
@@ -58,6 +65,16 @@ int cb_max_block_size(void)
     size = cb_max_block_size_c1();
 
     return size;
+}
+
+bool cb_is_container(container_header_t *ct)
+{
+    return (ct->version.ver[0] == CONFIG_BLOCK_C_VER_MAJOR);
+}
+
+bool cb_is_head(cfg_header_t *head)
+{
+    return (head->version.ver[0] == CONFIG_BLOCK_C_VER_MAJOR);
 }
 
 bool cb_test(config_container_t *cfg, CB_DTYPE type)

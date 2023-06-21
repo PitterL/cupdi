@@ -3,7 +3,10 @@
 
 #include "../include/blk.h"
 
-typedef enum { IB_HEAD = B_HEAD, IB_FW_VER, IB_FW_SIZE, IB_FUSE, IB_CFG, IB_CRC, IB_REG, IB_DATA_TYPES } IB_DTYPE;
+#define INFO_BLOCK_S_VER_MAJOR 's'
+
+#define B_MAJOR_OP(_t, _m)  (((_t) << 24) | ((_m) << 16))
+#define IB_OP(_m) B_MOP(_m)
 
 typedef ext_header_t info_header_t;
 
@@ -120,9 +123,9 @@ typedef struct ib_interface{
 }ib_interface_t;
 
 typedef struct information_container {
+    container_header_t header;
     ib_interface_t intf;
     information_header_t *head;
-    int type;
 }information_container_t;
 
 typedef struct {
@@ -135,12 +138,14 @@ typedef struct {
 }information_content_params_t;
 
 int ib_create_information_block(information_container_t *info, information_content_params_t *param, int len);
-int ib_set_information_block_data_ptr(information_container_t *info, char *data, int len, int type);
+int ib_set_information_block_data_ptr(information_container_t *info, char *data, int len, unsigned short flag);
 void ib_destory(information_container_t *info);
 int ib_max_block_size(void);
 bool ib_test(information_container_t *info, IB_DTYPE type);
 int ib_get(information_container_t *info, IB_DTYPE type);
 void ib_show(information_container_t *info);
+bool ib_is_container(container_header_t *ct);
+bool ib_is_head(info_header_t *head);
 
 #include "s1.h"
 #include "s2.h"

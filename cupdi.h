@@ -16,22 +16,11 @@ int updi_show_ext_info(void *nvm_ptr);
 int updi_show_fuse(void *nvm_ptr);
 int updi_verifiy_infoblock(void *nvm_ptr);
 int updi_reset(void *nvm_ptr);
+int updi_storage(void *nvm_ptr, char *cmd);
 int updi_debugview(void *nvm_ptr, char *cmd);
 int updi_selftest(void *nvm_ptr, char *cmd);
 
 int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file, int pack);
 int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file);
-
-
-#ifdef INFO_STORAGE_EEPROM
-#define INFO_BLOCK_STORAGE_TYPE   NVM_EEPROM
-#define CFG_BLOCK_STORAGE_TYPE   NVM_USERROW
-#else
-#define INFO_BLOCK_STORAGE_TYPE	  NVM_USERROW
-#define CFG_BLOCK_STORAGE_TYPE   NVM_EEPROM
-#endif
-
-#define INFO_BLOCK_ADDRESS_OFFSET   0
-#define CFG_BLOCK_ADDRESS_OFFSET   0
 
 #endif

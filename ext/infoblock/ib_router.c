@@ -14,10 +14,13 @@ int ib_create_information_block(information_container_t *info, information_conte
     return ib_create_information_block_s3(info, param, len);
 }
 
-int ib_set_information_block_data_ptr(information_container_t *info, char *data, int len, int flag)
+int ib_set_information_block_data_ptr(information_container_t *info, char *data, int len, unsigned short flag)
 {
     information_header_t * head;
     unsigned crc8;
+
+    if (!TEST_BIT(flag, BLOCK_INFO))
+        return -1; 
 
     if (!info || !data)
         return -2;
@@ -26,9 +29,13 @@ int ib_set_information_block_data_ptr(information_container_t *info, char *data,
     if (head->data.size < IB_HEAD_AND_TAIL_SIZE || head->data.size > len)
         return -3;
 
+    if (head->data.version.ver[0] != INFO_BLOCK_S_VER_MAJOR) {
+        return -4;
+    }
+
     crc8 = calc_crc8((unsigned char *)data, head->data.size);
     if (crc8 != 0)
-        return -4;
+        return -5;
 
     switch (head->data.version.value) {
     case INFO_BLOCK_S1_VERSION:
@@ -38,7 +45,7 @@ int ib_set_information_block_data_ptr(information_container_t *info, char *data,
     case INFO_BLOCK_S3_VERSION:
         return ib_set_infoblock_data_ptr_s3(info, data, head->data.size, flag);
     default:
-        return -5;
+        return -6;
     }
 }
 
@@ -74,6 +81,16 @@ int ib_max_block_size(void)
     size = max(size, ib_max_block_size_s3());
 
     return size;
+}
+
+bool ib_is_container(container_header_t *ct)
+{
+    return (ct->version.ver[0] == INFO_BLOCK_S_VER_MAJOR);
+}
+
+bool ib_is_head(info_header_t *head)
+{
+    return (head->version.ver[0] == INFO_BLOCK_S_VER_MAJOR);
 }
 
 bool ib_test(information_container_t *info, IB_DTYPE type)

@@ -39,7 +39,7 @@ void *nvm_get_content(void *nvm_ptr, int type, int *req_size);
 /*
 Max waiting time for chip reset
 */
-#define TIMEOUT_WAIT_CHIP_RESET 50
+#define TIMEOUT_WAIT_CHIP_RESET 150
 
 /* 
 UPDI Max Transfer size

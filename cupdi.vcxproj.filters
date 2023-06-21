@@ -120,6 +120,9 @@
     <ClInclude Include="ext\include\vardef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ext\cfgblock\c0.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cupdi.c">
