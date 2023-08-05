@@ -114,6 +114,10 @@ static uint32_t get_config_value(const config_information_t *cfg, int type)
     switch (type) {
     case IB_CFG_VER:
         return cfg->data.version.value;
+    case IB_CFG_VER_NAME:
+        return cfg->data.version.ver[0];
+    case IB_CFG_VER_BUILD:
+        return cfg->data.version.ver[1];
     case IB_CFG_SIZE:
         return cfg->data.size;
     default:
@@ -213,8 +217,9 @@ void ib_show_element_s3(information_header_t *head)
         ib_get_element_s3(head, IB_REG_AN_ACQ),
         ib_get_element_s3(head, IB_REG_AN_NODE));
 
-    DBG_INFO(UPDI_DEBUG, "cfg: ver %02x size %04x",
-        ib_get_element_s3(head, IB_CFG_VER),
+    DBG_INFO(UPDI_DEBUG, "Configure Block(%c%c) size %hd bytes",
+        ib_get_element_s3(head, IB_CFG_VER_NAME),
+        ib_get_element_s3(head, IB_CFG_VER_BUILD),
         ib_get_element_s3(head, IB_CFG_SIZE));
 
     DBG_INFO(UPDI_DEBUG, "fuse: size %02x crc %02x",

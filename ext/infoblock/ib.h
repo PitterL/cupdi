@@ -51,7 +51,7 @@ typedef union {
     config_info_t data;
     unsigned int value;
 }config_information_t;
-enum { IB_CFG_ST = SUB_OP_START(IB_CFG), IB_CFG_VER = IB_CFG_ST, IB_CFG_SIZE };
+enum { IB_CFG_ST = SUB_OP_START(IB_CFG), IB_CFG_VER = IB_CFG_ST, IB_CFG_VER_NAME, IB_CFG_VER_BUILD, IB_CFG_SIZE };
 
 typedef struct {
     header_version_t version;
