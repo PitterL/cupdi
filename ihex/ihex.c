@@ -350,7 +350,7 @@ int load_segments_from_file(const char *file, hex_data_t *dhex)
     //  Fill and allocate data to memory
     dhex->flag = SEG_ALLOC_MEMORY;
     if (!dhex_read(infile, ihex_data_read, dhex)) {
-        result = -3;
+        result = -4;
         goto out;
     }
 out:

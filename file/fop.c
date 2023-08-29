@@ -97,7 +97,7 @@ int _search_defined_value_from_buf(char *content, const char *pat_str, const cha
         tre_compile(pat_value, &tregex);
         st = tre_match(&tregex, st, &end);
         if (st) {
-			if (end > st && end - st <= 10) {	// 32bit hex number start with `0x`, so 10 chars max
+			if (end > st/* && end - st <= 10*/) {	// 32bit hex number start with `0x`, so 10 chars(2+8), but there may be many ZERO pre-fix at the beginning, so no limited the length
 				val = (unsigned int)strtol(st, NULL, 0); // 0 is error
 				*output = val;
 				result++;
