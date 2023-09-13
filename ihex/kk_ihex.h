@@ -109,7 +109,6 @@
 #define KK_IHEX_VERSION "2017-10-05"
 
 #include <stdint.h>
-
 #ifdef IHEX_USE_STDBOOL
 #include <stdbool.h>
 typedef bool ihex_bool_t;
@@ -119,6 +118,9 @@ typedef uint_fast8_t ihex_bool_t;
 
 typedef uint_least32_t ihex_address_t;
 typedef uint_least16_t ihex_segment_t;
+typedef uint_least16_t ihex_seg_type_t;
+typedef uint_least16_t ihex_hex_flag_t;
+typedef uint_least16_t ihex_offset_t;
 typedef int ihex_count_t;
 
 #ifndef IHEX_SEGMENT_VALUE_MAX

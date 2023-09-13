@@ -211,16 +211,14 @@ ihex_set_output_line_length (struct ihex_state * ihex,
 void
 ihex_write_at_segment (struct ihex_state * ihex,
                        ihex_segment_t segment,
-                       ihex_address_t address) {
+                       ihex_address_t address,
+                       ihex_bool_t linear) {
     ihex_write_at_address(ihex, address);
-    // force write the segment
-    //if (ihex->segment != segment) {
-        // whatever wrtie the segment infomation
-        ihex_write_extended_address(ihex, (ihex->segment = segment),
-                                    IHEX_EXTENDED_SEGMENT_ADDRESS_RECORD);
-        // clear the overflow tage if the new segement is assigned
-        ihex->flags &= ~IHEX_FLAG_ADDRESS_OVERFLOW;
-    //}
+    // whatever wrtie the segment infomation
+    ihex_write_extended_address(ihex, (ihex->segment = segment),
+                                linear ?  IHEX_EXTENDED_LINEAR_ADDRESS_RECORD : IHEX_EXTENDED_SEGMENT_ADDRESS_RECORD);
+    // clear the overflow tage if the new segement is assigned
+    ihex->flags &= ~IHEX_FLAG_ADDRESS_OVERFLOW;
 }
 #endif
 

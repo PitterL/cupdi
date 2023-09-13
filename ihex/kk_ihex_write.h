@@ -157,7 +157,8 @@ extern void ihex_flush_buffer(struct ihex_state *ihex,
 #ifndef IHEX_DISABLE_SEGMENTS
 void ihex_write_at_segment(struct ihex_state *ihex,
                            ihex_segment_t segment,
-                           ihex_address_t address);
+                           ihex_address_t address,
+                           ihex_bool_t linear);
 #endif
 
 // Set the output line length to `length` - may be safely called only right

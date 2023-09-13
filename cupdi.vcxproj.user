@@ -12,7 +12,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>-d tiny3217 -c com14 -f "D:\Users\a41450\MPLABXProjects\Li_X02B.X\desay\production\1.hex" --pack-build</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-d tiny3217 -c com14 -f "D:\Users\a41450\MPLABXProjects\Li_X02B.X\dist\default\production\fw.hex" --ipe --pack-rebuild</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

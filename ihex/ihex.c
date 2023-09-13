@@ -7,13 +7,14 @@
 #include <os/platform.h>
 #include "ihex.h"
 
+/*
 int set_default_segment_id(hex_data_t *dhex, ihex_segment_t source,  ihex_segment_t target)
 {
     segment_buffer_t *seg;
     int result = 0;
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
+        seg = &dhex->segments[i];
         if (seg->sid == source && seg->addr_to && seg->data) {
             seg->sid = target;
             result++;
@@ -22,14 +23,15 @@ int set_default_segment_id(hex_data_t *dhex, ihex_segment_t source,  ihex_segmen
 
     return result;
 }
+*/
 
 segment_buffer_t *get_segment_by_id(hex_data_t *dhex, ihex_segment_t segmentid)
 {
     segment_buffer_t *seg;
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
-        if (seg->sid == segmentid)
+        seg = &dhex->segments[i];
+        if (VALID_SEG(seg) && seg->sid == segmentid)
             return seg;
     }
 
@@ -41,7 +43,7 @@ segment_buffer_t *get_segment_by_id_addr(hex_data_t *dhex, ihex_segment_t segmen
     segment_buffer_t *seg;
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
+        seg = &dhex->segments[i];
         if (seg->sid == segmentid) {
             if (segmentid == IHEX_SEGMENT_VALUE_MAX) {
                 if (seg->addr_from || seg->addr_to) {
@@ -58,24 +60,22 @@ segment_buffer_t *get_segment_by_id_addr(hex_data_t *dhex, ihex_segment_t segmen
     return NULL;
 }
 
-/*
-void walk_segments_by_id(hex_data_t *dhex, ihex_segment_t segmentid, int (*cb)(segment_buffer_t *, void *), void *param)
+int walk_segments_by_id(hex_data_t *dhex, ihex_seg_type_t flag, int (*cb)(segment_buffer_t *, const void *, ihex_seg_type_t), const void *param)
 {
     segment_buffer_t *seg;
     int result = 0;
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
-        if (seg->sid == segmentid) {
-            if (cb) {
-                result = cb(seg, param);
-                if (result)
-                    break;
-            }
+        seg = &dhex->segments[i];
+        if (VALID_SEG(seg) && cb) {
+            result = cb(seg, param, flag);
+            if (result)
+                break;
         }
     }
+
+    return result;
 }
-*/
 
 /*
 the body of create segment informantion by sgmentid, addr, len, and data,
@@ -86,20 +86,28 @@ if data is null, the seg only record sgmentid/from/to informantion
 @addr: addr for the new data
 @len: len for the new data
 @data: data pointer
+@sflag: indicate the segment flag
 return seg pointer if success, NULl if failed
 */
-segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, char *data)
+/* the default data value for the Memory if not copied data
+   There is still unclear that the reserved bits should be set to Zero or 0xFF,
+   for the compiler of fuse, we saw the result is Zero, so we set to Zero here 
+ */
+#define DEFAULT_DATA_BYTE_VALUE 0x0
+
+segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, char *data, ihex_seg_type_t sflag)
 {
     segment_buffer_t *seg;
     ihex_address_t addr_to;
+    char *buf;
     ihex_count_t size;
 
     //search seg first
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
+        seg = &dhex->segments[i];
         //the segment exist, expand the address
-        if (seg->sid == segmentid && seg->addr_to) {
-            if (addr >= seg->addr_from && addr + len < MAX_DATA_IN_ONE_SEGMENT) {   //in buffer, or continous at tail coul call realloc
+        if (VALID_SEG(seg) && seg->sid == segmentid) {
+            if (addr >= seg->addr_from && addr <= seg->addr_to && addr + len < MAX_DATA_IN_ONE_SEGMENT) {   //in buffer, or continous at tail coul call realloc
                 addr_to = addr + len;
                 addr_to = max(addr_to, seg->addr_to);
                 size = addr_to - seg->addr_from;
@@ -108,19 +116,28 @@ segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t 
                 if (data) {
                     if (seg->data) {
                         if (size > seg->len) {
-                            seg->data = realloc(seg->data, size);
-                            if (seg->data)
+                            buf = realloc(seg->data, size);
+                            if (buf) {
+                                memset(buf + seg->len, DEFAULT_DATA_BYTE_VALUE, size - seg->len);
+                                seg->data = buf;
                                 seg->len = size;
-                            else
-                                seg->len = 0;// report mem error
+                            } else {
+                                // memory error
+                                free(seg->data);
+                                seg->data = NULL;
+                                seg->len = 0;
+                            }
                         }
                     }
                     else {
                         seg->data = malloc(size);
-                        if (seg->data)
+                        if (seg->data) {
                             seg->len = size;
-                        else
-                            seg->len = 0;// report mem error
+                            memset(seg->data, DEFAULT_DATA_BYTE_VALUE, size);
+                        } else {
+                            // mem error
+                            seg->len = 0;
+                        }
                     }
                 }
 
@@ -134,7 +151,7 @@ segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t 
 
     //Not found existing segment in current list
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
+        seg = &dhex->segments[i];
         //get an unused seg
         if (!seg->sid && !seg->addr_from && !seg->addr_to) {
             if (data) {
@@ -148,6 +165,7 @@ segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t 
             }
 
             seg->sid = segmentid;
+            seg->flag = sflag;
             seg->addr_from = addr;
             seg->addr_to = addr + len;
             return seg;
@@ -164,9 +182,10 @@ The new segment may not combined together is address if address is increasing di
     @segmentid: segment id
     @addr: addr for the new data
     @len: len for the new data
+    @sflag: indicate the segment flag
 return seg pointer if success, NULl if failed
 */
-segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len)
+segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, ihex_seg_type_t sflag)
 {
     segment_buffer_t *seg;
     ihex_address_t addr_from, addr_to;
@@ -175,7 +194,7 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
     addr_to = addr + len;
 
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
+        seg = &dhex->segments[i];
         //the segment exist, expand the address
         if (seg->sid == segmentid && seg->addr_to > 0 && seg->addr_to < MAX_DATA_IN_ONE_SEGMENT) {
             if ((addr_from >= seg->addr_from && addr_from <= seg->addr_to) ||
@@ -190,10 +209,11 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
 
     //Not found existing segment in current list
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
-        seg = &dhex->segment[i];
+        seg = &dhex->segments[i];
         //get an unused seg
         if (!seg->sid && !seg->addr_from && !seg->addr_to) {
             seg->sid = segmentid;
+            seg->flag = sflag;
             seg->addr_from = addr;
             seg->addr_to = addr + len;
             return seg;
@@ -205,14 +225,14 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
 
 /*
 create segment informantion by sgmentid, addr, len, and data,
-    if SEG_ALLOC_MEMORY is not set(or data is invalid), the seg only record sgmentid/from/to informantion
+    if HEX_ALLOC_MEMORY is not set(or data is invalid), the seg only record sgmentid/from/to informantion
     @dhex: hex_data_t created by create_dhex()
     @segmentid: segment id
     @addr: addr for the new data
     @len: len for the new data
     @data: data pointer
     @flag: flag options
-        SEG_ALLOC_MEMORY: alloc memory
+        HEX_ALLOC_MEMORY: alloc memory
     return seg pointer if success, NULl if failed
 */
 segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, char *data, int flag)
@@ -220,6 +240,8 @@ segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t s
 	segment_buffer_t * seg = NULL;
 	ihex_segment_t sid = segmentid;
     ihex_address_t st = addr, end, size;
+    ihex_hex_flag_t hflag = GET_HEX_TYPE(flag);
+    ihex_seg_type_t sflag = GET_SEG_TYPE(flag);
 
     do {
         end = st + len;
@@ -228,15 +250,15 @@ segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t s
         }
         size = end - st;
 
-        if (flag & SEG_INIT_SEGMENT) {
-            seg = _set_segment_range_by_id_addr(dhex, sid, st, size);
+        if (hflag & HEX_INIT_SEGMENT) {
+            seg = _set_segment_range_by_id_addr(dhex, sid, st, size, sflag);
             if (!seg) {
                 return NULL;
             }
         }
 
-        if (flag & SEG_ALLOC_MEMORY) {
-            seg = _set_segment_data_by_id_addr(dhex, sid, st, size, data);
+        if (hflag & HEX_ALLOC_MEMORY) {
+            seg = _set_segment_data_by_id_addr(dhex, sid, st, size, data, sflag);
             if (!seg) {
                 return NULL;
             }
@@ -249,7 +271,11 @@ segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t s
 
         st = 0;
         data += size;
-		sid += (MAX_DATA_IN_ONE_SEGMENT >> 4);
+        if (sflag & SEG_EX_SEGMENT_ADDRESS) {
+		    sid += (MAX_DATA_IN_ONE_SEGMENT >> 4);
+        } else/* if (sflag & SEG_EX_LINEAR_ADDRESS) */{
+            sid++;
+        }
     } while (len);
 
 	return seg;
@@ -261,7 +287,7 @@ Hex reading callback for each record.
     @ihex: ihex_state structure, initialiezed at ihex_init(), store parser state and data
         @flag:
             SEG_EXPAND_MEMORY: use the maximum memory boundary
-            SEG_ALLOC_MEMORY: alloc memory in to each segment
+            HEX_ALLOC_MEMORY: alloc memory in to each segment
     @type: record type
     @checksum_error: checksum result of the record
 */
@@ -278,22 +304,22 @@ ihex_bool_t ihex_data_read(struct ihex_state *ihex,
 #endif
 
     if (type == IHEX_DATA_RECORD) {
-        set_segment_data_by_id_addr(dhex, sid, ihex->address, ihex->length, ihex->data, dhex->flag);
+        set_segment_data_by_id_addr(dhex, sid, ihex->address, ihex->length, ihex->data, dhex->flag.value);
     }
     else if (type == IHEX_EXTENDED_SEGMENT_ADDRESS_RECORD) {
-    
+        dhex->flag.seg = SEG_EX_SEGMENT_ADDRESS;
     }
     else if (type == IHEX_START_SEGMENT_ADDRESS_RECORD) {
 
     }
     else if (type == IHEX_EXTENDED_LINEAR_ADDRESS_RECORD) {
-
+        dhex->flag.seg = SEG_EX_LINEAR_ADDRESS;
     }
     else if (type == IHEX_START_LINEAR_ADDRESS_RECORD) {
 
     }
     else if (type == IHEX_END_OF_FILE_RECORD) {
-    
+        dhex->flag.seg = 0; 
     }
     return true;
 }
@@ -341,14 +367,14 @@ int load_segments_from_file(const char *file, hex_data_t *dhex)
     }
     
     //  Walk file to set segment range
-    dhex->flag = SEG_INIT_SEGMENT;
+    dhex->flag.hex = HEX_INIT_SEGMENT;
     if (!dhex_read(infile, ihex_data_read, dhex)) {
         result = -3;
         goto out;
     }
 
     //  Fill and allocate data to memory
-    dhex->flag = SEG_ALLOC_MEMORY;
+    dhex->flag.hex = HEX_ALLOC_MEMORY;
     if (!dhex_read(infile, ihex_data_read, dhex)) {
         result = -4;
         goto out;
@@ -367,8 +393,8 @@ void unload_segment_by_sid(hex_data_t *dhex, ihex_segment_t segmentid)
     int i;
 
     //alloc data buffer
-    for (i = 0; i < ARRAY_SIZE(dhex->segment); i++) {
-        seg = &dhex->segment[i];
+    for (i = 0; i < ARRAY_SIZE(dhex->segments); i++) {
+        seg = &dhex->segments[i];
         if (seg->sid == segmentid) {
             if (seg->data)
                 free(seg->data);
@@ -383,8 +409,8 @@ void unload_segments(hex_data_t *dhex)
     int i;
 
     //alloc data buffer
-    for (i = 0; i < ARRAY_SIZE(dhex->segment); i++) {
-        seg = &dhex->segment[i];
+    for (i = 0; i < ARRAY_SIZE(dhex->segments); i++) {
+        seg = &dhex->segments[i];
         if (seg->data)
             free(seg->data);
 
@@ -392,6 +418,7 @@ void unload_segments(hex_data_t *dhex)
     }
 }
 
+/*
 hex_data_t * get_hex_info_from_file(const char *file)
 {
     hex_data_t *dhex;
@@ -419,6 +446,7 @@ void release_dhex(hex_data_t *dhex)
         free(dhex);
     }
 }
+*/
 
 void ihex_flush_buffer(struct ihex_state *ihex, char *buffer, char *eptr) 
 {
@@ -450,10 +478,10 @@ int save_hex_info_to_file(const char *file, const hex_data_t *dhex)
 #endif
     ihex_init(&ihex, ihex_flush_buffer, outfile);
     
-    for (i = 0; i < ARRAY_SIZE(dhex->segment); i++) {
-        seg = &dhex->segment[i];
+    for (i = 0; i < ARRAY_SIZE(dhex->segments); i++) {
+        seg = &dhex->segments[i];
         if (seg->data) {
-            ihex_write_at_segment(&ihex, seg->sid, seg->addr_from);
+            ihex_write_at_segment(&ihex, seg->sid, seg->addr_from, seg->flag == SEG_EX_LINEAR_ADDRESS);
             if (write_initial_address) {
                 if (debug_enabled) {
                     (void)fprintf(stderr, "Address offset: 0x%lx\n",

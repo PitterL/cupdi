@@ -78,11 +78,14 @@ ihex_end_read (struct ihex_state * ihex) {
         sum = (~sum + 1U) ^ *eptr; // *eptr is the received checksum
     }
     if (cb_read(ihex, type, (uint8_t) sum)) {
+#ifndef IHEX_DISABLE_SEGMENTS
         if (type == IHEX_EXTENDED_LINEAR_ADDRESS_RECORD) {
+            ihex->segment = (ihex_segment_t) ((ihex->data[0] << 8) | ihex->data[1]);
+            /*
             ihex->address &= 0xFFFFU;
             ihex->address |= (((ihex_address_t) ihex->data[0]) << 24) |
                              (((ihex_address_t) ihex->data[1]) << 16);
-#ifndef IHEX_DISABLE_SEGMENTS
+            */
         } else if (type == IHEX_EXTENDED_SEGMENT_ADDRESS_RECORD) {
             ihex->segment = (ihex_segment_t) ((ihex->data[0] << 8) | ihex->data[1]);
 #endif
