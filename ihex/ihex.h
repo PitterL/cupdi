@@ -59,10 +59,12 @@ typedef struct _hex_data
     ihex_flag_t flag;
 } hex_data_t;
 
+#define EX_SEGMENT_ADDRESS_SHIFT 4
 #define ADDR_TO_EX_SEGMENT_ID(_addr) ((_addr) >> 4)
 #define ADDR_OFFSET_EX_SEGMENT(_addr) ((_addr) & 0xF)
 #define EX_SEGMENT_ID_TO_ADDR(_segid) ((_segid) << 4)
 
+#define EX_LINEAR_ADDRESS_SHIFT 16
 #define ADDR_TO_EX_LINEAR_ID(_addr) ((_addr) >> 16)
 #define ADDR_OFFSET_EX_LINEAR(_addr) ((_addr) & 0xFFFF)
 #define EX_LINEAR_ID_TO_ADDR(_segid) ((_segid) << 16)

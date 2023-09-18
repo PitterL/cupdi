@@ -19,6 +19,8 @@ int nvm_read_userrow(void *nvm_ptr, u32 address, u8 *data, int len);
 int nvm_write_userrow(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy);
 int nvm_read_fuse(void *nvm_ptr, u32 address, u8 *data, int len);
 int nvm_write_fuse(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy);
+int nvm_write_lockbits(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy);
+int nvm_read_lockbits(void *nvm_ptr, u32 address, u8 *data, int len);
 int nvm_read_mem(void *nvm_ptr, u32 address, u8 *data, int len);
 int nvm_write_mem(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy);
 
@@ -35,6 +37,12 @@ int nvm_wait(void *nvm_ptr);
 int nvm_get_block_info(void *nvm_ptr, /*NVM_TYPE_T*/int type, nvm_info_t *info);
 int nvm_get_block_info_ext(void *nvm_ptr, int type, nvm_info_t *info, char **pname);
 void *nvm_get_content(void *nvm_ptr, int type, int *req_size);
+
+enum {
+    FLAG_ADDR_REAL = (1 << 0), 
+    FLAG_ADDR_MAPPED = (1 << 1),
+    FLAG_DATA_READBACK = (1 << 7)
+};
 
 /*
 Max waiting time for chip reset

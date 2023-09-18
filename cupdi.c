@@ -76,10 +76,13 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <b> 20230912: Patch for 3rd programmer compatible
             1. Using mapped address to generate sid when flag is Segment Address, while un-mapped address for Linear Address
             2. don't merge the data in same segment if the data offset address is not successive
-
+        <d> 1. Using Mapped address as primary address in program and packing
+            2. add lockbits in extend memory
+            3. in auto read/write, truck the size if larger than blocksize
+            4. in linear address, real address will be added with flash start address
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19c"
+#define SOFTWARE_VERSION "1.19d"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -191,8 +194,8 @@ int main(int argc, const char *argv[])
         OPT_BIT('i', "info", &flag, "Get Infoblock infomation of firmware", NULL, (1 << FLAG_INFO), 0),
         OPT_BIT('-', "save", &flag, "Save flash to a VCS HEX file", NULL, (1 << FLAG_SAVE), 0),
         OPT_BIT('-', "dump", &flag, "Dump flash to a Intel HEX file", NULL, (1 << FLAG_DUMP), 0),
-        OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addre1:size]...  Note Address is Hex format, and Number is Dec format"),
-        OPT_STRING('w', "write", &write, "Direct write to any memory [addr]:[data0];[data1];[data1]... Note address and data format with Hex format"),
+        OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addre1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
+        OPT_STRING('w', "write", &write, "Direct write to any memory [addr0]:[data0];[data1];[data1]|[addr1]... Note address and data format with Hex type dig"),
         OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]", NULL, (intptr_t) ""),
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range sighi=[n]|siglo=[n]|range=[n]|slot=[n]|st=[n]|keys=[n]", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
@@ -589,27 +592,23 @@ ihex_segment_t _block_segment_id(nvm_info_t *block, int flag)
             <1> Segment flag: mapped address
             <2> Linear flag: unmapped address
     */
-    if (block->nvm_mapped_start && flag == SEG_EX_SEGMENT_ADDRESS)
-    {
-        address = block->nvm_mapped_start;
-    }
-    else
-    {
-        address = block->nvm_start;
-    }
 
     if (flag & SEG_EX_SEGMENT_ADDRESS)
     {
+        address = block->nvm_mapped_start ? block->nvm_mapped_start : block->nvm_start;
         sid = ADDR_TO_EX_SEGMENT_ID(address);
     }
     else if (flag & SEG_EX_LINEAR_ADDRESS)
     {
-        sid = ADDR_TO_EX_LINEAR_ID(address);
-        /*
-        if (flag & SEG_EX_MAGIC_OFFSET_ADDRESS) {
+        if (block->nvm_magicoff)
+        {
             sid = block->nvm_magicoff;
         }
-        */
+        else
+        {
+            address = block->nvm_start;
+            sid = ADDR_TO_EX_LINEAR_ID(address);
+        }
     }
 
     return sid;
@@ -649,7 +648,32 @@ unsigned int _segment_id_to_address(ihex_segment_t sid, int flag)
     }
     else if (flag & SEG_EX_LINEAR_ADDRESS)
     {
+        //FIXME, not considerred the Magicoff type Linear address
+
         address = EX_LINEAR_ID_TO_ADDR(sid);
+    }
+
+    return address;
+}
+
+unsigned int _block_start_address(nvm_info_t *block, int flag)
+{
+    unsigned int address;
+
+    if (flag & FLAG_ADDR_REAL)
+    {
+        address = block->nvm_start;
+    }
+    else
+    {
+        if (block->nvm_mapped_start)
+        {
+            address = block->nvm_mapped_start;
+        }
+        else
+        {
+            address = block->nvm_start;
+        }
     }
 
     return address;
@@ -659,32 +683,32 @@ int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag
 {
     const device_info_t *dev = (const device_info_t *)param;
     nvm_info_t iblock;
-    ihex_segment_t sba, lba;
+    ihex_segment_t sid;
     ihex_segment_t base;
     unsigned int offset;
     int i, result = 0;
 
     if (!seg->flag)
     {
-        // <1> No segment flag indicated
+        // <1> No segment flag indicated, it's Flash area
         result = dev_get_nvm_info_ext(dev, NVM_FLASH, &iblock, NULL);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type `NVM_FLASH` failed %d, set sid Zero", result);
-            sba = 0;
+			sid = 0;
         }
         else
         {
-            sba = _block_segment_id(&iblock, flag);
+			sid = _block_segment_id(&iblock, flag);
         }
-        seg->sid = sba;
+        seg->sid = sid;
         seg->flag = flag;
     }
-    else if (seg->flag == SEG_EX_SEGMENT_ADDRESS &&
-             flag == SEG_EX_LINEAR_ADDRESS)
+    else if (seg->flag == SEG_EX_SEGMENT_ADDRESS)
     {
-        // <2> Segment -> linear(magicoff) address
+        // <2> Segment -> Segment or linear(magicoff) address
         base = EX_SEGMENT_ID_TO_ADDR(seg->sid);
+
         for (i = 0; i < NUM_NVM_EX_TYPES; i++)
         {
             result = dev_get_nvm_info_ext(dev, i, &iblock, NULL);
@@ -697,15 +721,7 @@ int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag
                 if (base == iblock.nvm_start ||
                     (iblock.nvm_mapped_start && base == iblock.nvm_mapped_start))
                 {
-                    if (iblock.nvm_magicoff)
-                    {
-                        lba = iblock.nvm_magicoff;
-                    }
-                    else
-                    {
-                        lba = _block_segment_id(&iblock, flag);
-                    }
-                    seg->sid = lba;
+                    seg->sid = _block_segment_id(&iblock, flag);
                     seg->flag = flag;
 
                     break;
@@ -719,46 +735,66 @@ int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag
             result = -2;
         }
     }
-    else if (seg->flag == SEG_EX_LINEAR_ADDRESS &&
-             flag == SEG_EX_SEGMENT_ADDRESS)
+    else if (seg->flag == SEG_EX_LINEAR_ADDRESS)
     {
-        // <3> Linear to segment address
-        if (LINEAR_ID_MAGIC(seg->sid))
+        if (flag == SEG_EX_SEGMENT_ADDRESS)
         {
-            for (i = 0; i < NUM_NVM_EX_TYPES; i++)
+            // <3> Linear to Segment address
+            if (LINEAR_ID_MAGIC(seg->sid))
             {
-                result = dev_get_nvm_info_ext(dev, i, &iblock, NULL);
+                // Magicoff placement
+                for (i = 0; i < NUM_NVM_EX_TYPES; i++)
+                {
+                    result = dev_get_nvm_info_ext(dev, i, &iblock, NULL);
+                    if (result)
+                    {
+                        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", i, result);
+                    }
+                    else
+                    {
+                        if (iblock.nvm_magicoff && iblock.nvm_magicoff == seg->sid)
+                        {
+                            seg->sid = _block_segment_id(&iblock, flag);
+                            seg->flag = flag;
+
+                            // Adjust the offset when cover to segment address, some packing is not segment aligned(Lockbits)
+                            offset = _block_segment_offset(&iblock, flag);
+                            seg->addr_from += offset;
+                            seg->addr_to += offset;
+                            break;
+                        }
+                    }
+                }
+
+                if (i == NUM_NVM_EX_TYPES)
+                {
+                    DBG_INFO(UPDI_ERROR, "Linear address(magic) 0x%x to Segment not found", seg->sid);
+                    result = -3;
+                }
+            }
+            else
+            {
+                // Actual Linear address, directly convert to Segment address
+                // Flash content only since linear address only record upper 16 bit
+                result = dev_get_nvm_info_ext(dev, NVM_FLASH, &iblock, NULL);
                 if (result)
                 {
-                    DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", i, result);
+                    DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type `NVM_FLASH` failed %d, set sid Zero", result);
+                    sid = 0;
                 }
                 else
                 {
-                    if (iblock.nvm_magicoff && iblock.nvm_magicoff == seg->sid)
-                    {
-                        seg->sid = _block_segment_id(&iblock, flag);
-                        seg->flag = flag;
-
-                        // Adjust the offset when cover to segment address
-                        offset = _block_segment_offset(&iblock, flag);
-                        seg->addr_from += offset;
-                        seg->addr_to += offset;
-                        break;
-                    }
+                    sid = _block_segment_id(&iblock, flag);
                 }
-            }
 
-            if (i == NUM_NVM_EX_TYPES)
-            {
-                DBG_INFO(UPDI_ERROR, "Linear address(magic) 0x%x to Segment not found", seg->sid);
-                result = -3;
+                seg->sid = (seg->sid << (EX_LINEAR_ADDRESS_SHIFT - EX_SEGMENT_ADDRESS_SHIFT)) + sid;
+                seg->flag = flag;
             }
         }
-        else
+        else if (flag == SEG_EX_LINEAR_ADDRESS)
         {
-            // Linear address to Segment address
-            seg->sid = (seg->sid << 12);
-            seg->flag = flag;
+            // Linear to Linear address
+            // Do nothing...
         }
     }
 
@@ -967,7 +1003,8 @@ int get_ext_data_from_hex_dev(const device_info_t *dev, hex_data_t *dhex, void *
 int get_ext_info_from_storage(void *nvm_ptr, void *contnr, B_BLOCK_TYPE btype)
 {
     nvm_info_t iblock;
-    int nvm_type, offset;
+    int nvm_type;
+    unsigned start, offset;
 
     config_header_t header;
     char *buf = NULL;
@@ -984,10 +1021,11 @@ int get_ext_info_from_storage(void *nvm_ptr, void *contnr, B_BLOCK_TYPE btype)
         return -3;
     }
 
-    result = nvm_read_auto(nvm_ptr, iblock.nvm_start + offset, (u8 *)&header, sizeof(header));
+    start = _block_start_address(&iblock, FLAG_ADDR_MAPPED);
+    result = nvm_read_auto(nvm_ptr, start + offset, (u8 *)&header, sizeof(header));
     if (result)
     {
-        DBG_INFO(UPDI_ERROR, "nvm_read_auto (0x%x off %d)failed %d", iblock.nvm_start, offset, result);
+        DBG_INFO(UPDI_ERROR, "nvm_read_auto (0x%x off %d)failed %d", start, offset, result);
         return -4;
     }
 
@@ -1013,10 +1051,10 @@ int get_ext_info_from_storage(void *nvm_ptr, void *contnr, B_BLOCK_TYPE btype)
         return -7;
     }
 
-    result = nvm_read_auto(nvm_ptr, iblock.nvm_start + offset, (u8 *)buf, len);
+    result = nvm_read_auto(nvm_ptr, start + offset, (u8 *)buf, len);
     if (result)
     {
-        DBG_INFO(UPDI_ERROR, "nvm_read_auto %d bytes failed %d", len, result);
+        DBG_INFO(UPDI_ERROR, "nvm_read_auto(0x%x off %d) %d bytes failed %d", start, offset, len, result);
         return -8;
     }
 
@@ -1379,7 +1417,7 @@ int updi_program(void *nvm_ptr, const char *file, const device_info_t *dev, bool
         result = nvm_chip_erase(nvm_ptr);
         if (result) {
             DBG_INFO(UPDI_DEBUG, "nvm_chip_erase failed %d", result);
-            result = -4;
+            result = -3;
             goto out;
         }
     */
@@ -1393,7 +1431,7 @@ int updi_program(void *nvm_ptr, const char *file, const device_info_t *dev, bool
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "nvm_write_auto %d failed %d", i, result);
-                result = -5;
+                result = -4;
                 goto out;
             }
         }
@@ -1610,38 +1648,6 @@ out:
 }
 
 /*
-    UPDI compare and program firmware
-    @nvm_ptr: updi_nvm_init() device handle
-    @file: ihex firmware file
-    @dev: device info structure, get by get_chip_info()
-    @check: whether readback data for double checking
-    return 0 if success, else failed
-*/
-/*
-int updi_update(void *nvm_ptr, const char *file, const device_info_t * dev, bool check)
-{
-    int result;
-
-    // Compare infoblock
-    result = updi_compare(nvm_ptr, file, dev);
-    if (result == 0) {
-        // Check Flash content
-        result = updi_check(nvm_ptr);
-    }
-
-    if (result) {
-        result = updi_program(nvm_ptr, file, dev, check);
-        if (result) {
-            DBG_INFO(UPDI_DEBUG, "updi_program failed %d", result);
-            result = -2;
-        }
-    }
-
-    return result;
-}
-*/
-
-/*
     UPDI Save flash content to a ihex file
     @nvm_ptr: updi_nvm_init() device handle
     @file: Hex file path for output
@@ -1661,7 +1667,8 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     int len;
     int crc, ecrc;
     char *save_file = NULL;
-    int i, offset, result;
+    int i, result;
+    unsigned start, offset;
 
     memset(&dhex_info, 0, sizeof(dhex_info));
     memset(&info_container, 0, sizeof(info_container));
@@ -1751,7 +1758,8 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
             break;
         }
 
-        result = nvm_read_auto(nvm_ptr, iblock.nvm_start, buf, iblock.nvm_size);
+        start = _block_start_address(&iblock, FLAG_ADDR_MAPPED);
+        result = nvm_read_auto(nvm_ptr, start, buf, iblock.nvm_size);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "nvm_read_auto type %d failed %d", i, result);
@@ -1823,6 +1831,7 @@ int updi_dump(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     char *save_file = NULL;
 
     int i, result = 0;
+    unsigned int start;
 
     memset(&dhex_info, 0, sizeof(dhex_info));
     for (i = 0; i < NUM_NVM_TYPES; i++)
@@ -1843,7 +1852,8 @@ int updi_dump(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
             break;
         }
 
-        result = nvm_read_auto(nvm_ptr, iblock.nvm_start, buf, iblock.nvm_size);
+        start = _block_start_address(&iblock, FLAG_ADDR_MAPPED);
+        result = nvm_read_auto(nvm_ptr, start, buf, iblock.nvm_size);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "nvm_read_auto type %d failed %d", i, result);
@@ -1891,53 +1901,6 @@ out:
     return result;
 }
 
-/*
-    Load flash segment from hex file
-    @dev: device info structure, get by get_chip_info()
-    @file: hex file name
-    @dhex: hex data structure
-    return flash segment if sucessful, else NULL
-*/
-/*
-segment_buffer_t * load_flash_segment_from_file(const device_info_t * dev, const char *file, hex_data_t *dhex)
-{
-    nvm_info_t iblock;
-
-    segment_buffer_t *seg = NULL;
-    ihex_segment_t sid;
-    int result;
-
-    if (!dev || !file || !dhex)
-        return NULL;
-
-    //Flash data content
-    result = dev_hex_load(dev, file, dhex);
-    if (result) {
-        DBG_INFO(UPDI_DEBUG, "load_hex_file '%s' failed %d", file, result);
-        return NULL;
-    }
-
-    //check and set default segment to flash
-    result = dev_get_nvm_info(dev, NVM_FLASH, &iblock);
-    if (result) {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -3;
-        goto out;
-    }
-
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    seg = get_segment_by_id_addr(dhex, sid, iblock.nvm_start);
-    if (!seg) {
-        seg = get_segment_by_id_addr(dhex, IHEX_SEGMENT_VALUE_MAX, iblock.nvm_start);
-        if (seg) {
-            set_default_segment_id(dhex, IHEX_SEGMENT_VALUE_MAX, sid);
-        }
-    }
-
-out:
-    return seg;
-}
-*/
 /*
     Load version segment from vcs file
     @dev: device info structure, get by get_chip_info()
@@ -2149,6 +2112,120 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", NVM_FUSES, result);
+        return -2;
+    }
+
+    fuses_config = malloc(iblock.nvm_size * sizeof(*fuses_config));
+    if (!fuses_config)
+    {
+        DBG_INFO(UPDI_DEBUG, "malloc fuses_config failed %d");
+        result = -3;
+        goto out;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(version_files); i++)
+    {
+        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
+        if (!vcs_file)
+        {
+            DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
+            result = -4;
+            goto out;
+        }
+
+        result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock.nvm_size, invalid_value, HEX_FORMAT);
+        free(vcs_file);
+        if (result == 0)
+        {
+            DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", version_files[i]);
+            goto out;
+        }
+        else if (result < 0 || (u32)result > iblock.nvm_size)
+        {
+            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
+            result = -5;
+        }
+        else
+        {
+            DBG_INFO(UPDI_DEBUG, "search_defined_array_int_from_file (%s) successfully", version_files[i]);
+            count = result;
+            break;
+        }
+    }
+
+    if (result < 0 || (u32)result > iblock.nvm_size)
+    {
+        DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
+        result = -6;
+        goto out;
+    }
+
+    if (count == 0)
+    {
+        goto out;
+    }
+    // Unload fuse
+    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
+    unload_segment_by_sid(dhex, sid);
+
+    // Unload lockbits
+    result = dev_get_nvm_info(dev, NVM_LOCKBITS, &iblock_lockbits);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", NVM_LOCKBITS, result);
+        result = -7;
+        goto out;
+    }
+    else
+    {
+        sid_lockbits = _block_segment_id(&iblock_lockbits, SEG_EX_SEGMENT_ADDRESS);
+        unload_segment_by_sid(dhex, sid_lockbits);
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        if (fuses_config[i] < invalid_value)
+        {
+            val = fuses_config[i] & 0xff;
+            seg = set_segment_data_by_id_addr(dhex, sid, i, 1, &val, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
+            if (!seg)
+            {
+                DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed %d val 0x%02x", i, val);
+                result = -7;
+                goto out;
+            }
+        }
+        else
+        {
+            DBG_INFO(UPDI_DEBUG, "Fuse[%d]: %02x is not supported", i, val);
+            result = -8;
+            goto out;
+        }
+    }
+out:
+
+    if (fuses_config)
+        free(fuses_config);
+
+    return result;
+}
+
+int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, char* name, const char *file, hex_data_t *dhex)
+{
+    nvm_info_t iblock, iblock_lockbits;
+    segment_buffer_t *seg = NULL;
+    ihex_segment_t sid, sid_lockbits;
+    unsigned char val;
+    unsigned int *fuses_config = NULL;
+    const unsigned int invalid_value = 0x800;
+    const char *version_files[] = BOARD_FILES;
+    char *vcs_file = NULL;
+    int i, count = 0, result = 0;
+
+    result = dev_get_nvm_info(dev, type, &iblock);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", type, result);
         return -2;
     }
 
@@ -2656,7 +2733,10 @@ int updi_page_erase(void *nvm_ptr, char *cmd)
 /*
     Memory Read
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and count. Format: [addr0:size]|[addre1:size]...
+    @cmd: cmd string use for address and count. 
+        Format: [addr0:size]|[addre1:size]...
+            addr is hex type dig
+            size is auto type dig
     @returns 0 - success, other value failed code
 */
 int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
@@ -2677,7 +2757,7 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
             { // only work when no error occur
                 if (i == 0)
                 {
-                    address = (int)strtol(tk_w[i], NULL, 0);
+                    address = (int)strtol(tk_w[i], NULL, 16);
                 }
                 else if (i == 1)
                 {
@@ -2749,7 +2829,10 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
 /*
     UPDI Memory Read
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and count. Format: [addr0:size]|[addre1:size]...
+    @cmd: cmd string use for address and count. 
+        Format: [addr0:size]|[addre1:size]...
+            addr is hex type dig
+            size is auto type dig
     @returns 0 - success, other value failed code
 */
 int updi_read(void *nvm_ptr, char *cmd)
@@ -2784,7 +2867,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
             { // only work when no error occur
                 if (m == 0)
                 {
-                    address = (int)strtol(tk_w[m], NULL, 0);
+                    address = (int)strtol(tk_w[m], NULL, 16);
                 }
                 else if (m == 1)
                 {
@@ -2793,7 +2876,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
                     {
                         DBG_INFO(UPDI_DEBUG, "Write[%d]: %s", i, tokens[i]);
                         j = i % UPDI_WRITE_STROKEN_LEN;
-                        buf[j] = (char)(strtol(tokens[i], NULL, 0) & 0xff);
+                        buf[j] = (char)(strtol(tokens[i], NULL, 16) & 0xff);
                         dirty = true;
                         if (j + 1 == UPDI_WRITE_STROKEN_LEN)
                         {
@@ -2852,7 +2935,10 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
 /*
 UPDI Memory Write
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and data. Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
+    @cmd: cmd string use for address and data. 
+        Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
+            addr is hex type dig
+            dat is hex type dig
     @check: whether readback data for double checking
     @returns 0 - success, other value failed code
 */
