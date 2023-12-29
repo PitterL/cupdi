@@ -43,7 +43,7 @@ typedef struct _upd_physical{
     @baud: baudrate
     @return LINK ptr, NULL if failed
 */
-void *updi_physical_init(const char *port, int baud)
+void *updi_physical_init(const char *port, int baud, int breaks)
 {
     void *ser;
     upd_physical_t *phy = NULL;
@@ -72,10 +72,11 @@ void *updi_physical_init(const char *port, int baud)
         phy->ser = ser;
         phy->ibdly = 0;
         memcpy(&phy->stat, &stat, sizeof(stat));
-        
+
         // Send an initial break as handshake
         // Use double break whatever. If we only send one break, the [Clock Recovery Error] in UPDI_CS_STATUSB will occurred
-        result = phy_send_double_break(phy);
+        //result = phy_send_double_break(phy);
+        result = phy_send_break(phy, breaks);
         if (result) {
             DBG_INFO(PHY_DEBUG, "<PHY> Init: send break failed %d", result);
             return NULL;
@@ -159,7 +160,12 @@ int _phy_send_break(void *ptr_phy, int count, int baud)
     if (!VALID_PHY(phy))
         return ERROR_PTR;
 
-    DBG_INFO(PHY_DEBUG, "<PHY> D-Break: Sending double break");
+    DBG_INFO(PHY_DEBUG, "<PHY> D-Break: Sending %d break, baud(%d)", count, baud);
+
+	/* Skip breaks */
+	if (count == 0)
+		return 0;
+
     /*
         # Re - init at a lower baud
         # At 300 bauds, the break character will pull the line low for 30ms
@@ -178,7 +184,7 @@ int _phy_send_break(void *ptr_phy, int count, int baud)
 	}
 
     /*Send two break characters, with 1 stop bit in between */
-    /*Send break characters, with 1 stop bit in between */
+    /*Send break characters, with 2 stop bit in between */
     for (i = 0; i < count; i++) {
       result = phy_send_byte(phy, UPDI_BREAK);
       if (result) {
@@ -202,11 +208,12 @@ int _phy_send_break(void *ptr_phy, int count, int baud)
 /*
   PHY send break
   @ptr_phy: APP object pointer, acquired from updi_physical_init()
+  @breaks: how many breaks will be sent
   @return 0 successful, other value if failed
 */
-int phy_send_break(void *ptr_phy)
+int phy_send_break(void *ptr_phy, int breaks)
 {
-    return _phy_send_break(ptr_phy, 1, 0);
+    return _phy_send_break(ptr_phy, breaks, UPDI_BAUTRATE_DOUBLE_BREAK);
 }
 
 /*

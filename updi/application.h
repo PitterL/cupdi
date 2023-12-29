@@ -3,7 +3,7 @@
 
 #define BLOCK_ID_NA (u8)(-1)
 
-void *updi_application_init(const char *port, int baud, int guard, const void *dev);
+void *updi_application_init(const char *port, int baud, int guard, int breaks, const void *dev);
 void updi_application_deinit(void *app_ptr);
 int app_device_info(void *app_ptr);
 bool app_in_prog_mode(void *app_ptr);

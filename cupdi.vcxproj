@@ -58,6 +58,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="argparse\argparse.c" />
+    <ClCompile Include="ext\cfgblock\c0.c" />
     <ClCompile Include="ext\ext.c" />
     <ClCompile Include="ext\cfgblock\c1.c" />
     <ClCompile Include="ext\cfgblock\cb_router.c" />

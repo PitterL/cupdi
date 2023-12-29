@@ -8,10 +8,10 @@
 #define UPDI_BAUTRATE_IN_CLK_8M_MAX		450000
 #define UPDI_BAUTRATE_IN_CLK_16M_MAX	900000
 
-void *updi_physical_init(const char *port, int baud);
+void *updi_physical_init(const char *port, int baud, int breaks);
 void updi_physical_deinit(void *ptr_phy);
 int phy_set_baudrate(void *ptr_phy, int baud);
-int phy_send_break(void *ptr_phy);
+int phy_send_break(void *ptr_phy, int breaks);
 int phy_send_double_break(void *ptr_phy);
 int phy_send(void *ptr_phy, const u8 *data, int len);
 int phy_send_byte(void *ptr_phy, u8 val);

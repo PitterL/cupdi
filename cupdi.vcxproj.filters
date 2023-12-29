@@ -212,5 +212,8 @@
     <ClCompile Include="ext\infoblock\s3.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ext\cfgblock\c0.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -13,15 +13,18 @@ int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len
     config_tail_t *tail;
     unsigned int crc24;
 
-    if (!TEST_BIT(flag, BLOCK_CFG))
+    if (!TEST_BIT(flag, BLOCK_CFG)) {
         return -1;
+    }
 
-    if (!cfg || !data)
+    if (!cfg || !data) {
         return -2;
+    }
 
     head = (config_header_t *)data;
-    if (head->data.size < CB_HEAD_AND_TAIL_SIZE || head->data.size > len)
+    if (head->data.size < CB_HEAD_AND_TAIL_SIZE || head->data.size > len) {
         return -3;
+    }
 
     tail = (config_tail_t *)((char *)head + head->data.size - sizeof(config_tail_t));
 
@@ -29,19 +32,22 @@ int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len
     case CONFIG_BLOCK_C0_VERSION:
         // CRC only data
         crc24 = calc_crc24((unsigned char *)data + sizeof(config_header_t), head->data.size - sizeof(config_header_t) - sizeof(config_tail_t));
-        if (crc24 != tail->data.cfg)
+        if (crc24 != tail->data.cfg) {
             return -5;
-        return 0;
+        }
+        return cb_set_configure_block_ptr_c0(cfg, data, head->data.size, flag);
     case CONFIG_BLOCK_C1_VERSION:
         // CRC include header
         crc24 = calc_crc24((unsigned char *)data, head->data.size - sizeof(config_tail_t));
-        if (crc24 != tail->data.cfg)
+        if (crc24 != tail->data.cfg) {
             return -6;
-
+        }
         return cb_set_configure_block_ptr_c1(cfg, data, head->data.size, flag);
     default:
         return -7;
     }
+
+    
 }
 
 void cb_destory(config_container_t *cfg)
@@ -53,6 +59,9 @@ void cb_destory(config_container_t *cfg)
 
     head = cfg->head;
     switch (head->data.version.value) {
+    case CONFIG_BLOCK_C0_VERSION:
+        cb_destory_c0(cfg);
+        break;
     case CONFIG_BLOCK_C1_VERSION:
         cb_destory_c1(cfg);
         break;
@@ -65,7 +74,8 @@ int cb_max_block_size(void)
 {
     int size;
 
-    size = cb_max_block_size_c1();
+    size = cb_max_block_size_c0();
+    size = max(cb_max_block_size_c1(), size);
 
     return size;
 }

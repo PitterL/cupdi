@@ -63,7 +63,7 @@ typedef struct _upd_application {
     @dev: point chip dev object
     @return APP ptr, NULL if failed
 */
-void *updi_application_init(const char *port, int baud, int guard, const void *dev)
+void *updi_application_init(const char *port, int baud, int guard, int breaks, const void *dev)
 {
     upd_application_t *app = NULL;
 	size_t size;
@@ -71,7 +71,7 @@ void *updi_application_init(const char *port, int baud, int guard, const void *d
 
     DBG_INFO(APP_DEBUG, "<APP> init application");
 
-    link = updi_datalink_init(port, baud, guard);
+    link = updi_datalink_init(port, baud, guard, breaks);
     if (link) {
 		size = sizeof(*app);
         app = (upd_application_t *)malloc(size);

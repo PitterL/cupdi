@@ -57,7 +57,7 @@ typedef struct _upd_nvm
     @dev: point chip dev object
     @return NVM ptr, NULL if failed
 */
-void *updi_nvm_init(const char *port, int baud, int guard, const void *dev)
+void *updi_nvm_init(const char *port, int baud, int guard, int breaks, const void *dev)
 {
     upd_nvm_t *nvm = NULL;
     size_t size;
@@ -65,7 +65,7 @@ void *updi_nvm_init(const char *port, int baud, int guard, const void *dev)
 
     DBG_INFO(NVM_DEBUG, "<NVM> init nvm");
 
-    app = updi_application_init(port, baud, guard, dev);
+    app = updi_application_init(port, baud, guard, breaks, dev);
     if (app)
     {
         size = sizeof(*nvm);

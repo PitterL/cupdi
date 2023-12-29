@@ -80,9 +80,14 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. add lockbits in extend memory
             3. in auto read/write, truck the size if larger than blocksize
             4. in linear address, real address will be added with flash start address
+        <f> 1. Added num of breaks issued option at initialization, defaut = 2
+            2. Fixed an issue loop around when issue reset/disable failed
+            3. Fixed a code issue of support 'uoff, eoff' in command storage(not tested)
+            4. Fixed a issue of support `C0` type configure storage, which don't recogize the header and tail
+            5. Added of function of link_dump()
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19d"
+#define SOFTWARE_VERSION "1.19f"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -152,6 +157,7 @@ int main(int argc, const char *argv[])
     char *comport = NULL;
     int baudrate = 115200;
     int guard = 0;
+	int breaks = 2;
     char *file = NULL;
     char *read = NULL;
     char *write = NULL;
@@ -181,6 +187,7 @@ int main(int argc, const char *argv[])
         OPT_STRING('c', "comport", &comport, "Com port to use (Windows: COMx | *nix: /dev/ttyX)"),
         OPT_INTEGER('b', "baudrate", &baudrate, "Baud rate, default=115200"),
         OPT_INTEGER('g', "guard", &guard, "Guard time, default 16 cycles"),
+        OPT_INTEGER('-', "break", &breaks, "Break sent at initialize, default 2 break"),
         OPT_STRING('f', "file", &file, "Intel HEX file to flash"),
         OPT_BIT('p', "", &flag, "Perform a chip enter program mode", NULL, (1 << FLAG_PROG_MODE), 0),
         OPT_BIT('u', "unlock", &flag, "Perform a chip unlock (implied with --unlock)", NULL, (1 << FLAG_UNLOCK), 0),
@@ -307,7 +314,7 @@ int main(int argc, const char *argv[])
         return ERROR_PTR;
     }
 
-    nvm_ptr = updi_nvm_init(comport, baudrate, guard, (void *)dev);
+    nvm_ptr = updi_nvm_init(comport, baudrate, guard, breaks, (void *)dev);
     if (!nvm_ptr)
     {
         DBG_INFO(UPDI_DEBUG, "Nvm initialize failed");
@@ -540,7 +547,6 @@ out:
             {
                 DBG_INFO(UPDI_DEBUG, "NVM reset failed %d", result);
                 result = -15;
-                goto out;
             }
         }
 
@@ -551,7 +557,6 @@ out:
             {
                 DBG_INFO(UPDI_DEBUG, "nvm_disable failed %d", result);
                 result = -18;
-                goto out;
             }
         }
     }
@@ -3133,7 +3138,6 @@ int get_storage_type(B_BLOCK_TYPE btype)
 
 int get_storage_offset(B_BLOCK_TYPE btype)
 {
-    int offset = 0;
     int id = STORAGE_USERROW_OFFSET;
 
     if (btype == BLOCK_INFO)
@@ -3163,7 +3167,7 @@ int get_storage_offset(B_BLOCK_TYPE btype)
         // Not support
     }
 
-    return offset;
+    return storage_params[id];
 }
 
 int updi_storage(void *nvm_ptr, char *cmd)

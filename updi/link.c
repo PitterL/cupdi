@@ -46,7 +46,7 @@ typedef struct _upd_datalink {
 	@guard: guard time of when the transmission direction switches
     @return LINK ptr, NULL if failed
 */
-void *updi_datalink_init(const char *port, int baud, int guard)
+void *updi_datalink_init(const char *port, int baud, int guard, int breaks)
 {
     upd_datalink_t *link = NULL;
     void *phy;
@@ -55,7 +55,7 @@ void *updi_datalink_init(const char *port, int baud, int guard)
 
     DBG_INFO(LINK_DEBUG, "<LINK> init link");
     
-    phy = updi_physical_init(port, UPDI_BAUTRATE_DEFAULT /*dummy*/);
+    phy = updi_physical_init(port, UPDI_BAUTRATE_DEFAULT /*dummy*/, breaks);
     if (phy) {
 		size = sizeof(*link);
         link = (upd_datalink_t *)malloc(size);
@@ -70,24 +70,26 @@ void *updi_datalink_init(const char *port, int baud, int guard)
         link->phy = (void *)phy;
 
         do {
-          result = link_set_init(link, baud, guard);
-          if (result) {
-              DBG_INFO(LINK_DEBUG, "link_set_init failed %d, retry=%d", result, retry);
-              phy_send_double_break(phy);
-              continue;
-          }
+            result = link_set_init(link, baud, guard);
+            if (result) {
+                DBG_INFO(LINK_DEBUG, "link_set_init failed %d, retry=%d", result, retry);
+                phy_send_double_break(phy);
+                //phy_send_break(phy, breaks);
+                continue;
+            }
 
-          result = link_check(link);
-          if (result) {
-              DBG_INFO(LINK_DEBUG, "link_check failed %d, retry=%d", result, retry);
-              phy_send_double_break(phy);
-              continue;
-          }
+            result = link_check(link);
+            if (result) {
+                DBG_INFO(LINK_DEBUG, "link_check failed %d, retry=%d", result, retry);
+                phy_send_double_break(phy);
+			    //phy_send_break(phy, breaks);
+                continue;
+            }
         } while(retry-- && result);
 
         if (result) {
-          updi_datalink_deinit(link);
-          return NULL;
+            updi_datalink_deinit(link);
+            return NULL;
         }
     }
 
@@ -108,6 +110,32 @@ void updi_datalink_deinit(void *link_ptr)
         updi_physical_deinit(PHY(link));
         free(link);
     }
+}
+
+/*
+	Dump UPDI register
+	@link_ptr: APP object pointer, acquired from updi_datalink_init()
+	@return 0 successful, other value if failed
+*/
+int link_dump(void *link_ptr)
+{
+	u8 resp[NUM_UPDI_REGS], i;
+	int result = 0;
+
+	DBG_INFO(LINK_DEBUG, "<LINK> link dump");
+	for (i = UPDI_CS_STATUSA; i < NUM_UPDI_REGS; i++) {
+		result = _link_ldcs(link_ptr, i, &resp[i]);
+		if (result) {
+			DBG_INFO(LINK_DEBUG, "UPDI can't be accessed %d, error %d", i, result);
+			break;
+		}
+	}
+
+	if (result == 0) {
+		DBG(DEFAULT_DEBUG, "UPDI register dump:", resp, sizeof(resp), "%02X ");
+	}
+
+	return result;
 }
 
 /*
