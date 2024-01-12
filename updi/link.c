@@ -113,6 +113,23 @@ void updi_datalink_deinit(void *link_ptr)
 }
 
 /*
+    LINK object destroy
+    @link_ptr: APP object pointer, acquired from updi_datalink_init()
+     @return 0 successful, other value if failed
+*/
+int link_send_breaks(void *link_ptr, int breaks)
+{
+    upd_datalink_t *link = (upd_datalink_t *)link_ptr;
+
+    if (!VALID_LINK(link))
+        return ERROR_PTR;
+
+    DBG_INFO(LINK_DEBUG, "<LINK> send breaks %d", breaks);
+
+    return phy_send_break(PHY(link), breaks);    
+}
+
+/*
 	Dump UPDI register
 	@link_ptr: APP object pointer, acquired from updi_datalink_init()
 	@return 0 successful, other value if failed

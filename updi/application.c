@@ -399,15 +399,27 @@ int app_disable(void *app_ptr)
     */
     upd_application_t *app = (upd_application_t *)app_ptr;
     int result;
+    u8 resp = 0;
 
     if (!VALID_APP(app))
         return ERROR_PTR;
 
     DBG_INFO(APP_DEBUG, "<APP> Disable");
+    // To avoid internal Error state blocks
+    result = link_send_breaks(LINK(app), 2);
+    if (result) {
+        DBG_INFO(APP_ERROR, "link_send_breaks failed %d", result);
+        return -2;
+    }
+
+    resp = link_ldcs(LINK(app), UPDI_CS_STATUSB);
+    if (resp) {
+        DBG_INFO(APP_ERROR, "Status B is 0x%02x", resp);
+    }
 
     result = link_stcs(LINK(app), UPDI_CS_CTRLB, (1 << UPDI_CTRLB_UPDIDIS_BIT) | (1 << UPDI_CTRLB_CCDETDIS_BIT));
     if (result) {
-        DBG_INFO(APP_DEBUG, "link_stcs failed %d", result);
+        DBG_INFO(APP_ERROR, "link_stcs disable UPDI failed %d", result);
         return -2;
     }
 

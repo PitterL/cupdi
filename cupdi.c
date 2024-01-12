@@ -85,9 +85,11 @@ This is C version of UPDI interface achievement, referred to the Python version 
             3. Fixed a code issue of support 'uoff, eoff' in command storage(not tested)
             4. Fixed a issue of support `C0` type configure storage, which don't recogize the header and tail
             5. Added of function of link_dump()
+        <g> 1. split -i and --info command, for -i, the chip won't enter into programming mode
+            2. in updi disable, we will re-assert break signal and STATUB read to avoid some error to block UPDI communication
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19f"
+#define SOFTWARE_VERSION "1.19g"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -166,6 +168,7 @@ int main(int argc, const char *argv[])
     char *selftest = NULL;
     char *storage = NULL;
     int flag = 0;
+    bool show_info = false;
     bool unlock = false;
     int verbose = 1;
     bool reset = false;
@@ -198,7 +201,8 @@ int main(int argc, const char *argv[])
         OPT_BIT('-', "check", &flag, "Check flash content with infoblock CRC", NULL, (1 << FLAG_CHECK), 0),
         OPT_BIT('-', "compare", &flag, "Compare vcs HEX file with infoblock and fuses content", NULL, (1 << FLAG_COMPARE), 0),
         OPT_BIT('-', "verify", &flag, "Check infoblock infomation (and compare hex if offered)", NULL, (1 << FLAG_VERIFY), 0),
-        OPT_BIT('i', "info", &flag, "Get Infoblock infomation of firmware", NULL, (1 << FLAG_INFO), 0),
+        OPT_BIT('-', "info", &flag, "Get Infoblock infomation of firmware", NULL, (1 << FLAG_INFO), 0),
+        OPT_BOOLEAN('i', "", &show_info, "Get Infoblock infomation of firmware"),
         OPT_BIT('-', "save", &flag, "Save flash to a VCS HEX file", NULL, (1 << FLAG_SAVE), 0),
         OPT_BIT('-', "dump", &flag, "Dump flash to a Intel HEX file", NULL, (1 << FLAG_DUMP), 0),
         OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addre1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
@@ -332,7 +336,7 @@ int main(int argc, const char *argv[])
     }
 
     // unlock
-    if (flag /* read || write || erase || dbgview || selftest*/)
+    if (flag /* || read || write || erase || dbgview || selftest*/)
     {
         result = nvm_enter_progmode(nvm_ptr);
         if (result)
@@ -444,7 +448,7 @@ int main(int argc, const char *argv[])
     }
 
     // show info block
-    if (TEST_BIT(flag, FLAG_INFO))
+    if (TEST_BIT(flag, FLAG_INFO) || show_info)
     {
         result = updi_show_ext_info(nvm_ptr);
         if (result)

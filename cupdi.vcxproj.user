@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-d tiny3217 -c com14 -f "D:\Users\a41450\atmel studio\ATtiny3217-1Finger-Low_Power-Project-MPT2\ATtiny3217-1Finger-Low_Power-Project-MPT2\Debug\fw.save" --verify  -v 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-d tiny816 -c com14 -f "D:\Users\a41450\atmel studio\ATtiny3217-1Finger-Low_Power-Project-MPT2\ATtiny3217-1Finger-Low_Power-Project-MPT2\Debug\fw.save" -i --disable  -v 2</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

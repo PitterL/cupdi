@@ -4,6 +4,7 @@
 void *updi_datalink_init(const char *port, int baud, int guard, int breaks);
 void updi_datalink_deinit(void *link_ptr);
 int link_set_init(void *link_ptr, int baud, int guard);
+int link_send_breaks(void *link_ptr, int breaks);
 int link_dump(void *link_ptr);
 int link_check(void *link_ptr);
 int _link_ldcs(void *link_ptr, u8 address, u8 *val);
