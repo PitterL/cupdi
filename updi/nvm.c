@@ -1403,7 +1403,7 @@ int nvm_halt(void *nvm_ptr)
     @info: chip flash information
     @return 0 successful, other value failed
 */
-int nvm_get_block_info(void *nvm_ptr, int type, nvm_info_t *info)
+int nvm_get_block_info(void *nvm_ptr, int type, nvm_info_t *inf)
 {
     /*
         get block info
@@ -1415,7 +1415,7 @@ int nvm_get_block_info(void *nvm_ptr, int type, nvm_info_t *info)
 
     // DBG_INFO(NVM_DEBUG, "<NVM> Get chip nvm type %d info", type);
 
-    return dev_get_nvm_info(nvm->dev, type, info);
+    return dev_get_nvm_info(nvm->dev, type, inf);
 }
 
 /*

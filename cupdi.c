@@ -87,9 +87,12 @@ This is C version of UPDI interface achievement, referred to the Python version 
             5. Added of function of link_dump()
         <g> 1. split -i and --info command, for -i, the chip won't enter into programming mode
             2. in updi disable, we will re-assert break signal and STATUB read to avoid some error to block UPDI communication
+        <h> 1. A memcpy() issue for varible address copy of _get_var_addr_data()
+            2. compatible 81x and 161x library of definition of "qtm_acq_node_config_t"
+
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19g"
+#define SOFTWARE_VERSION "1.19h"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -515,7 +518,7 @@ int main(int argc, const char *argv[])
     // Selftest
     if (selftest)
     {
-        result = updi_selftest(nvm_ptr, selftest);
+        result = updi_selftest(nvm_ptr, selftest, dev->type);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "selftest failed %d", result);
@@ -1162,8 +1165,8 @@ int load_varible_address_from_file(const char *file, varible_address_t *output)
     varible_search_t search_list[] = {
         {&ds, {"ptc_qtlib_node_stat1", "qtm_node_stat1"}, 2},
         {&dr, {"qtlib_key_data_set1", "qtm_key_data_set1"}, 2},
-        {&node, {"ptc_seq_node_cfg1", "qtm_seq_node_cfg1"}, 2},
         {&acq, {"ptc_qtlib_acq_gen1", "qtm_acq_gen1"}, 2},
+        {&node, {"ptc_seq_node_cfg1", "qtm_seq_node_cfg1"}, 2},
     };
 
     int i, j, result;
@@ -3023,7 +3026,7 @@ static void _verbar_token_parse(char *cmd, const char *tag[], int *params, int c
 // Use pf(float)
 #define CALCULATE_CAP_DIV(_v) ((_v)&0x0F) * 0.00675 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + ((((_v) >> 12) & 0x03) + (((_v) >> 14) & 0x03)) * 6.75;
 
-static int _get_var_addr_data(void *nvm_ptr, varible_address_t *vaddr)
+static int _get_var_addr_data(void *nvm_ptr, varible_address_t *va)
 {
     information_container_t info_container;
     varible_address_array_t var_arr;
@@ -3054,9 +3057,9 @@ static int _get_var_addr_data(void *nvm_ptr, varible_address_t *vaddr)
         }
     }
 
-    if (vaddr)
+    if (va)
     {
-        memcpy(vaddr, &var_arr.var_addr, sizeof(vaddr));
+        memcpy(va, &var_arr.var_addr, sizeof(*va));
     }
 
 out:
@@ -3405,7 +3408,7 @@ const char *sltest_token_tag[SLTEST_MAX_PARAM_NUM] = {
     "st",
     "keys"};
 
-int updi_selftest(void *nvm_ptr, char *cmd)
+int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
 {
     cap_sample_value_t rsd_data;
     varible_address_t var_addr;
@@ -3416,8 +3419,9 @@ int updi_selftest(void *nvm_ptr, char *cmd)
     bool siglim_alloc = false;
 
     // debug varible
-    qtm_acq_node_config_t ptc_node;
+    qtm_acq_union_node_config_t ptc_node;
     qtm_acq_node_group_config_t ptc_acq;
+    uint8_t node_gain;
 
     int params[SLTEST_MAX_PARAM_NUM] = {0 /*SLTEST_SIGLIM_LO*/, 0 /*SLTEST_SIGLIM_HI*/, 0 /*SLTEST_DS_DR_RANGE*/, 0 /*SLTEST_ACQ_ND_ADDR*/, 0 /*SLTEST_KEY_START*/, 1 /*SLTEST_KEY_CNT*/}; // keys default set to 1
     _verbar_token_parse(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM);
@@ -3484,7 +3488,7 @@ int updi_selftest(void *nvm_ptr, char *cmd)
         var_addr.acqnd.value = (unsigned int)params[SLTEST_ACQ_ND_ADDR];
     }
 
-    if (/*reset*/ 0)
+    if (0 /*reset*/)
     {
         // Reset that mcu can continue to run
         nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
@@ -3529,7 +3533,8 @@ int updi_selftest(void *nvm_ptr, char *cmd)
                 }
                 else
                 {
-                    result = _get_mem_data(nvm_ptr, channel, var_addr.acqnd.data.node, &ptc_node, sizeof(ptc_node));
+                    size = dev_type >= TINY161x ? sizeof(ptc_node.n16) : sizeof(ptc_node.n8);
+                    result = _get_mem_data(nvm_ptr, channel, var_addr.acqnd.data.node, &ptc_node, size);
                     if (result)
                     {
                         DBG_INFO(UPDI_DEBUG, "_get_mem_data(node) failed 0x%x", result);
@@ -3544,10 +3549,11 @@ int updi_selftest(void *nvm_ptr, char *cmd)
                         }
                         else
                         {
-                            val = rsd_data.reference >> NODE_GAIN_DIG(ptc_node.node_gain);
+                            node_gain = dev_type >= TINY161x ? ptc_node.n16.node_gain : ptc_node.n8.node_gain;
+                            val = rsd_data.reference >> NODE_GAIN_DIG(node_gain);
                             if (val > NODE_BASE_LINE + siglim[i].limit.range || val < NODE_BASE_LINE - siglim[i].limit.range)
                             {
-                                DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d %d) variance out of range (%d) ", i, channel, rsd_data.reference, val, siglim[i].limit.range);
+                                DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) gain(0x%02x), val %d out of variance (%d) ", i, channel, rsd_data.reference, node_gain, val, siglim[i].limit.range);
                                 result = -8;
                                 goto out;
                             }

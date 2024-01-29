@@ -34,7 +34,7 @@ int nvm_erase_auto(void *nvm_ptr, u32 address, int count);
 int nvm_reset(void *nvm_ptr, int delay_ms, bool reset_or_halt);
 int nvm_halt(void *nvm_ptr);
 int nvm_wait(void *nvm_ptr);
-int nvm_get_block_info(void *nvm_ptr, /*NVM_TYPE_T*/int type, nvm_info_t *info);
+int nvm_get_block_info(void *nvm_ptr, /*NVM_TYPE_T*/int type, nvm_info_t *inf);
 int nvm_get_block_info_ext(void *nvm_ptr, int type, nvm_info_t *info, char **pname);
 void *nvm_get_content(void *nvm_ptr, int type, int *req_size);
 

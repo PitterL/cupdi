@@ -20,6 +20,20 @@ typedef struct {
 	uint8_t node_oversampling; /* Accumulator setting */
 } qtm_acq_node_config_t;
 
+typedef struct {
+	uint16_t node_xmask;        /* Selects the X Pins for this node */
+	uint16_t node_ymask;        /* Selects the Y Pins for this node */
+	uint8_t  node_csd;          /* Charge Share Delay */
+	uint8_t  node_rsel_prsc;    /* Bits 7:4 = Resistor, Bits 3:0  Prescaler */
+	uint8_t  node_gain;         /* Bits 7:4 = Analog gain, Bits 3:0 = Digital gain */
+	uint8_t  node_oversampling; /* Accumulator setting */
+} qtm_acq_t161x_node_config_t;
+
+typedef union {
+	qtm_acq_node_config_t n8;
+	qtm_acq_t161x_node_config_t n16;
+} qtm_acq_union_node_config_t;
+
 /* Node run-time data - Defined in common api as it will be used with all acquisition modules */
 
 /* Node group configuration */

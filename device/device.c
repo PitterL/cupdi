@@ -103,17 +103,17 @@ const chip_info_t device_tiny_41x = {
     {0x128A, 1, 1, 0, 0, 0x83}};
 
 static const device_info_t g_device_list[] = {
-    {"avr128da", &device_avr128da},
-    {"avr64da", &device_avr64da},
-    {"avr32da", &device_avr32da},
-    {"tiny3216", &device_tiny_321x},
-    {"tiny3217", &device_tiny_321x},
-    {"tiny1616", &device_tiny_161x},
-    {"tiny1617", &device_tiny_161x},
-    {"tiny814", &device_tiny_81x},
-    {"tiny816", &device_tiny_81x},
-    {"tiny817", &device_tiny_81x},
-    {"tiny417", &device_tiny_41x},
+    {"avr128da", AVRDA, &device_avr128da},
+    {"avr64da", AVRDA, &device_avr64da},
+    {"avr32da", AVRDA, &device_avr32da},
+    {"tiny3216", TINY321x, &device_tiny_321x},
+    {"tiny3217", TINY321x, &device_tiny_321x},
+    {"tiny1616", TINY161x, &device_tiny_161x},
+    {"tiny1617", TINY161x, &device_tiny_161x},
+    {"tiny814", TINY81x, &device_tiny_81x},
+    {"tiny816", TINY81x, &device_tiny_81x},
+    {"tiny817", TINY81x, &device_tiny_81x},
+    {"tiny417", TINY41x, &device_tiny_41x},
 };
 
 const char *chip_nvm_name[NUM_NVM_EX_TYPES] = {
@@ -151,7 +151,7 @@ Device get block info, this is defined in device.c
     @info: chip flash information
     @return 0 successful, other value failed
 */
-int dev_get_nvm_info(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *info)
+int dev_get_nvm_info(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *inf)
 {
     /*
     get NVM information
@@ -183,7 +183,7 @@ int dev_get_nvm_info(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *info)
         return -2;
     }
 
-    memcpy(info, iblock, sizeof(*info));
+    memcpy(inf, iblock, sizeof(*inf));
 
     return 0;
 }

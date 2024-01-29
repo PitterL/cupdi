@@ -18,6 +18,14 @@ typedef struct _reg_info
     unsigned short sigrow_address;
 } reg_info_t;
 
+typedef enum {
+    TINY41x,
+    TINY81x,
+    TINY161x,
+    TINY321x,
+    AVRDA,
+} DEV_TYPE_T;
+
 typedef struct _chip_info
 {
     const char *dev_name;
@@ -33,6 +41,7 @@ typedef struct _chip_info
 typedef struct _device_info
 {
     const char *name;
+    DEV_TYPE_T type;
     const chip_info_t *mmap;
 } device_info_t;
 
@@ -53,7 +62,7 @@ typedef enum _NVM_TYPE_EX
     NUM_NVM_EX_TYPES
 } NVM_TYPE_EX_T;
 
-int dev_get_nvm_info(const void *dev, NVM_TYPE_EX_T type, nvm_info_t *info);
+int dev_get_nvm_info(const void *dev, NVM_TYPE_EX_T type, nvm_info_t *inf);
 int dev_get_nvm_info_ext(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *info, const char **pname);
 
 #endif
