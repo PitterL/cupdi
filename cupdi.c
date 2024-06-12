@@ -89,10 +89,11 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. in updi disable, we will re-assert break signal and STATUB read to avoid some error to block UPDI communication
         <h> 1. A memcpy() issue for varible address copy of _get_var_addr_data()
             2. compatible 81x and 161x library of definition of "qtm_acq_node_config_t"
+        <i> 1. Change the algorithm of CC value calcualtion
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19h"
+#define SOFTWARE_VERSION "1.19i"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -3015,16 +3016,16 @@ static void _verbar_token_parse(char *cmd, const char *tag[], int *params, int c
 }
 
 // Use 1/1000 pf as unit, the max value 675 * 8 = 54000, less than 16bit, but will show negative value in studio if more thant 32767
-#define CALCULATE_CAP_DIV_1000(_v) (((_v)&0x0F) * 7 + (((_v) >> 4) & 0x0F) * 68 + (((_v) >> 8) & 0x0F) * 675 + ((((_v) >> 12) & 0x03) + (((_v) >> 14) & 0x03)) * 6750)
+#define CALCULATE_CAP_DIV_1000(_v) (((_v) & 0x0F) * 10 + (((_v) >> 4) & 0x0F) * 68 + (((_v) >> 8) & 0x0F) * 675 + (((_v) >> 12) & 0x03) * 6750 + (((_v) >> 14) & 0x03) * 6200)
 
 // Use 1/100 pf as unit
-#define CALCULATE_CAP_DIV_100(_v) ((((_v) >> 2) & 0x03) * 3 + (((_v) >> 4) & 0x0F) * 7 + (((_v) >> 8) & 0x0F) * 68 + ((((_v) >> 12) & 0x03) + (((_v) >> 14) & 0x03)) * 675)
+#define CALCULATE_CAP_DIV_100(_v) (((_v) & 0x0F) * 1 + (((_v) >> 4) & 0x0F) * 7 + (((_v) >> 8) & 0x0F) * 68 + (((_v) >> 12) & 0x03) * 675 + (((_v) >> 14) & 0x03) * 620)
 
 // Use 1/10 pf as unit
-#define CALCULATE_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 2) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + ((((_v) >> 12) & 0x03) + (((_v) >> 14) & 0x03)) * 68)
+#define CALCULATE_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 2) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + (((_v) >> 12) & 0x03) * 68 + (((_v) >> 14) & 0x03) * 62)
 
 // Use pf(float)
-#define CALCULATE_CAP_DIV(_v) ((_v)&0x0F) * 0.00675 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + ((((_v) >> 12) & 0x03) + (((_v) >> 14) & 0x03)) * 6.75;
+#define CALCULATE_CAP_DIV(_v) (((_v) & 0x0F) * 0.01 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + (((_v) >> 12) & 0x03) * 6.75 + (((_v) >> 14) & 0x03) * 6.2)
 
 static int _get_var_addr_data(void *nvm_ptr, varible_address_t *va)
 {
@@ -3322,12 +3323,13 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                 tm_info = localtime(&timer);
                 strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
 
-                DBG_INFO(DEFAULT_DEBUG, "T[%s][%d-%d]: delta,%hd, ref,%hd, signal,%hd, cc,%hd(%.2f), sensor_state,%02xH, node_state,%02xH", timebuf, i, j,
+                DBG_INFO(DEFAULT_DEBUG, "T[%s][%d-%d]: delta,%hd, ref,%hd, signal,%hd, cc,%hd(%.2f, 0x%x), sensor_state,%02xH, node_state,%02xH", timebuf, i, j,
                          (int16_t)(rsd_data.signal - rsd_data.reference),
                          rsd_data.reference,
                          rsd_data.signal,
                          rsd_data.cccap,
                          rsd_data.cc_value,
+                         rsd_data.comcap,
                          rsd_data.sensor_state,
                          rsd_data.node_acq_status);
             }
