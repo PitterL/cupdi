@@ -50,6 +50,7 @@
     <ClInclude Include="string\split.h" />
     <ClInclude Include="string\strlcat.h" />
     <ClInclude Include="string\strndup.h" />
+    <ClInclude Include="string\trim.h" />
     <ClInclude Include="updi\application.h" />
     <ClInclude Include="updi\constants.h" />
     <ClInclude Include="updi\link.h" />
@@ -83,6 +84,7 @@
     <ClCompile Include="string\split.c" />
     <ClCompile Include="string\strlcat.c" />
     <ClCompile Include="string\strndup.c" />
+    <ClCompile Include="string\trim.c" />
     <ClCompile Include="updi\application.c" />
     <ClCompile Include="updi\link.c" />
     <ClCompile Include="updi\nvm.c" />

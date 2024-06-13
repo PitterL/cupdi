@@ -61,6 +61,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include <updi/nvm.h>
 #include <ihex/ihex.h>
 #include <string/split.h>
+#include <string/trim.h>
 #include <file/fop.h>
 #include <crc/crc.h>
 #include <ext/ext.h>
@@ -90,10 +91,11 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <h> 1. A memcpy() issue for varible address copy of _get_var_addr_data()
             2. compatible 81x and 161x library of definition of "qtm_acq_node_config_t"
         <i> 1. Change the algorithm of CC value calcualtion
+        <j> 1. change selftest command format with CFGBLOCK C1 format --selftest "siglim={ key_cnt, siglo, sighi, range_variance }"
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19i"
+#define SOFTWARE_VERSION "1.19j"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -212,7 +214,7 @@ int main(int argc, const char *argv[])
         OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addre1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
         OPT_STRING('w', "write", &write, "Direct write to any memory [addr0]:[data0];[data1];[data1]|[addr1]... Note address and data format with Hex type dig"),
         OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]", NULL, (intptr_t) ""),
-        OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range sighi=[n]|siglo=[n]|range=[n]|slot=[n]|st=[n]|keys=[n]", NULL, (intptr_t) ""),
+        OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
         OPT_BOOLEAN('-', "reset", &reset, "UPDI reset device"),
@@ -2971,21 +2973,34 @@ int updi_reset(void *nvm_ptr)
 }
 
 /*
-    Debug view
-    @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and data. Format: ds=[ptr]|dr[ptr]|loop=[dat1]|keys[dat2]
+    Token parser
+    @cmd: cmd string use for address and data. Format: ds=[ptr]|dr[ptr]|<array>={1,2,3}
             ds pointer: ptc_qtlib_node_stat1 address, which store structure qtm_acq_node_data_t, we get signal and cc value in it
             dr pointer: qtlib_key_data_set1 address, which store qtm_touch_key_data_t, we get ref value in it
+            <array>: data array
+    @tag[]: the tag will be parsed
+    @tag_val[]: the tag value
+    @max_tag_count: the max tag value
+    @arr_val[]: store the array data
+    @max_arr_count: maximum count of the arrays
+    @each_arr_depth: the depth of each array
+    @elem_size: each size of the array's element
+    @max_arr_depth_ptr: maximum depth of all array
     @returns 0 - success, other value failed code. this function will print the log in console
 */
-
-static void _verbar_token_parse(char *cmd, const char *tag[], int *params, int count)
+static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val, int max_tag_count, int *arr_val[], int max_arr_count, int each_arr_depth, int elem_size, int *max_arr_depth_ptr)
 {
-    char **tk_s, **tk_w; // token section, token words
-    int i, j;
+    char **tk_s, **tk_w, **tk_arr, *str, *cmd_dup;// token section, token words
+    int i, j, k, arr_i = 0;
+    int max_each_arr_depth = 0;
+
+    cmd_dup = __strndup(cmd, 255);
+    if (!cmd_dup) {
+        return;
+    }
 
     // Parse tokens
-    tk_s = str_split(cmd, '|');
+    tk_s = str_split(cmd_dup, '|');
     if (tk_s)
     {
         for (i = 0; tk_s[i]; i++)
@@ -2995,24 +3010,74 @@ static void _verbar_token_parse(char *cmd, const char *tag[], int *params, int c
             {
                 if (tk_w && tk_w[0] && tk_w[1])
                 {
-                    for (j = 0; j < count; j++)
+                    for (j = 0; j < max_tag_count; j++)
                     {
                         if (!strcmp(tag[j], tk_w[0]))
                         {
-                            params[j] = (int)strtol(tk_w[1], NULL, 0);
+                            // Check the value whether starting with '{', that an array
+                            str = trim(tk_w[1]);
+                            if (str[0] == '{') {
+                                // skip first '{'
+                                tk_arr = str_split(str + 1, ',');
+                                if (tk_arr) {
+                                    // array elements
+                                    for (k = 0; tk_arr[k]; k++) {
+                                        if (arr_val && arr_i < max_arr_count && k < each_arr_depth) {
+                                            if (elem_size == 4) {
+                                                ((int *)arr_val)[arr_i * each_arr_depth + k] = (int)strtol(tk_arr[k], NULL, 0);
+                                            }else if (elem_size == 2) {
+                                                ((short *)arr_val)[arr_i * each_arr_depth + k] = (short)strtol(tk_arr[k], NULL, 0);
+                                            }else /*elem_size == 1*/{
+                                                // Default minimum size
+                                                ((char *)arr_val)[arr_i * each_arr_depth + k] = (char)strtol(tk_arr[k], NULL, 0);
+                                            }
+                                        }
+
+                                        free(tk_arr[k]);
+                                    }
+
+                                    if (max_each_arr_depth < k) {
+                                        max_each_arr_depth = k;
+                                    }
+
+                                    free(tk_arr);
+                                }
+                                
+                                tag_val[j] = arr_i;
+                                arr_i++;
+                            } else {
+                                tag_val[j] = (int)strtol(tk_w[1], NULL, 0);
+                            }
+
                             break;
                         }
                     }
                 }
 
-                for (j = 0; tk_w[j]; j++)
+                for (j = 0; tk_w[j]; j++) {
                     free(tk_w[j]);
+                }
+
+                free(tk_w);
             }
 
             free(tk_s[i]);
         }
         free(tk_s);
     }
+
+    if (max_arr_depth_ptr) {
+        *max_arr_depth_ptr = max_each_arr_depth;
+    }
+
+    if (cmd_dup) {
+        free(cmd_dup);
+    }
+}
+
+static void _verbar_token_parse(char *cmd, const char *tag[], int *tag_val, int max_tag_count)
+{
+    _verbar_token_parse_data(cmd, tag, tag_val, max_tag_count, NULL, 0, 0, 0, NULL);
 }
 
 // Use 1/1000 pf as unit, the max value 675 * 8 = 54000, less than 16bit, but will show negative value in studio if more thant 32767
@@ -3391,46 +3456,60 @@ out:
 /* param tag */
 enum
 {
-    SLTEST_SIGLIM_LO,
-    SLTEST_SIGLIM_HI,
-    SLTEST_REF_RANGE,
-    SLTEST_DS_DR_ADDR,
-    SLTEST_ACQ_ND_ADDR,
-    SLTEST_KEY_START,
-    SLTEST_KEY_CNT,
+    SLTEST_DS_ADDR,
+    SLTEST_DR_ADDR,
+    SLTEST_ACQ_ADDR,
+    SLTEST_NODE_ADDR,
+    SLTEST_SIGLIM_IDX,
     SLTEST_MAX_PARAM_NUM
 };
 
 const char *sltest_token_tag[SLTEST_MAX_PARAM_NUM] = {
-    "siglo",
-    "sighi",
-    "range",
-    "dsdr",
-    "acqnd",
-    "st",
-    "keys"};
+    "ds",
+    "dr",
+    "acq",
+    "node",
+    "siglim"
+};
 
 int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
 {
     cap_sample_value_t rsd_data;
     varible_address_t var_addr;
     int16_t val;
-    int i, j, k, size, lim_count, channel, start, result = 0;
-    signal_limit_data_t *siglim = NULL, limit_setting;
-    bool reset = false;
-    bool siglim_alloc = false;
-
+    int i, j, k, size, lim_count, lim_elem_count = 0, channel, result = 0;
+    signal_limit_data_t *siglim = NULL;
+   
     // debug varible
     qtm_acq_union_node_config_t ptc_node;
     qtm_acq_node_group_config_t ptc_acq;
     uint8_t node_gain;
+    int params[SLTEST_MAX_PARAM_NUM] = { 
+            0 /*SLTEST_DS_ADDR*/, 0 /*SLTEST_DR_ADDR*/, 
+            0 /*SLTEST_ACQ_ADDR*/, 0 /*SLTEST_NODE_ADDR*/, 
+            -1 /* SLTEST_SIGLIM_IDX */};
 
-    int params[SLTEST_MAX_PARAM_NUM] = {0 /*SLTEST_SIGLIM_LO*/, 0 /*SLTEST_SIGLIM_HI*/, 0 /*SLTEST_DS_DR_RANGE*/, 0 /*SLTEST_ACQ_ND_ADDR*/, 0 /*SLTEST_KEY_START*/, 1 /*SLTEST_KEY_CNT*/}; // keys default set to 1
-    _verbar_token_parse(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM);
-
-    // Verify the input limit parameters
-    if (!params[SLTEST_SIGLIM_LO] && !params[SLTEST_SIGLIM_HI] && !params[SLTEST_REF_RANGE])
-    {
+    // <1> Load test parameters from command, this will be higer priority than NVM setting
+    _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM, 
+            NULL, 0, 0, 0, &lim_elem_count);
+    if (params[SLTEST_SIGLIM_IDX] >= 0) {
+        lim_count = lim_elem_count / NUM_SIGLIM_TYPES;
+        if (lim_count) {
+            size = lim_count * sizeof(signal_limit_data_t);
+            siglim = malloc(size);
+            if (!siglim)
+            {
+                return -1;
+            }
+            else
+            {
+                memset(siglim, 0, size);
+                _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM, 
+                    (int **)siglim, 1, size, sizeof(s_elem_t), NULL);
+            }
+        }
+    } else {
+        // <2> Load test count and range setting from NVM
         lim_count = _get_cfg_body_data(nvm_ptr, NULL, 0);
         if (lim_count <= 0)
         {
@@ -3447,7 +3526,6 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
             }
             else
             {
-                siglim_alloc = true;
                 lim_count = _get_cfg_body_data(nvm_ptr, siglim, size);
                 if (lim_count <= 0)
                 {
@@ -3457,22 +3535,18 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
                 }
             }
         }
-        start = 0;
-        reset = true;
-    }
-    else
-    {
-        limit_setting.limit.count = (uint8_t)params[SLTEST_KEY_CNT];
-        limit_setting.limit.siglo = (uint16_t)params[SLTEST_SIGLIM_LO];
-        limit_setting.limit.sighi = (uint16_t)params[SLTEST_SIGLIM_HI];
-        limit_setting.limit.range = (uint8_t)params[SLTEST_REF_RANGE];
-        siglim = &limit_setting;
-        start = params[SLTEST_KEY_START];
-        lim_count = 1;
     }
 
-    // Verify the input addr parameters
-    if (!params[SLTEST_DS_DR_ADDR] || !params[SLTEST_ACQ_ND_ADDR])
+    // <3> Verify the input addr parameters
+    if (params[SLTEST_DS_ADDR] && params[SLTEST_DR_ADDR] &&
+        params[SLTEST_ACQ_ADDR] && params[SLTEST_NODE_ADDR] ) 
+    {
+        var_addr.dsdr.data.ds = (unsigned short)params[SLTEST_DS_ADDR];
+        var_addr.dsdr.data.dr = (unsigned short)params[SLTEST_DR_ADDR];
+        var_addr.acqnd.data.acq = (unsigned short)params[SLTEST_ACQ_ADDR];
+        var_addr.acqnd.data.node = (unsigned int)params[SLTEST_NODE_ADDR];
+    }
+    else
     {
         // No valid address, load from info block
         result = _get_var_addr_data(nvm_ptr, &var_addr);
@@ -3482,18 +3556,6 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
             result = -5;
             goto out;
         }
-        reset = true;
-    }
-    else
-    {
-        var_addr.dsdr.value = (unsigned int)params[SLTEST_DS_DR_ADDR];
-        var_addr.acqnd.value = (unsigned int)params[SLTEST_ACQ_ND_ADDR];
-    }
-
-    if (0 /*reset*/)
-    {
-        // Reset that mcu can continue to run
-        nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
     }
 
     // ptc_acq
@@ -3507,11 +3569,10 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
 
     DBG_INFO(UPDI_DEBUG, "==========================");
     DBG_INFO(UPDI_DEBUG, "Selftest Parameters:");
-    for (i = 0, j = start; i < lim_count; i++)
+    for (i = 0, j = 0; i < lim_count; i++)
     {
         DBG_INFO(UPDI_DEBUG, "Group(%d): K%d(n%d): [%d - %d / %d]",
-                 i,
-                 start,
+                 i, j,
                  siglim[i].limit.count,
                  siglim[i].limit.siglo,
                  siglim[i].limit.sighi,
@@ -3521,7 +3582,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
     DBG_INFO(UPDI_DEBUG, "");
 
     // Get range
-    for (i = 0, k = start; i < lim_count; i++)
+    for (i = 0, k = 0; i < lim_count; i++)
     {
         for (j = 0; j < siglim[i].limit.count; j++)
         {
@@ -3543,7 +3604,8 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
                     }
                     else
                     {
-                        if (rsd_data.cccap > siglim[i].limit.sighi || rsd_data.cccap < siglim[i].limit.siglo)
+                        if ((siglim[i].limit.sighi || siglim[i].limit.siglo) &&
+                            (rsd_data.cccap > siglim[i].limit.sighi || rsd_data.cccap < siglim[i].limit.siglo))
                         {
                             DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) signal(%d) out of range (%d~%d) ", i, channel, rsd_data.cccap, siglim[i].limit.siglo, siglim[i].limit.sighi);
                             result = -7;
@@ -3553,7 +3615,8 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
                         {
                             node_gain = dev_type >= TINY161x ? ptc_node.n16.node_gain : ptc_node.n8.node_gain;
                             val = rsd_data.reference >> NODE_GAIN_DIG(node_gain);
-                            if (val > NODE_BASE_LINE + siglim[i].limit.range || val < NODE_BASE_LINE - siglim[i].limit.range)
+                            if ((siglim[i].limit.range) &&
+                                (val > NODE_BASE_LINE + siglim[i].limit.range || val < NODE_BASE_LINE - siglim[i].limit.range))
                             {
                                 DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) gain(0x%02x), val %d out of variance (%d) ", i, channel, rsd_data.reference, node_gain, val, siglim[i].limit.range);
                                 result = -8;
@@ -3573,7 +3636,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
         k += j;
     }
 out:
-    if (siglim && siglim_alloc)
+    if (siglim)
     {
         free(siglim);
     }

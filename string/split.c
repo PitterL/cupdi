@@ -4,6 +4,9 @@
 #include <assert.h>
 #include "strndup.h"
 
+/*
+    note: input str will be changed
+*/
 char** str_split(char* a_str, const char a_delim)
 {
     char** result = 0;

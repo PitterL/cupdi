@@ -123,6 +123,9 @@
     <ClInclude Include="ext\cfgblock\c0.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="string\trim.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cupdi.c">
@@ -213,6 +216,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ext\cfgblock\c0.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="string\trim.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
