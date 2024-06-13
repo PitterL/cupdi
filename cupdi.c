@@ -92,10 +92,11 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. compatible 81x and 161x library of definition of "qtm_acq_node_config_t"
         <i> 1. Change the algorithm of CC value calcualtion
         <j> 1. change selftest command format with CFGBLOCK C1 format --selftest "siglim={ key_cnt, siglo, sighi, range_variance }"
+        <k> 2. comport can be enumulated if not specified
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19j"
+#define SOFTWARE_VERSION "1.19k"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -315,13 +316,6 @@ int main(int argc, const char *argv[])
         }
 
         return 0;
-    }
-
-    //<Part 2> The command below requires common port
-    if (!comport)
-    {
-        DBG_INFO(UPDI_DEBUG, "No COM PORT appointed");
-        return ERROR_PTR;
     }
 
     nvm_ptr = updi_nvm_init(comport, baudrate, guard, breaks, (void *)dev);
@@ -2988,7 +2982,7 @@ int updi_reset(void *nvm_ptr)
     @max_arr_depth_ptr: maximum depth of all array
     @returns 0 - success, other value failed code. this function will print the log in console
 */
-static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val, int max_tag_count, int *arr_val[], int max_arr_count, int each_arr_depth, int elem_size, int *max_arr_depth_ptr)
+static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val, int max_tag_count, void *arr_val[], int max_arr_count, int each_arr_depth, int elem_size, int *max_arr_depth_ptr)
 {
     char **tk_s, **tk_w, **tk_arr, *str, *cmd_dup;// token section, token words
     int i, j, k, arr_i = 0;
@@ -3505,7 +3499,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
             {
                 memset(siglim, 0, size);
                 _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM, 
-                    (int **)siglim, 1, size, sizeof(s_elem_t), NULL);
+                    (void **)siglim, 1, size, sizeof(s_elem_t), NULL);
             }
         }
     } else {

@@ -52,7 +52,7 @@ void *updi_physical_init(const char *port, int baud, int breaks)
     int result;
 
     DBG_INFO(PHY_DEBUG, "<PHY> Opening port %s, baudrate %d", port, baud);
-
+    
     stat.baudRate = baud;
     stat.byteSize = 8;
     stat.stopBits = TWOSTOPBITS;

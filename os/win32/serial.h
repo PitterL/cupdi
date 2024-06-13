@@ -39,7 +39,7 @@ typedef struct __SER_PORT_STATE{
  * Initialises a serial port handle for reading and writing
  * @implementation serial.c
  */
-HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *state);
+HANDLE OpenPort(const char *port, const SER_PORT_STATE_T *state);
 
 /**
 * configure a serial port 

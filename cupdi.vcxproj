@@ -40,6 +40,7 @@
     <ClInclude Include="ext\infoblock\s2.h" />
     <ClInclude Include="os\platform.h" />
     <ClInclude Include="os\win32\delay.h" />
+    <ClInclude Include="os\win32\enum.h" />
     <ClInclude Include="os\win32\error.h" />
     <ClInclude Include="os\win32\logging.h" />
     <ClInclude Include="os\win32\serial.h" />
@@ -75,6 +76,7 @@
     <ClCompile Include="ext\infoblock\s1.c" />
     <ClCompile Include="ext\infoblock\s2.c" />
     <ClCompile Include="os\win32\delay.c" />
+    <ClCompile Include="os\win32\enum.c" />
     <ClCompile Include="os\win32\logging.c" />
     <ClCompile Include="os\win32\serial.c" />
     <ClCompile Include="os\win32\swap.c" />

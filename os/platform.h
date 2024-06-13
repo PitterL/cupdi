@@ -46,6 +46,7 @@ typedef long ssize_t;
 #include <os/win32/swap.h>
 #include <os/win32/logging.h>
 #include <os/win32/error.h>
+#include <os/win32/enum.h>
 
 #include <string/getline.h>
 #include <string/strndup.h>

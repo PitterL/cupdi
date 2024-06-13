@@ -8,9 +8,12 @@
  * This file contains the function implementations for serial port
  * communication.
  */
+#include <stdio.h>
 #include "serial.h"
 #include "error.h"
+#include "enum.h"
 #include <string/strlcat.h>
+
 
 typedef struct _upd_sercom {
 #define UPD_SERCOM_MAGIC_WORD 0xA5A5 //'user'
@@ -33,14 +36,28 @@ typedef struct _upd_sercom {
  *                      serial port connection.
  */
 
-HANDLE OpenPort(const void *port, const SER_PORT_STATE_T *st) {
+HANDLE OpenPort(const char *port, const SER_PORT_STATE_T *st) {
     upd_sercom_t *ser;
 	size_t size;
     HANDLE fd = NULL;
-    char comport[16] = "\\\\.\\";
+    char comprefix[16] = "\\\\.\\";
+    char comport[16] = "";
+    char comnum = 0;
 
-    /* Create the file descriptor handle */
-    strlcat(comport, port, sizeof(comport) - 1);
+    // Check port number or list of target COM device
+    if (!port || !strlen(port)) {
+        comnum = ListSerialPorts(USBSER_VID, USBSER_PID);
+        if (comnum) { 
+            snprintf(comport, sizeof(comport), "%sCOM%d", comprefix, comnum);
+        } else {
+            return NULL;
+        }
+    } else {
+        /* Create the file descriptor handle */
+        snprintf(comport, sizeof(comport), "%s%s", comprefix, port);
+    }
+
+    // Open port
     if ((fd = CreateFileA(comport, GENERIC_READ | GENERIC_WRITE, 0, NULL,
                     OPEN_EXISTING, 0/*FILE_FLAG_OVERLAPPED*/, NULL))
         == INVALID_HANDLE_VALUE) {
