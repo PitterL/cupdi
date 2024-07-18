@@ -94,10 +94,11 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <j> 1. change selftest command format with CFGBLOCK C1 format --selftest "siglim={ key_cnt, siglo, sighi, range_variance }"
         <k> 1. comport can be enumulated if not specified
         <l> 1. change dbgview output string format
+        <m> 1. change the sram magicoffset to 0xFF to avoid combined with flash zone in format convert
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19l"
+#define SOFTWARE_VERSION "1.19m"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"

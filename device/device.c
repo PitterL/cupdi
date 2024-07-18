@@ -33,7 +33,7 @@ const chip_info_t device_avr128da = {
     {0x1050, 9, 1, 0, 0, 0x82},
     {0x1080, 32, 32, 0, 0, 0x85},
     {0x1400, 512, 1, 0, 0, 0x81},
-    {0x4000, 16 * 1024, 1024 /*dummy*/},
+    {0x4000, 16 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
     {0x1040, 4, 1, 0, 0, 0x83}};
 
 const chip_info_t device_avr64da = {
@@ -44,7 +44,7 @@ const chip_info_t device_avr64da = {
     {0x1050, 9, 1, 0, 0, 0x82},
     {0x1080, 32, 32, 0, 0, 0x85},
     {0x1400, 512, 1, 0, 0, 0x81},
-    {0x4000, 8 * 1024, 1024 /*dummy*/},
+    {0x4000, 8 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
     {0x1040, 4, 1, 0, 0, 0x83}};
 
 const chip_info_t device_avr32da = {
@@ -55,7 +55,7 @@ const chip_info_t device_avr32da = {
     {0x1050, 9, 1, 0, 0, 0x82},
     {0x1080, 32, 32, 0, 0, 0x85},
     {0x1400, 512, 1, 0, 0, 0x81},
-    {0x4000, 4 * 1024, 1024 /*dummy*/},
+    {0x4000, 4 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
     {0x1040, 4, 1, 0, 0, 0x83}};
 
 const chip_info_t device_tiny_321x = {
@@ -66,7 +66,7 @@ const chip_info_t device_tiny_321x = {
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 64, 64, 0, 0, 0x85},
     {0x1400, 256, 64, 0, 0, 0x81},
-    {0x3800, 2 * 1024, 1024 /*dummy*/},
+    {0x3800, 2 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
     {0x128A, 1, 1, 0, 0, 0x83}};
 
 const chip_info_t device_tiny_161x = {
@@ -77,7 +77,7 @@ const chip_info_t device_tiny_161x = {
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 32, 32, 0, 0, 0x85},
     {0x1400, 256, 32, 0, 0, 0x81},
-    {0x3800, 2 * 1024, 1024 /*dummy*/},
+    {0x3800, 2 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
     {0x128A, 1, 1, 0, 0, 0x83}};
 
 const chip_info_t device_tiny_81x = {
@@ -88,7 +88,7 @@ const chip_info_t device_tiny_81x = {
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 32, 32, 0, 0, 0x85},
     {0x1400, 128, 32, 0, 0, 0x81},
-    {0x3E00, 512, 512 /*dummy*/},
+    {0x3E00, 512, 512 /*dummy*/, 0, 0, 0xFF /*dummy*/},
     {0x128A, 1, 1, 0, 0, 0x83}};
 
 const chip_info_t device_tiny_41x = {
@@ -99,7 +99,7 @@ const chip_info_t device_tiny_41x = {
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 32, 32, 0, 0, 0x85},
     {0x1400, 128, 32, 0, 0, 0x81},
-    {0x3F00, 256, 256 /*dummy*/},
+    {0x3F00, 256, 256 /*dummy*/, 0, 0, 0xFF /*dummy*/},
     {0x128A, 1, 1, 0, 0, 0x83}};
 
 static const device_info_t g_device_list[] = {
