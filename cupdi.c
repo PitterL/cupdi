@@ -92,11 +92,12 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. compatible 81x and 161x library of definition of "qtm_acq_node_config_t"
         <i> 1. Change the algorithm of CC value calcualtion
         <j> 1. change selftest command format with CFGBLOCK C1 format --selftest "siglim={ key_cnt, siglo, sighi, range_variance }"
-        <k> 2. comport can be enumulated if not specified
+        <k> 1. comport can be enumulated if not specified
+        <l> 1. change dbgview output string format
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19k"
+#define SOFTWARE_VERSION "1.19l"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -3382,7 +3383,7 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                 tm_info = localtime(&timer);
                 strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
 
-                DBG_INFO(DEFAULT_DEBUG, "T[%s][%d-%d]: delta,%hd, ref,%hd, signal,%hd, cc,%hd(%.2f, 0x%x), sensor_state,%02xH, node_state,%02xH", timebuf, i, j,
+                DBG_INFO(DEFAULT_DEBUG, "%d, [%s], K%d, delta,%hd,\t ref,%hd, signal,%hd, cc,%hd,(%.2f,%04x), stat_s,%02x, stat_n,%02x", i, timebuf, j,
                          (int16_t)(rsd_data.signal - rsd_data.reference),
                          rsd_data.reference,
                          rsd_data.signal,
