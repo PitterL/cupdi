@@ -97,7 +97,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19l"
+#define SOFTWARE_VERSION "A.19m"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -3320,6 +3320,11 @@ enum
     DBG_LOOP_CNT,
     DBG_KEY_START,
     DBG_KEY_CNT,
+    DBG_REG_ADDR,
+    DBG_REG_SIZE,
+    DBG_MASK_OFFSET,
+    DBG_MASK_POS,
+    DBG_MASK_NEG,
     DBG_MAX_PARAM_NUM
 };
 
@@ -3328,7 +3333,12 @@ const char *dbg_token_tag[DBG_MAX_PARAM_NUM] = {
     "dr" /*qtlib_key_data_set1->ref value*/,
     "loop",
     "st",
-    "keys"};
+    "keys",
+    "reg",
+    "size",
+    "off",
+    "mask_p",
+    "mask_n"};
 
 int updi_debugview(void *nvm_ptr, char *cmd)
 {
@@ -3339,13 +3349,16 @@ int updi_debugview(void *nvm_ptr, char *cmd)
     time_t timer;
     char timebuf[26];
     struct tm *tm_info;
-#define VPORTA 0x0
-#define VPORT_SIZE 0xC
-    u8 vbuf[VPORT_SIZE];
+    int addr, size;
+    u8 val, off, mask_n, mask_p, *buf;
+    bool show;
 
     int i, j, channel, result = 0;
 
-    int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/}; // loop value default set to 1, keys default set to 1
+    int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/
+         ,0/*DBG_REG_ADDR*/, 0/*DBG_REG_SIZE*/
+         ,0/*DBG_MASK_OFFSET*/, 0/*DBG_MASK_POS*/, 0/*DBG_MASK_NEG*/
+         }; // loop value default set to 1, keys default set to 1
 
     _verbar_token_parse(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM);
 
@@ -3396,16 +3409,43 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                          rsd_data.sensor_state,
                          rsd_data.node_acq_status);
                 
-                result = nvm_read_mem(nvm_ptr, VPORTA, vbuf, VPORT_SIZE);
-                if (result) {
-                    DBG_INFO(UPDI_DEBUG, "nvm_read_auto failed 0x%x", result);
-                } else {
-                    // DBG(DEFAULT_DEBUG, "%d, [%s], GPIO:", vbuf, VPORT_SIZE, "%02x,", i, timebuf);
-                    DBG_INFO(DEFAULT_DEBUG, "%d, [%s], GPIO, %02x,%02x,%02x,%02x, %02x,%02x,%02x,%02x, %02x,%02x,%02x,%02x,", 
-                        i, timebuf,
-                        vbuf[0], vbuf[1], vbuf[2], vbuf[3],
-                        vbuf[4], vbuf[5], vbuf[6], vbuf[7],
-                        vbuf[8], vbuf[9], vbuf[10], vbuf[11]);
+                addr = params[DBG_REG_ADDR];
+                size = params[DBG_REG_SIZE];
+                if (size && size < 256) {
+                    buf = malloc(size);
+                    if (buf) {
+                        result = nvm_read_mem(nvm_ptr, addr, buf, size);
+                        if (result) {
+                            DBG_INFO(UPDI_DEBUG, "nvm_read_auto failed 0x%x", result);
+                        } else {
+                            show = true;
+                            off = params[DBG_MASK_OFFSET];
+                            mask_p = params[DBG_MASK_POS];
+                            mask_n = params[DBG_MASK_NEG];
+                            if (off < size) {
+                                val = buf[off];
+                                if (mask_p) {
+                                    if (!(val & mask_p)) {
+                                        show = false;
+                                    }
+                                }
+
+                                if (mask_n) {
+                                    if (val & mask_n) {
+                                        show = false;
+                                    }
+                                }
+                            }
+
+                            if (show) {
+                                DBG(DEFAULT_DEBUG, "%d, [%s], REG(%04X):", buf, size, "%02x,", i, timebuf, addr);
+                            }
+                        }
+
+                        free(buf);
+                    } else {
+                        DBG_INFO(UPDI_DEBUG, "malloc %d failed", size);
+                    }
                 }
             }
         }
