@@ -97,7 +97,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19m"
+#define SOFTWARE_VERSION "A.19o"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -215,7 +215,7 @@ int main(int argc, const char *argv[])
         OPT_BIT('-', "dump", &flag, "Dump flash to a Intel HEX file", NULL, (1 << FLAG_DUMP), 0),
         OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addre1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
         OPT_STRING('w', "write", &write, "Direct write to any memory [addr0]:[data0];[data1];[data1]|[addr1]... Note address and data format with Hex type dig"),
-        OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]", NULL, (intptr_t) ""),
+        OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]|regs={addr, size, mask_p, mask_n, off, ...}", NULL, (intptr_t) ""),
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
@@ -3320,11 +3320,7 @@ enum
     DBG_LOOP_CNT,
     DBG_KEY_START,
     DBG_KEY_CNT,
-    DBG_REG_ADDR,
-    DBG_REG_SIZE,
-    DBG_MASK_OFFSET,
-    DBG_MASK_POS,
-    DBG_MASK_NEG,
+    DBG_REGS,
     DBG_MAX_PARAM_NUM
 };
 
@@ -3334,11 +3330,18 @@ const char *dbg_token_tag[DBG_MAX_PARAM_NUM] = {
     "loop",
     "st",
     "keys",
-    "reg",
-    "size",
-    "off",
-    "mask_p",
-    "mask_n"};
+    "regs"};
+
+#pragma pack(1)
+typedef struct {
+    u16 addr;
+    u16 size;
+    u16 mask_p;
+    u16 mask_n;
+    u16 off;
+} dbg_regs_t;
+#pragma pack()
+enum { DBG_REGS_ADDR, DBG_REGS_SIZE, DBG_REGS_MASK_P, DBG_REGS_MASK_N, DBG_REGS_OFF, NUM_DBG_REGS_PARAM_TYPES };
 
 int updi_debugview(void *nvm_ptr, char *cmd)
 {
@@ -3349,18 +3352,35 @@ int updi_debugview(void *nvm_ptr, char *cmd)
     time_t timer;
     char timebuf[26];
     struct tm *tm_info;
-    int addr, size;
-    u8 val, off, mask_n, mask_p, *buf;
     bool show;
+    int addr, size, lim_count, lim_elem_count = 0, i, j, k, channel, result = 0;
+    u8 val, mask_p, mask_n, off, buf[256];
 
-    int i, j, channel, result = 0;
+    dbg_regs_t *dbg_regs = NULL;
 
     int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/
-         ,0/*DBG_REG_ADDR*/, 0/*DBG_REG_SIZE*/
-         ,0/*DBG_MASK_OFFSET*/, 0/*DBG_MASK_POS*/, 0/*DBG_MASK_NEG*/
-         }; // loop value default set to 1, keys default set to 1
+         ,-1 /*DBG_REGS*/ }; // loop value default set to 1, keys default set to 1
 
-    _verbar_token_parse(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM);
+    _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM, 
+            NULL, 0, 0, 0, &lim_elem_count);
+    if (params[DBG_REGS] >= 0) {
+        lim_count = lim_elem_count / NUM_DBG_REGS_PARAM_TYPES;
+        if (lim_count) {
+            size = lim_count * sizeof(dbg_regs_t);
+            dbg_regs = malloc(size);
+            if (!dbg_regs)
+            {
+                return -1;
+            }
+            else
+            {
+                memset(dbg_regs, 0, size);
+                _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM, 
+                    (void **)dbg_regs, 1, size, sizeof(u16), NULL);
+            }
+        }
+    }
+
 
     // Verify the input parameters
     if (!params[DBG_SIGNAL_ADDR] || !params[DBG_REFERENCE_ADDR])
@@ -3370,7 +3390,8 @@ int updi_debugview(void *nvm_ptr, char *cmd)
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "_get_var_addr_data failed 0x%x", result);
-            return -2;
+            result = -2;
+            goto out;
         }
         else
         {
@@ -3392,6 +3413,8 @@ int updi_debugview(void *nvm_ptr, char *cmd)
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "_get_rsd_data failed 0x%x", result);
+                result = -3;
+                goto out;
             }
             else
             {
@@ -3409,19 +3432,25 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                          rsd_data.sensor_state,
                          rsd_data.node_acq_status);
                 
-                addr = params[DBG_REG_ADDR];
-                size = params[DBG_REG_SIZE];
-                if (size && size < 256) {
-                    buf = malloc(size);
-                    if (buf) {
+                if (dbg_regs) {
+                    for ( k = 0; k < lim_count; k ++) {
+                        addr = dbg_regs[k].addr;
+                        size = dbg_regs[k].size;
+                        if (size > ARRAY_SIZE(buf)) {
+                            size = ARRAY_SIZE(buf);
+                        }
+                        mask_p = dbg_regs[k].mask_p & 0xFF;
+                        mask_n = dbg_regs[k].mask_n & 0xFF;
+                        off = dbg_regs[k].off & 0xFF;
+
                         result = nvm_read_mem(nvm_ptr, addr, buf, size);
                         if (result) {
-                            DBG_INFO(UPDI_DEBUG, "nvm_read_auto failed 0x%x", result);
+                            DBG_INFO(UPDI_DEBUG, "nvm_read_mem addr 0x%x size %d failed 0x%x", addr, size, result);
+                            result = -4;
+                            goto out;
                         } else {
                             show = true;
-                            off = params[DBG_MASK_OFFSET];
-                            mask_p = params[DBG_MASK_POS];
-                            mask_n = params[DBG_MASK_NEG];
+
                             if (off < size) {
                                 val = buf[off];
                                 if (mask_p) {
@@ -3441,14 +3470,16 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                                 DBG(DEFAULT_DEBUG, "%d, [%s], REG(%04X):", buf, size, "%02x,", i, timebuf, addr);
                             }
                         }
-
-                        free(buf);
-                    } else {
-                        DBG_INFO(UPDI_DEBUG, "malloc %d failed", size);
                     }
                 }
             }
         }
+    }
+
+
+out:
+    if (dbg_regs) {
+        free(dbg_regs);
     }
 
     return result;

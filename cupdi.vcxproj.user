@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-d tiny816 -p --selftest ""</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-d tiny816 --dbgview "ds=0x3e90|dr=0x3ea0|regs={0x3e68, 9, 0, 0x1, 7}|keys=2|loop=10"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
