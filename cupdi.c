@@ -105,6 +105,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #define VAR_FILE_RELATIVE_POS_2 "mpt2\\board.h"
 #define VAR_FILE_RELATIVE_POS_3 "mpt3\\board.h"
 #define VAR_FILE_RELATIVE_POS_MPLAB "..\\..\\mpt\\board.h"
+#define VAR_FILE_RELATIVE_LOCAL "pack.h"
 
 #define BOARD_FILES                     \
     {                                   \
@@ -112,7 +113,8 @@ This is C version of UPDI interface achievement, referred to the Python version 
             VAR_FILE_RELATIVE_POS_1,    \
             VAR_FILE_RELATIVE_POS_2,    \
             VAR_FILE_RELATIVE_POS_3,    \
-            VAR_FILE_RELATIVE_POS_MPLAB \
+            VAR_FILE_RELATIVE_POS_MPLAB, \
+            VAR_FILE_RELATIVE_LOCAL \
     }
 
 #define VCS_IPE_HEX_FILE_EXTENSION_NAME "ipe.ihex"
@@ -689,86 +691,48 @@ unsigned int _block_start_address(nvm_info_t *block, int flag)
     return address;
 }
 
-int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag)
+/*
+    Translate segment title as target flag
+    @seg: segment data input
+    @param: dev handler
+    @to_flag: target segment type
+    @return 0 successful, other value failed
+*/
+int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_flag)
 {
     const device_info_t *dev = (const device_info_t *)param;
     nvm_info_t iblock;
     ihex_segment_t sid;
     ihex_segment_t base;
     unsigned int offset;
-    int i, result = 0;
+    int i, bid, found = 0, result = 0;
 
-    if (!seg->flag)
+    if (seg->flag == SEG_EX_LINEAR_ADDRESS)
     {
-        // <1> No segment flag indicated, it's Flash area
-        result = dev_get_nvm_info_ext(dev, NVM_FLASH, &iblock, NULL);
-        if (result)
+        /* <1.1> SEG_EX_LINEAR_ADDRESS -> SEG_EX_LINEAR_ADDRESS */
+        if (to_flag == SEG_EX_SEGMENT_ADDRESS)
         {
-            DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type `NVM_FLASH` failed %d, set sid Zero", result);
-			sid = 0;
-        }
-        else
-        {
-			sid = _block_segment_id(&iblock, flag);
-        }
-        seg->sid = sid;
-        seg->flag = flag;
-    }
-    else if (seg->flag == SEG_EX_SEGMENT_ADDRESS)
-    {
-        // <2> Segment -> Segment or linear(magicoff) address
-        base = EX_SEGMENT_ID_TO_ADDR(seg->sid);
-
-        for (i = 0; i < NUM_NVM_EX_TYPES; i++)
-        {
-            result = dev_get_nvm_info_ext(dev, i, &iblock, NULL);
-            if (result)
-            {
-                DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", i, result);
-            }
-            else
-            {
-                if (base == iblock.nvm_start ||
-                    (iblock.nvm_mapped_start && base == iblock.nvm_mapped_start))
-                {
-                    seg->sid = _block_segment_id(&iblock, flag);
-                    seg->flag = flag;
-
-                    break;
-                }
-            }
-        }
-
-        if (i == NUM_NVM_EX_TYPES)
-        {
-            DBG_INFO(UPDI_ERROR, "Segment address 0x%x to Linear not found", base);
-            result = -2;
-        }
-    }
-    else if (seg->flag == SEG_EX_LINEAR_ADDRESS)
-    {
-        if (flag == SEG_EX_SEGMENT_ADDRESS)
-        {
-            // <3> Linear to Segment address
+            /* Linear -> Segment */
             if (LINEAR_ID_MAGIC(seg->sid))
             {
                 // Magicoff placement
                 for (i = 0; i < NUM_NVM_EX_TYPES; i++)
                 {
-                    result = dev_get_nvm_info_ext(dev, i, &iblock, NULL);
+                    bid = NUM_NVM_EX_TYPES - 1 - i;
+                    result = dev_get_nvm_info_ext(dev, bid, &iblock, NULL);
                     if (result)
                     {
-                        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", i, result);
+                        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
                     }
                     else
                     {
                         if (iblock.nvm_magicoff && iblock.nvm_magicoff == seg->sid)
                         {
-                            seg->sid = _block_segment_id(&iblock, flag);
-                            seg->flag = flag;
+                            seg->sid = _block_segment_id(&iblock, to_flag);
+                            seg->flag = to_flag;
 
                             // Adjust the offset when cover to segment address, some packing is not segment aligned(Lockbits)
-                            offset = _block_segment_offset(&iblock, flag);
+                            offset = _block_segment_offset(&iblock, to_flag);
                             seg->addr_from += offset;
                             seg->addr_to += offset;
                             break;
@@ -779,7 +743,7 @@ int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag
                 if (i == NUM_NVM_EX_TYPES)
                 {
                     DBG_INFO(UPDI_ERROR, "Linear address(magic) 0x%x to Segment not found", seg->sid);
-                    result = -3;
+                    result = -2;
                 }
             }
             else
@@ -794,17 +758,93 @@ int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag
                 }
                 else
                 {
-                    sid = _block_segment_id(&iblock, flag);
+                    sid = _block_segment_id(&iblock, to_flag);
                 }
 
                 seg->sid = (seg->sid << (EX_LINEAR_ADDRESS_SHIFT - EX_SEGMENT_ADDRESS_SHIFT)) + sid;
-                seg->flag = flag;
+                seg->flag = to_flag;
             }
         }
-        else if (flag == SEG_EX_LINEAR_ADDRESS)
+        /* <1.2> SEG_EX_LINEAR_ADDRESS -> SEG_EX_LINEAR_ADDRESS */
+        else if (to_flag == SEG_EX_LINEAR_ADDRESS)
         {
             // Linear to Linear address
-            // Do nothing...
+            // Not supported
+        }
+    }
+    else if (seg->flag == SEG_EX_SEGMENT_ADDRESS)
+    {
+        // <2.1> Segment -> Segment or linear(magicoff) address
+        base = EX_SEGMENT_ID_TO_ADDR(seg->sid);
+
+        for (i = 0; i < NUM_NVM_EX_TYPES; i++)
+        {
+            bid = NUM_NVM_EX_TYPES - 1 - i;
+            result = dev_get_nvm_info_ext(dev, bid, &iblock, NULL);
+            if (result)
+            {
+                DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
+            }
+            else
+            {
+                if (base == iblock.nvm_start ||
+                    (iblock.nvm_mapped_start && base == iblock.nvm_mapped_start))
+                {
+                    seg->sid = _block_segment_id(&iblock, to_flag);
+                    seg->flag = to_flag;
+                    break;
+                }
+            }
+        }
+
+        if (i == NUM_NVM_EX_TYPES)
+        {
+            DBG_INFO(UPDI_ERROR, "Segment address 0x%x to Linear not found", base);
+            result = -3;
+        }
+    }
+    else
+    {
+        // <3> No segment flag indicated, search the range and set sid, flag
+        for (i = 0, found = 0; i < NUM_NVM_EX_TYPES; i++)
+        {
+            bid = NUM_NVM_EX_TYPES - 1 - i;
+            result = dev_get_nvm_info_ext(dev, bid, &iblock, NULL);
+            if (result)
+            {
+                DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
+            }
+            else
+            {
+                if (seg-> addr_from >= iblock.nvm_start && seg-> addr_to <= iblock.nvm_start + iblock.nvm_size) {
+                    found = 1;
+                    base = iblock.nvm_start;
+                } else if (seg-> addr_from >= iblock.nvm_mapped_start && seg-> addr_to <= iblock.nvm_mapped_start + iblock.nvm_size) {
+                    base = iblock.nvm_mapped_start;
+                    found = 1;
+                } else {
+                    base = 0;
+                }
+
+                if (found)
+                {
+                    sid = _block_segment_id(&iblock, to_flag);
+                    // Some block like Lockbit is overlapped with fuse, so we need the offset
+					offset = _block_segment_offset(&iblock, to_flag);
+                    
+                    seg->sid = sid;
+					seg->flag = to_flag;
+                    seg->addr_from = seg->addr_from - base + offset;
+                    seg->addr_to = seg->addr_to - base + offset;
+                    break;
+                }
+            }
+        }
+
+        if (i == NUM_NVM_EX_TYPES)
+        {
+            DBG_INFO(UPDI_ERROR, "Segment address 0x%x to Linear not found", seg-> addr_from);
+            result = -4;
         }
     }
 

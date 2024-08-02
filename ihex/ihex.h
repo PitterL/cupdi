@@ -20,7 +20,7 @@ typedef struct _segment_buffer
     ihex_seg_type_t flag;
 
     ihex_address_t addr_from;
-    ihex_address_t addr_to;
+    ihex_address_t addr_to; // not included
 
     char *data; // buffer pointer
     int len;    // buffer data len
