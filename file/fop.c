@@ -273,6 +273,8 @@ int search_defined_array_int_from_file(const char *file, const char *varname, un
             strerror(errno));
         return -3;
     }
+
+	return result;
 }
 
 /*
@@ -310,6 +312,8 @@ int search_defined_value_int_from_file(const char *file, const char *varname, un
             strerror(errno));
         return -3;
     }
+
+	return result;
 }
 
 /*
@@ -339,4 +343,6 @@ int search_map_value_int_from_file(const char *file, const char *varname, unsign
             strerror(errno));
         return -3;
     }
+
+	return result;
 }

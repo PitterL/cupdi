@@ -75,7 +75,7 @@ segment_buffer_t *get_segment_by_id_addr(hex_data_t *dhex, ihex_segment_t segmen
 //int set_default_segment_id(hex_data_t *dhex, ihex_segment_t source, ihex_segment_t target);
 int walk_segments_by_id(hex_data_t *dhex, ihex_seg_type_t flag, int (*cb)(segment_buffer_t *, const void *, ihex_seg_type_t), const void *param);
 
-int load_segments_from_file(const char *file, hex_data_t *dhex);
+int dhex_load(const char *file, hex_data_t *dhex);
 void unload_segment_by_sid(hex_data_t *dhex, ihex_segment_t segmentid);
 void unload_segments(hex_data_t *dhex);
 segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, char *data, int flag);
