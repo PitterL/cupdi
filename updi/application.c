@@ -135,19 +135,19 @@ int app_device_info(void *app_ptr)
         return -2;
     }
 
-    DBG(APP_DEBUG, "[SIB]", sib, sizeof(sib), "%02x ");
-    DBG(APP_DEBUG, "[Family ID]", sib, 7, "%c");
-    DBG(APP_DEBUG, "[NVM revision]", sib + 8, 3, "%c");
+    DBG(UPDI_INFO, "[SIB]", sib, sizeof(sib), "%02x ");
+    DBG(UPDI_INFO, "[Family ID]", sib, 7, "%c");
+    DBG(UPDI_INFO, "[NVM revision]", sib + 8, 3, "%c");
 	if (!strncmp(sib + 8, "P:2", 3)) {
 		// 24bit link address
-		DBG_INFO(APP_DEBUG, "[NVM Version P2, Using 24bit address mode]");
+		DBG_INFO(UPDI_INFO, "[NVM Version P2, Using 24bit address mode]");
 		app->version = APP_VERSION_V1;
 	}
-    DBG(APP_DEBUG, "[OCD revision]", sib + 11, 3, "%c");
-    DBG_INFO(APP_DEBUG, "[PDI OSC] is %cMHz", sib[15]);
+    DBG(UPDI_INFO, "[OCD revision]", sib + 11, 3, "%c");
+    DBG_INFO(UPDI_INFO, "[PDI OSC] is %cMHz", sib[15]);
 
     pdi = link_ldcs(LINK(app), UPDI_CS_STATUSA);
-    DBG_INFO(APP_DEBUG, "[PDI Rev] is %d", (pdi >> 4));
+    DBG_INFO(UPDI_INFO, "[PDI Rev] is %d", (pdi >> 4));
 
     if (app_in_prog_mode(app)) {
         result = app_read_data(app, APP_REG(app, sigrow_address), sigrow, sizeof(sigrow));
@@ -161,9 +161,10 @@ int app_device_info(void *app_ptr)
             DBG_INFO(APP_DEBUG, "app_read_data revid failed %d", result);
             return -4;
         }
-        DBG(APP_DEBUG, "[Device ID]", sigrow, 3, "%02x ");
-        DBG(APP_DEBUG, "[Sernum ID]", sigrow + 3, 10, "%02x ");
-        DBG_INFO(APP_DEBUG, "[Device Rev] is %c", revid[0] + 'A');
+
+        DBG(UPDI_INFO, "[Device ID]", sigrow, 3, "%02x ");
+        DBG(UPDI_INFO, "[Sernum ID]", sigrow + 3, 10, "%02x ");
+        DBG_INFO(UPDI_INFO, "[Device Rev] is %c", revid[0] + 'A');
     }
 
     return 0;

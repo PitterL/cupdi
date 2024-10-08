@@ -1,6 +1,7 @@
 #ifndef __CUPDI_H
 #define __CUPDI_H
 
+int updi_device_id(void *nvm_ptr);
 int updi_erase(void *nvm_ptr);
 int updi_program(void *nvm_ptr, const char *file, const device_info_t * dev, bool check);
 int updi_compare(void *nvm_ptr, const char *file, const device_info_t * dev);

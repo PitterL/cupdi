@@ -101,7 +101,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19p"
+#define SOFTWARE_VERSION "A.19q"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -341,15 +341,6 @@ int main(int argc, const char *argv[])
         goto out;
     }
 
-    // check device id
-    result = nvm_get_device_info(nvm_ptr);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "nvm_get_device_info failed");
-        result = -4;
-        goto out;
-    }
-
     // unlock
     if (flag /* || read || write || erase || dbgview || selftest*/)
     {
@@ -364,19 +355,20 @@ int main(int argc, const char *argv[])
                 if (result)
                 {
                     DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
-                    result = -5;
+                    result = -4;
                     goto out;
                 }
             }
-
-            result = nvm_get_device_info(nvm_ptr);
-            if (result)
-            {
-                DBG_INFO(UPDI_DEBUG, "nvm_get_device_info in program failed %d", result);
-                result = -6;
-                goto out;
-            }
         }
+    }
+
+    // device id
+    result = updi_device_id(nvm_ptr);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "updi_device_id in program failed %d", result);
+        result = -5;
+        goto out;
     }
 
     // erase
@@ -583,6 +575,16 @@ out:
     updi_nvm_deinit(nvm_ptr);
 
     return result;
+}
+
+/*
+    UPDI get device ID information
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
+int updi_device_id(void *nvm_ptr)
+{
+    return nvm_get_device_info(nvm_ptr);
 }
 
 /*
@@ -858,7 +860,7 @@ int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_f
 
         if (i == NUM_NVM_EX_TYPES)
         {
-            DBG_INFO(UPDI_ERROR, "Segment address 0x%x to Linear not found", seg-> addr_from);
+            DBG_INFO(UPDI_ERROR, "Segment address 0x%x not found in block table", seg-> addr_from);
             result = -4;
         }
     }
@@ -2285,7 +2287,7 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     const unsigned int invalid_value = 0x100;
     const char *version_files[] = BOARD_FILES;
     char *vcs_file = NULL;
-    int i, count = 0, result = 0;
+    int i, order, count = 0, result = 0;
 
     // <1> load fuse from pack file first
     result = dev_get_nvm_info(dev, NVM_FUSES, &iblock);
@@ -2305,7 +2307,14 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
 
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
-        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
+        // Give the searching order of the directory
+        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY) {
+            order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
+        } else {
+            order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
+        }
+
+        vcs_file = trim_name_with_extesion(file, '\\', order, version_files[i]);
         if (!vcs_file)
         {
             DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
@@ -2404,7 +2413,7 @@ int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, ch
     const unsigned int invalid_value = 0x800;
     const char *version_files[] = BOARD_FILES;
     char *vcs_file = NULL;
-    int i, count = 0, result = 0;
+    int i, order, count = 0, result = 0;
 
     result = dev_get_nvm_info(dev, type, &iblock);
     if (result)
@@ -2423,7 +2432,14 @@ int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, ch
 
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
-        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
+        // Give the searching order of the directory
+        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY) {
+            order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
+        } else {
+            order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
+        }
+
+        vcs_file = trim_name_with_extesion(file, '\\', order, version_files[i]);
         if (!vcs_file)
         {
             DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
@@ -2526,7 +2542,7 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
     s_elem_t *data = NULL;
     const char *version_files[] = BOARD_FILES;
     char *vcs_file = NULL;
-    int i, size, offset, count, len, result = 0;
+    int i, order, size, offset, count, len, result = 0;
 
     nvm_type = get_storage_type(BLOCK_CFG);
     result = dev_get_nvm_info(dev, nvm_type, &iblock);
@@ -2546,7 +2562,14 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
 
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
-        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
+        // Give the searching order of the directory
+        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY) {
+            order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
+        } else {
+            order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
+        }
+
+        vcs_file = trim_name_with_extesion(file, '\\', order, version_files[i]);
         if (!vcs_file)
         {
             DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
@@ -2960,10 +2983,10 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
                         continue;
                     }
 
-                    result = nvm_read_auto(nvm_ptr, address, buf, len);
+                    result = nvm_read_mem(nvm_ptr, address, buf, len);
                     if (result)
                     {
-                        DBG_INFO(UPDI_DEBUG, "nvm_read_auto failed %d", result);
+                        DBG_INFO(UPDI_DEBUG, "nvm_read_mem failed %d", result);
                         result = -4;
                     }
                     else
@@ -3625,19 +3648,31 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                         } else {
                             show = true;
 
+							/* 
+                                if `mask_n` is non-zero, `mask_p` and `mask_n` are test any mask bit matched
+                                if `mask_n` is zero, we only test `mask_p` if all bits matched of target value after masked
+                                if test condition is zero, we show the result directly
+                            */
                             if (off < size) {
                                 val = buf[off];
-                                if (mask_p) {
-                                    if (!(val & mask_p)) {
-                                        show = false;
-                                    }
-                                }
-
                                 if (mask_n) {
                                     if (val & mask_n) {
                                         show = false;
                                     }
-                                }
+
+									if (mask_p) {
+										if (!(val & mask_p)) {
+											show = false;
+										}
+									}
+								}
+								else {
+									if (mask_p) {
+										if ((val & mask_p) != mask_p) {
+											show = false;
+										}
+									}
+								}
                             }
 
                             if (show) {
