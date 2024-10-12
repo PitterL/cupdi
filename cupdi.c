@@ -111,15 +111,14 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #define VAR_FILE_RELATIVE_POS_MPLAB "..\\..\\mpt\\board.h"
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
 
-#define BOARD_FILES                     \
-    {                                   \
-        VAR_FILE_RELATIVE_POS_0,        \
-            VAR_FILE_RELATIVE_POS_1,    \
-            VAR_FILE_RELATIVE_POS_2,    \
-            VAR_FILE_RELATIVE_POS_3,    \
-            VAR_FILE_RELATIVE_POS_MPLAB, \
-            VAR_FILE_RELATIVE_LOCAL \
-    }
+#define BOARD_FILES                  \
+    {                                \
+        VAR_FILE_RELATIVE_POS_0,     \
+        VAR_FILE_RELATIVE_POS_1,     \
+        VAR_FILE_RELATIVE_POS_2,     \
+        VAR_FILE_RELATIVE_POS_3,     \
+        VAR_FILE_RELATIVE_POS_MPLAB, \
+        VAR_FILE_RELATIVE_LOCAL}
 
 #define VAR_FILE_ORDER_IN_PARENTS_DIRECTORY 4
 #define VAR_FILE_ORDER_LEVEL_OF_PARENTS 2
@@ -177,7 +176,7 @@ int main(int argc, const char *argv[])
     char *comport = NULL;
     int baudrate = 115200;
     int guard = 0;
-	int breaks = 2;
+    int breaks = 2;
     char *file = NULL;
     char *read = NULL;
     char *write = NULL;
@@ -488,8 +487,9 @@ int main(int argc, const char *argv[])
         }
     }
 
-    if (memtest) {
-        result = updi_memset(nvm_ptr, memtest, dev);
+    if (memtest)
+    {
+        result = updi_memtest(nvm_ptr, memtest, dev);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "Write memtest %d", result);
@@ -686,7 +686,7 @@ unsigned int _segment_id_to_address(ihex_segment_t sid, int flag)
     }
     else if (flag & SEG_EX_LINEAR_ADDRESS)
     {
-        //FIXME, not considerred the Magicoff type Linear address
+        // FIXME, not considerred the Magicoff type Linear address
 
         address = EX_LINEAR_ID_TO_ADDR(sid);
     }
@@ -842,16 +842,21 @@ int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_f
             }
             else
             {
-                if (seg-> addr_from >= iblock.nvm_start && seg-> addr_to <= iblock.nvm_start + iblock.nvm_size) {
+                if (seg->addr_from >= iblock.nvm_start && seg->addr_to <= iblock.nvm_start + iblock.nvm_size)
+                {
                     /* Normal Address */
                     found = 1;
                     base = iblock.nvm_start;
-                } else if (iblock.nvm_mapped_start && 
-                    seg-> addr_from >= iblock.nvm_mapped_start && seg-> addr_to <= iblock.nvm_mapped_start + iblock.nvm_size) {
+                }
+                else if (iblock.nvm_mapped_start &&
+                         seg->addr_from >= iblock.nvm_mapped_start && seg->addr_to <= iblock.nvm_mapped_start + iblock.nvm_size)
+                {
                     /* Mapped address */
                     found = 1;
                     base = iblock.nvm_mapped_start;
-                } else {
+                }
+                else
+                {
                     base = 0;
                 }
 
@@ -859,10 +864,10 @@ int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_f
                 {
                     sid = _block_segment_id(&iblock, to_flag);
                     // Some block like Lockbit is overlapped with fuse, so we need the offset
-					offset = _block_segment_offset(&iblock, to_flag);
-                    
+                    offset = _block_segment_offset(&iblock, to_flag);
+
                     seg->sid = sid;
-					seg->flag = to_flag;
+                    seg->flag = to_flag;
                     seg->addr_from = seg->addr_from - base + offset;
                     seg->addr_to = seg->addr_to - base + offset;
                     break;
@@ -872,7 +877,7 @@ int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_f
 
         if (i == NUM_NVM_EX_TYPES)
         {
-            DBG_INFO(UPDI_ERROR, "Segment address 0x%x not found in block table", seg-> addr_from);
+            DBG_INFO(UPDI_ERROR, "Segment address 0x%x not found in block table", seg->addr_from);
             result = -4;
         }
     }
@@ -903,7 +908,7 @@ int combine_segments(const device_info_t *dev, hex_data_t *dhex, uint8_t pad, ui
         DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
     }
 
-    for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) 
+    for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++)
     {
         seg = &dhex->segments[i];
         if (VALID_SEG(seg))
@@ -939,10 +944,10 @@ int combine_segments(const device_info_t *dev, hex_data_t *dhex, uint8_t pad, ui
             sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
             msid = _block_segment_id(&iblock, SEG_EX_LINEAR_ADDRESS);
 
-            for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) 
+            for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++)
             {
                 seg = &dhex->segments[i];
-                if (VALID_SEG(seg)) 
+                if (VALID_SEG(seg))
                 {
                     if (seg->sid == sid || seg->sid == msid) {
                         if (old_seg) {
@@ -2016,11 +2021,12 @@ int updi_dump(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     memset(&dhex_info, 0, sizeof(dhex_info));
     for (i = 0; i < NUM_NVM_TYPES; i++)
     {
-        if (i == MEM_SRAM) {
+        if (i == MEM_SRAM)
+        {
             // skip ram data
             continue;
         }
-        
+
         result = nvm_get_block_info(nvm_ptr, i, &iblock);
         if (result)
         {
@@ -2116,9 +2122,12 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     for (i = 0; i < size; i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY) {
+        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
-        } else {
+        }
+        else
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
         }
 
@@ -2320,9 +2329,12 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY) {
+        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
-        } else {
+        }
+        else
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
         }
 
@@ -2415,7 +2427,7 @@ out:
     return result;
 }
 
-int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, char* name, const char *file, hex_data_t *dhex)
+int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, char *name, const char *file, hex_data_t *dhex)
 {
     nvm_info_t iblock, iblock_lockbits;
     segment_buffer_t *seg = NULL;
@@ -2445,9 +2457,12 @@ int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, ch
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY) {
+        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
-        } else {
+        }
+        else
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
         }
 
@@ -2575,9 +2590,12 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY) {
+        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
-        } else {
+        }
+        else
+        {
             order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
         }
 
@@ -2952,7 +2970,7 @@ int updi_page_erase(void *nvm_ptr, char *cmd)
 /*
     Memory Read
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and count. 
+    @cmd: cmd string use for address and count.
         Format: [addr0:size]|[addre1:size]...
             addr is hex type dig
             size is auto type dig
@@ -3048,7 +3066,7 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
 /*
     UPDI Memory Read
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and count. 
+    @cmd: cmd string use for address and count.
         Format: [addr0:size]|[addre1:size]...
             addr is hex type dig
             size is auto type dig
@@ -3154,7 +3172,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
 /*
 UPDI Memory Write
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and data. 
+    @cmd: cmd string use for address and data.
         Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]...
             addr is hex type dig
             dat is hex type dig
@@ -3173,7 +3191,7 @@ int updi_write(void *nvm_ptr, char *cmd, bool check)
     @dev: device info structure, get by get_chip_info()
     @returns 0 - success, other value failed code
 */
-int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
+int updi_memtest(void *nvm_ptr, char *cmd, const device_info_t *dev)
 {
     char **tk_s, **tk_w, **tokens;
     int start, size, addr, len;
@@ -3182,7 +3200,8 @@ int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
     bool use_rand = true;
     nvm_info_t info;
 
-    if (!nvm_in_progmode(nvm_ptr)) {
+    if (!nvm_in_progmode(nvm_ptr))
+    {
         DBG_INFO(UPDI_INFO, "Memory test should runing at program mode to avoid memory various!");
     }
 
@@ -3192,7 +3211,9 @@ int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
     {
         DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
         return -2;
-    } else {
+    }
+    else
+    {
         start = info.nvm_mapped_start ? info.nvm_mapped_start : info.nvm_start;
         size = (int)info.nvm_size;
     }
@@ -3203,21 +3224,27 @@ int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
         tk_w = str_split(tk_s[k], '=');
         for (m = 0, addr = ERROR_PTR, len = 0; tk_w; m++)
         {
-            if (tk_w[m]) {
-                if (m == 0) {
+            if (tk_w[m])
+            {
+                if (m == 0)
+                {
                     tokens = str_split(tk_w[m], ':');
-                    if (tokens[0]) {
+                    if (tokens[0])
+                    {
                         addr = (int)strtol(tokens[0], NULL, 16);
-                        if (tokens[1]) {
+                        if (tokens[1])
+                        {
                             len = (int)strtol(tokens[1], NULL, 0);
                         }
                     }
 
-                    for (i = 0; tokens && tokens[i]; i++) {
+                    for (i = 0; tokens && tokens[i]; i++)
+                    {
                         free(tokens[i]);
                     }
 
-                    if (tokens) {
+                    if (tokens)
+                    {
                         free(tokens);
                     }
                 }
@@ -3228,30 +3255,43 @@ int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
                 }
 
                 free(tk_w[m]);
-            } else {
+            }
+            else
+            {
                 if (addr >= start &&
-                    addr + len <= start + size) {
-                    if (!len) {
+                    addr + len <= start + size)
+                {
+                    if (!len)
+                    {
                         len = start + size - addr;
                     }
 
                     // Step 1: test each bytes
-                    for ( i = 0; i < len && result == 0; i += sizeof(val) ) {
-                        if (use_rand) {
+                    for (i = 0; i < len && result == 0; i += sizeof(val))
+                    {
+                        if (use_rand)
+                        {
                             val = (rand() << 16 | rand());
                         }
 
                         result = nvm_write_mem(nvm_ptr, addr + i, (u8 *)&val, sizeof(val), 0);
-                        if (result != 0) {
+                        if (result != 0)
+                        {
                             DBG_INFO(UPDI_DEBUG, "nvm_write_mem off 0x%X failed %d", i, result);
                             result = -3;
-                        } else {
+                        }
+                        else
+                        {
                             result = nvm_read_mem(nvm_ptr, addr + i, (u8 *)&val_read, sizeof(val_read));
-                            if (result != 0) {
+                            if (result != 0)
+                            {
                                 DBG_INFO(UPDI_DEBUG, "nvm_read_mem off 0x%X failed %d", i, result);
                                 result = -4;
-                            } else {
-                                if (val != val_read) {
+                            }
+                            else
+                            {
+                                if (val != val_read)
+                                {
                                     DBG_INFO(DEFAULT_ERROR, "#1: Value compare failed w(%X), r(%X), at offset %d(0x%X)", val, val_read, i, i);
                                     result = -5;
                                 }
@@ -3260,14 +3300,20 @@ int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
                     }
 
                     // Step 1: test all bytes
-                    if (!use_rand) {
-                        for ( i = 0; i < len && result == 0; i += sizeof(val) ) {
+                    if (!use_rand)
+                    {
+                        for (i = 0; i < len && result == 0; i += sizeof(val))
+                        {
                             result = nvm_read_mem(nvm_ptr, addr + i, (u8 *)&val_read, sizeof(val_read));
-                            if (result != 0) {
+                            if (result != 0)
+                            {
                                 DBG_INFO(UPDI_DEBUG, "nvm_read_mem off 0x%X failed %d", i, result);
                                 result = -6;
-                            } else {
-                                if (val != val_read) {
+                            }
+                            else
+                            {
+                                if (val != val_read)
+                                {
                                     DBG_INFO(UPDI_DEBUG, "#2: Value compare failed w(%X), r(%X), at offset %d(0x%X)", val, val_read, i, i);
                                     result = -7;
                                 }
@@ -3295,7 +3341,14 @@ int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
         DBG_INFO(UPDI_DEBUG, "Parse write str: %s failed", cmd);
     }
     else
+    {
         free(tk_s);
+    }
+
+    if (result == 0)
+    {
+        DBG_INFO(UPDI_INFO, "Pass");
+    }
 
     return result;
 }
@@ -3328,12 +3381,13 @@ int updi_reset(void *nvm_ptr)
 */
 static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val, int max_tag_count, void *arr_val[], int max_arr_count, int each_arr_depth, int elem_size, int *max_arr_depth_ptr)
 {
-    char **tk_s, **tk_w, **tk_arr, *str, *cmd_dup;// token section, token words
+    char **tk_s, **tk_w, **tk_arr, *str, *cmd_dup; // token section, token words
     int i, j, k, arr_i = 0;
     int max_each_arr_depth = 0;
 
     cmd_dup = __strndup(cmd, 255);
-    if (!cmd_dup) {
+    if (!cmd_dup)
+    {
         return;
     }
 
@@ -3354,18 +3408,27 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
                         {
                             // Check the value whether starting with '{', that an array
                             str = trim(tk_w[1]);
-                            if (str[0] == '{') {
+                            if (str[0] == '{')
+                            {
                                 // skip first '{'
                                 tk_arr = str_split(str + 1, ',');
-                                if (tk_arr) {
+                                if (tk_arr)
+                                {
                                     // array elements
-                                    for (k = 0; tk_arr[k]; k++) {
-                                        if (arr_val && arr_i < max_arr_count && k < each_arr_depth) {
-                                            if (elem_size == 4) {
+                                    for (k = 0; tk_arr[k]; k++)
+                                    {
+                                        if (arr_val && arr_i < max_arr_count && k < each_arr_depth)
+                                        {
+                                            if (elem_size == 4)
+                                            {
                                                 ((int *)arr_val)[arr_i * each_arr_depth + k] = (int)strtol(tk_arr[k], NULL, 0);
-                                            }else if (elem_size == 2) {
+                                            }
+                                            else if (elem_size == 2)
+                                            {
                                                 ((short *)arr_val)[arr_i * each_arr_depth + k] = (short)strtol(tk_arr[k], NULL, 0);
-                                            }else /*elem_size == 1*/{
+                                            }
+                                            else /*elem_size == 1*/
+                                            {
                                                 // Default minimum size
                                                 ((char *)arr_val)[arr_i * each_arr_depth + k] = (char)strtol(tk_arr[k], NULL, 0);
                                             }
@@ -3374,16 +3437,19 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
                                         free(tk_arr[k]);
                                     }
 
-                                    if (max_each_arr_depth < k) {
+                                    if (max_each_arr_depth < k)
+                                    {
                                         max_each_arr_depth = k;
                                     }
 
                                     free(tk_arr);
                                 }
-                                
+
                                 tag_val[j] = arr_i;
                                 arr_i++;
-                            } else {
+                            }
+                            else
+                            {
                                 tag_val[j] = (int)strtol(tk_w[1], NULL, 0);
                             }
 
@@ -3392,7 +3458,8 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
                     }
                 }
 
-                for (j = 0; tk_w[j]; j++) {
+                for (j = 0; tk_w[j]; j++)
+                {
                     free(tk_w[j]);
                 }
 
@@ -3404,11 +3471,13 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
         free(tk_s);
     }
 
-    if (max_arr_depth_ptr) {
+    if (max_arr_depth_ptr)
+    {
         *max_arr_depth_ptr = max_each_arr_depth;
     }
 
-    if (cmd_dup) {
+    if (cmd_dup)
+    {
         free(cmd_dup);
     }
 }
@@ -3676,7 +3745,8 @@ const char *dbg_token_tag[DBG_MAX_PARAM_NUM] = {
     "regs"};
 
 #pragma pack(1)
-typedef struct {
+typedef struct
+{
     u16 addr;
     u16 size;
     u16 mask_p;
@@ -3684,7 +3754,15 @@ typedef struct {
     u16 off;
 } dbg_regs_t;
 #pragma pack()
-enum { DBG_REGS_ADDR, DBG_REGS_SIZE, DBG_REGS_MASK_P, DBG_REGS_MASK_N, DBG_REGS_OFF, NUM_DBG_REGS_PARAM_TYPES };
+enum
+{
+    DBG_REGS_ADDR,
+    DBG_REGS_SIZE,
+    DBG_REGS_MASK_P,
+    DBG_REGS_MASK_N,
+    DBG_REGS_OFF,
+    NUM_DBG_REGS_PARAM_TYPES
+};
 
 int updi_debugview(void *nvm_ptr, char *cmd)
 {
@@ -3702,13 +3780,16 @@ int updi_debugview(void *nvm_ptr, char *cmd)
     dbg_regs_t *dbg_regs = NULL;
 
     int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/
-         ,-1 /*DBG_REGS*/ }; // loop value default set to 1, keys default set to 1
+                                     ,
+                                     -1 /*DBG_REGS*/}; // loop value default set to 1, keys default set to 1
 
-    _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM, 
-            NULL, 0, 0, 0, &lim_elem_count);
-    if (params[DBG_REGS] >= 0) {
+    _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM,
+                             NULL, 0, 0, 0, &lim_elem_count);
+    if (params[DBG_REGS] >= 0)
+    {
         lim_count = lim_elem_count / NUM_DBG_REGS_PARAM_TYPES;
-        if (lim_count) {
+        if (lim_count)
+        {
             size = lim_count * sizeof(dbg_regs_t);
             dbg_regs = malloc(size);
             if (!dbg_regs)
@@ -3718,12 +3799,11 @@ int updi_debugview(void *nvm_ptr, char *cmd)
             else
             {
                 memset(dbg_regs, 0, size);
-                _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM, 
-                    (void **)dbg_regs, 1, size, sizeof(u16), NULL);
+                _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM,
+                                         (void **)dbg_regs, 1, size, sizeof(u16), NULL);
             }
         }
     }
-
 
     // Verify the input parameters
     if (!params[DBG_SIGNAL_ADDR] || !params[DBG_REFERENCE_ADDR])
@@ -3774,12 +3854,15 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                          rsd_data.comcap,
                          rsd_data.sensor_state,
                          rsd_data.node_acq_status);
-                
-                if (dbg_regs) {
-                    for ( k = 0; k < lim_count; k ++) {
+
+                if (dbg_regs)
+                {
+                    for (k = 0; k < lim_count; k++)
+                    {
                         addr = dbg_regs[k].addr;
                         size = dbg_regs[k].size;
-                        if (size > ARRAY_SIZE(buf)) {
+                        if (size > ARRAY_SIZE(buf))
+                        {
                             size = ARRAY_SIZE(buf);
                         }
                         mask_p = dbg_regs[k].mask_p & 0xFF;
@@ -3787,41 +3870,53 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                         off = dbg_regs[k].off & 0xFF;
 
                         result = nvm_read_mem(nvm_ptr, addr, buf, size);
-                        if (result) {
+                        if (result)
+                        {
                             DBG_INFO(UPDI_DEBUG, "nvm_read_mem addr 0x%x size %d failed 0x%x", addr, size, result);
                             result = -4;
                             goto out;
-                        } else {
+                        }
+                        else
+                        {
                             show = true;
 
-							/* 
+                            /*
                                 if `mask_n` is non-zero, `mask_p` and `mask_n` are test any mask bit matched
                                 if `mask_n` is zero, we only test `mask_p` if all bits matched of target value after masked
                                 if test condition is zero, we show the result directly
                             */
-                            if (off < size) {
+                            if (off < size)
+                            {
                                 val = buf[off];
-                                if (mask_n) {
-                                    if (val & mask_n) {
+                                if (mask_n)
+                                {
+                                    if (val & mask_n)
+                                    {
                                         show = false;
                                     }
 
-									if (mask_p) {
-										if (!(val & mask_p)) {
-											show = false;
-										}
-									}
-								}
-								else {
-									if (mask_p) {
-										if ((val & mask_p) != mask_p) {
-											show = false;
-										}
-									}
-								}
+                                    if (mask_p)
+                                    {
+                                        if (!(val & mask_p))
+                                        {
+                                            show = false;
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    if (mask_p)
+                                    {
+                                        if ((val & mask_p) != mask_p)
+                                        {
+                                            show = false;
+                                        }
+                                    }
+                                }
                             }
 
-                            if (show) {
+                            if (show)
+                            {
                                 DBG(DEFAULT_DEBUG, "%d, [%s], REG(%04X):", buf, size, "%02x,", i, timebuf, addr);
                             }
                         }
@@ -3831,9 +3926,9 @@ int updi_debugview(void *nvm_ptr, char *cmd)
         }
     }
 
-
 out:
-    if (dbg_regs) {
+    if (dbg_regs)
+    {
         free(dbg_regs);
     }
 
@@ -3905,8 +4000,7 @@ const char *sltest_token_tag[SLTEST_MAX_PARAM_NUM] = {
     "dr",
     "acq",
     "node",
-    "siglim"
-};
+    "siglim"};
 
 int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
 {
@@ -3915,22 +4009,24 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
     int16_t val;
     int i, j, k, size, lim_count, lim_elem_count = 0, channel, result = 0;
     signal_limit_data_t *siglim = NULL;
-   
+
     // debug varible
     qtm_acq_union_node_config_t ptc_node;
     qtm_acq_node_group_config_t ptc_acq;
     uint8_t node_gain;
-    int params[SLTEST_MAX_PARAM_NUM] = { 
-            0 /*SLTEST_DS_ADDR*/, 0 /*SLTEST_DR_ADDR*/, 
-            0 /*SLTEST_ACQ_ADDR*/, 0 /*SLTEST_NODE_ADDR*/, 
-            -1 /* SLTEST_SIGLIM_IDX */};
+    int params[SLTEST_MAX_PARAM_NUM] = {
+        0 /*SLTEST_DS_ADDR*/, 0 /*SLTEST_DR_ADDR*/,
+        0 /*SLTEST_ACQ_ADDR*/, 0 /*SLTEST_NODE_ADDR*/,
+        -1 /* SLTEST_SIGLIM_IDX */};
 
     // <1> Load test parameters from command, this will be higer priority than NVM setting
-    _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM, 
-            NULL, 0, 0, 0, &lim_elem_count);
-    if (params[SLTEST_SIGLIM_IDX] >= 0) {
+    _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM,
+                             NULL, 0, 0, 0, &lim_elem_count);
+    if (params[SLTEST_SIGLIM_IDX] >= 0)
+    {
         lim_count = lim_elem_count / NUM_SIGLIM_TYPES;
-        if (lim_count) {
+        if (lim_count)
+        {
             size = lim_count * sizeof(signal_limit_data_t);
             siglim = malloc(size);
             if (!siglim)
@@ -3940,11 +4036,13 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
             else
             {
                 memset(siglim, 0, size);
-                _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM, 
-                    (void **)siglim, 1, size, sizeof(s_elem_t), NULL);
+                _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM,
+                                         (void **)siglim, 1, size, sizeof(s_elem_t), NULL);
             }
         }
-    } else {
+    }
+    else
+    {
         // <2> Load test count and range setting from NVM
         lim_count = _get_cfg_body_data(nvm_ptr, NULL, 0);
         if (lim_count <= 0)
@@ -3975,7 +4073,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
 
     // <3> Verify the input addr parameters
     if (params[SLTEST_DS_ADDR] && params[SLTEST_DR_ADDR] &&
-        params[SLTEST_ACQ_ADDR] && params[SLTEST_NODE_ADDR] ) 
+        params[SLTEST_ACQ_ADDR] && params[SLTEST_NODE_ADDR])
     {
         var_addr.dsdr.data.ds = (unsigned short)params[SLTEST_DS_ADDR];
         var_addr.dsdr.data.dr = (unsigned short)params[SLTEST_DR_ADDR];
