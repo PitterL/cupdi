@@ -11,6 +11,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t * dev, bool i
 int updi_dump(void *nvm_ptr, const char *file, const device_info_t * dev, bool ipe_format);
 int updi_read(void *nvm_ptr, char *cmd);
 int updi_write(void *nvm_ptr, char *cmd, bool check);
+int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev);
 int updi_write_fuse(void *nvm_ptr, char *cmd, bool check);
 int updi_page_erase(void *nvm_ptr, char *cmd);
 int updi_show_ext_info(void *nvm_ptr);

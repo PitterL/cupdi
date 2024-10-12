@@ -146,7 +146,7 @@ const device_info_t *get_chip_info(const char *dev_name)
 
 /*
 Device get block info, this is defined in device.c
-    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @dev_ptr: device info structure pointer, get by get_chip_info()
     @type: NVM type
     @info: chip flash information
     @return 0 successful, other value failed

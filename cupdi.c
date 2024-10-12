@@ -98,10 +98,10 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <o> 1. add register content tap out in dbgview command
         <p> 1. pack command with 'pack.h' in current directory support
             2. trans_segment() search order change to avoid incorrectly repack the file without linear address
-
+        <r> 1. add command 'memtest'
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19q"
+#define SOFTWARE_VERSION "A.19r"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -183,6 +183,7 @@ int main(int argc, const char *argv[])
     char *write = NULL;
     char *erase = NULL;
     char *dbgview = NULL;
+    char *memtest = NULL;
     char *selftest = NULL;
     char *storage = NULL;
     int flag = 0;
@@ -225,9 +226,10 @@ int main(int argc, const char *argv[])
         OPT_BOOLEAN('i', "", &show_info, "Get Infoblock infomation of firmware"),
         OPT_BIT('-', "save", &flag, "Save flash to a VCS HEX file", NULL, (1 << FLAG_SAVE), 0),
         OPT_BIT('-', "dump", &flag, "Dump flash to a Intel HEX file", NULL, (1 << FLAG_DUMP), 0),
-        OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addre1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
-        OPT_STRING('w', "write", &write, "Direct write to any memory [addr0]:[data0];[data1];[data1]|[addr1]... Note address and data format with Hex type dig"),
+        OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addr1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
+        OPT_STRING('w', "write", &write, "Direct write to any memory [addr0]:[data0];[data1];[data2]|[addr1]... Note address and data format with Hex type dig"),
         OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]|regs={addr, size, mask_p, mask_n, off, ...}", NULL, (intptr_t) ""),
+        OPT_STRING('-', "memtest", &memtest, "test memory with give value [addr0]:[len0]=[32bit value]|[addr1]...  the len==0 means test all memory from addr[n], if no value specified, we will use rand() value"),
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
@@ -482,6 +484,16 @@ int main(int argc, const char *argv[])
         {
             DBG_INFO(UPDI_DEBUG, "updi_check failed %d", result);
             result = -11;
+            goto out;
+        }
+    }
+
+    if (memtest) {
+        result = updi_memset(nvm_ptr, memtest, dev);
+        if (result)
+        {
+            DBG_INFO(UPDI_DEBUG, "Write memtest %d", result);
+            result = -12;
             goto out;
         }
     }
@@ -3050,7 +3062,7 @@ int updi_read(void *nvm_ptr, char *cmd)
 /*
     Memory Write
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and data. Format: [addr];[dat0];[dat1];[dat2]|[addr1]...
+    @cmd: cmd string use for address and data. Format: [addr]:[dat0];[dat1];[dat2]|[addr1]:...
     @op: operating function for write
     @check: whether readback data for double checking
     @returns 0 - success, other value failed code
@@ -3143,7 +3155,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
 UPDI Memory Write
     @nvm_ptr: updi_nvm_init() device handle
     @cmd: cmd string use for address and data. 
-        Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
+        Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]...
             addr is hex type dig
             dat is hex type dig
     @check: whether readback data for double checking
@@ -3152,6 +3164,140 @@ UPDI Memory Write
 int updi_write(void *nvm_ptr, char *cmd, bool check)
 {
     return _updi_write(nvm_ptr, cmd, nvm_write_auto, check);
+}
+
+/*
+    Memory Test
+    @nvm_ptr: updi_nvm_init() device handle
+    @cmd: cmd string use for address and data. Format: [addr0]:[size0]=[dat0]|[addr1]...
+    @dev: device info structure, get by get_chip_info()
+    @returns 0 - success, other value failed code
+*/
+int updi_memset(void *nvm_ptr, char *cmd, const device_info_t *dev)
+{
+    char **tk_s, **tk_w, **tokens;
+    int start, size, addr, len;
+    unsigned int val, val_read;
+    int i, k, m, result = 0;
+    bool use_rand = true;
+    nvm_info_t info;
+
+    if (!nvm_in_progmode(nvm_ptr)) {
+        DBG_INFO(UPDI_INFO, "Memory test should runing at program mode to avoid memory various!");
+    }
+
+    // Get flash block information
+    result = dev_get_nvm_info(dev, MEM_SRAM, &info);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
+        return -2;
+    } else {
+        start = info.nvm_mapped_start ? info.nvm_mapped_start : info.nvm_start;
+        size = (int)info.nvm_size;
+    }
+
+    tk_s = str_split(cmd, '|');
+    for (k = 0; tk_s && tk_s[k]; k++)
+    {
+        tk_w = str_split(tk_s[k], '=');
+        for (m = 0, addr = ERROR_PTR, len = 0; tk_w; m++)
+        {
+            if (tk_w[m]) {
+                if (m == 0) {
+                    tokens = str_split(tk_w[m], ':');
+                    if (tokens[0]) {
+                        addr = (int)strtol(tokens[0], NULL, 16);
+                        if (tokens[1]) {
+                            len = (int)strtol(tokens[1], NULL, 0);
+                        }
+                    }
+
+                    for (i = 0; tokens && tokens[i]; i++) {
+                        free(tokens[i]);
+                    }
+
+                    if (tokens) {
+                        free(tokens);
+                    }
+                }
+                else if (m == 1)
+                {
+                    val = (unsigned int)(strtol(tk_w[m], NULL, 16));
+                    use_rand = false;
+                }
+
+                free(tk_w[m]);
+            } else {
+                if (addr >= start &&
+                    addr + len <= start + size) {
+                    if (!len) {
+                        len = start + size - addr;
+                    }
+
+                    // Step 1: test each bytes
+                    for ( i = 0; i < len && result == 0; i += sizeof(val) ) {
+                        if (use_rand) {
+                            val = (rand() << 16 | rand());
+                        }
+
+                        result = nvm_write_mem(nvm_ptr, addr + i, (u8 *)&val, sizeof(val), 0);
+                        if (result != 0) {
+                            DBG_INFO(UPDI_DEBUG, "nvm_write_mem off 0x%X failed %d", i, result);
+                            result = -3;
+                        } else {
+                            result = nvm_read_mem(nvm_ptr, addr + i, (u8 *)&val_read, sizeof(val_read));
+                            if (result != 0) {
+                                DBG_INFO(UPDI_DEBUG, "nvm_read_mem off 0x%X failed %d", i, result);
+                                result = -4;
+                            } else {
+                                if (val != val_read) {
+                                    DBG_INFO(DEFAULT_ERROR, "#1: Value compare failed w(%X), r(%X), at offset %d(0x%X)", val, val_read, i, i);
+                                    result = -5;
+                                }
+                            }
+                        }
+                    }
+
+                    // Step 1: test all bytes
+                    if (!use_rand) {
+                        for ( i = 0; i < len && result == 0; i += sizeof(val) ) {
+                            result = nvm_read_mem(nvm_ptr, addr + i, (u8 *)&val_read, sizeof(val_read));
+                            if (result != 0) {
+                                DBG_INFO(UPDI_DEBUG, "nvm_read_mem off 0x%X failed %d", i, result);
+                                result = -6;
+                            } else {
+                                if (val != val_read) {
+                                    DBG_INFO(UPDI_DEBUG, "#2: Value compare failed w(%X), r(%X), at offset %d(0x%X)", val, val_read, i, i);
+                                    result = -7;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                break;
+            }
+        }
+
+        if (!tk_w)
+        {
+            DBG_INFO(UPDI_DEBUG, "Parse write str: %s failed", tk_s[k]);
+        }
+        else
+            free(tk_w);
+
+        free(tk_s[k]);
+    }
+
+    if (!tk_s)
+    {
+        DBG_INFO(UPDI_DEBUG, "Parse write str: %s failed", cmd);
+    }
+    else
+        free(tk_s);
+
+    return result;
 }
 
 /*
