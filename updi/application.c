@@ -135,19 +135,19 @@ int app_device_info(void *app_ptr)
         return -2;
     }
 
-    DBG(UPDI_INFO, "[SIB]", sib, sizeof(sib), "%02x ");
-    DBG(UPDI_INFO, "[Family ID]", sib, 7, "%c");
-    DBG(UPDI_INFO, "[NVM revision]", sib + 8, 3, "%c");
+    DBG(APP_INFO, "[SIB]", sib, sizeof(sib), "%02x ");
+    DBG(APP_INFO, "[Family ID]", sib, 7, "%c");
+    DBG(APP_INFO, "[NVM revision]", sib + 8, 3, "%c");
 	if (!strncmp(sib + 8, "P:2", 3)) {
 		// 24bit link address
-		DBG_INFO(UPDI_INFO, "[NVM Version P2, Using 24bit address mode]");
+		DBG_INFO(APP_INFO, "[NVM Version P2, Using 24bit address mode]");
 		app->version = APP_VERSION_V1;
 	}
-    DBG(UPDI_INFO, "[OCD revision]", sib + 11, 3, "%c");
-    DBG_INFO(UPDI_INFO, "[PDI OSC] is %cMHz", sib[15]);
+    DBG(APP_INFO, "[OCD revision]", sib + 11, 3, "%c");
+    DBG_INFO(APP_INFO, "[PDI OSC] is %cMHz", sib[15]);
 
     pdi = link_ldcs(LINK(app), UPDI_CS_STATUSA);
-    DBG_INFO(UPDI_INFO, "[PDI Rev] is %d", (pdi >> 4));
+    DBG_INFO(APP_INFO, "[PDI Rev] is %d", (pdi >> 4));
 
     if (app_in_prog_mode(app)) {
         result = app_read_data(app, APP_REG(app, sigrow_address), sigrow, sizeof(sigrow));
@@ -162,9 +162,9 @@ int app_device_info(void *app_ptr)
             return -4;
         }
 
-        DBG(UPDI_INFO, "[Device ID]", sigrow, 3, "%02x ");
-        DBG(UPDI_INFO, "[Sernum ID]", sigrow + 3, 10, "%02x ");
-        DBG_INFO(UPDI_INFO, "[Device Rev] is %c", revid[0] + 'A');
+        DBG(APP_INFO, "[Device ID]", sigrow, 3, "%02x ");
+        DBG(APP_INFO, "[Sernum ID]", sigrow + 3, 10, "%02x ");
+        DBG_INFO(APP_INFO, "[Device Rev] is %c", revid[0] + 'A');
     }
 
     return 0;

@@ -99,6 +99,8 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <p> 1. pack command with 'pack.h' in current directory support
             2. trans_segment() search order change to avoid incorrectly repack the file without linear address
         <r> 1. add command 'memtest'
+            2. change strtol() to strtoll() to avoid 32bit value overflow
+
     CUPDI Software version
 */
 #define SOFTWARE_VERSION "A.19r"
@@ -225,10 +227,10 @@ int main(int argc, const char *argv[])
         OPT_BOOLEAN('i', "", &show_info, "Get Infoblock infomation of firmware"),
         OPT_BIT('-', "save", &flag, "Save flash to a VCS HEX file", NULL, (1 << FLAG_SAVE), 0),
         OPT_BIT('-', "dump", &flag, "Dump flash to a Intel HEX file", NULL, (1 << FLAG_DUMP), 0),
-        OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addr1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
-        OPT_STRING('w', "write", &write, "Direct write to any memory [addr0]:[data0];[data1];[data2]|[addr1]... Note address and data format with Hex type dig"),
+        OPT_STRING('r', "read", &read, "Direct read from any memory [addr_hex:len_auto]|<next token>..."),
+        OPT_STRING('w', "write", &write, "Direct write to any memory [addr_hex]:[dat0_hex];[dat1_hex];[dat2_hex]|<next token>..."),
         OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]|regs={addr, size, mask_p, mask_n, off, ...}", NULL, (intptr_t) ""),
-        OPT_STRING('-', "memtest", &memtest, "test memory with give value [addr0]:[len0]=[32bit value]|[addr1]...  the len==0 means test all memory from addr[n], if no value specified, we will use rand() value"),
+        OPT_STRING('-', "memtest", &memtest, "test memory with give value [addr_hex]:[len_auto]=[test_32bit_hex]|<next token>...  if len_auto is ZERO indicated the whole SRAM space; if no test_32bit specified, we will use a rand value for test"),
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
@@ -2909,12 +2911,12 @@ int _updi_page_erase(void *nvm_ptr, char *cmd)
             if (result == 0)
             { // only work when no error occur
                 if (i == 0)
-                    address = (int)strtol(tk_w[i], NULL, 0);
+                    address = (int)strtoll(tk_w[i], NULL, 0);
                 else if (i == 1)
                 {
                     if (VALID_PTR(address))
                     {
-                        count = (int)(strtol(tk_w[i], NULL, 0)); // Max size 255 once
+                        count = (int)(strtoll(tk_w[i], NULL, 0)); // Max size 255 once
                         if (count > UPDI_PAGE_ERASE_STROKEN_COUNT)
                         {
                             count = UPDI_PAGE_ERASE_STROKEN_COUNT;
@@ -2971,15 +2973,13 @@ int updi_page_erase(void *nvm_ptr, char *cmd)
     Memory Read
     @nvm_ptr: updi_nvm_init() device handle
     @cmd: cmd string use for address and count.
-        Format: [addr0:size]|[addre1:size]...
-            addr is hex type dig
-            size is auto type dig
+        Format: [addr_hex:len_auto]|<next token>...
     @returns 0 - success, other value failed code
 */
 int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
 {
     char **tk_s, **tk_w; // token section, token words
-#define UPDI_READ_STROKEN_WORDS_LEN 1024
+#define UPDI_READ_STROKEN_WORDS_LEN 4096
     int address, len, copylen, outlen_left = outlen;
     char *buf;
     int i, k, result = 0;
@@ -2994,11 +2994,11 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
             { // only work when no error occur
                 if (i == 0)
                 {
-                    address = (int)strtol(tk_w[i], NULL, 16);
+                    address = (int)strtoll(tk_w[i], NULL, 16);
                 }
                 else if (i == 1)
                 {
-                    len = (int)(strtol(tk_w[i], NULL, 0)); // Max size 255 once
+                    len = (int)(strtoll(tk_w[i], NULL, 0)); // Max size 255 once
                     if (len > UPDI_READ_STROKEN_WORDS_LEN)
                     {
                         DBG_INFO(UPDI_DEBUG, "Read memory len %d over max, set to", len, UPDI_READ_STROKEN_WORDS_LEN);
@@ -3067,9 +3067,7 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
     UPDI Memory Read
     @nvm_ptr: updi_nvm_init() device handle
     @cmd: cmd string use for address and count.
-        Format: [addr0:size]|[addre1:size]...
-            addr is hex type dig
-            size is auto type dig
+        Format: [addr_hex:len_auto]|<next token>...
     @returns 0 - success, other value failed code
 */
 int updi_read(void *nvm_ptr, char *cmd)
@@ -3080,7 +3078,8 @@ int updi_read(void *nvm_ptr, char *cmd)
 /*
     Memory Write
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and data. Format: [addr]:[dat0];[dat1];[dat2]|[addr1]:...
+    @cmd: cmd string use for address and data. 
+        Format: [addr_hex]:[dat0_hex];[dat1_hex];[dat2_hex]|<next token>
     @op: operating function for write
     @check: whether readback data for double checking
     @returns 0 - success, other value failed code
@@ -3104,7 +3103,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
             { // only work when no error occur
                 if (m == 0)
                 {
-                    address = (int)strtol(tk_w[m], NULL, 16);
+                    address = (int)strtoll(tk_w[m], NULL, 16);
                 }
                 else if (m == 1)
                 {
@@ -3113,7 +3112,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
                     {
                         DBG_INFO(UPDI_DEBUG, "Write[%d]: %s", i, tokens[i]);
                         j = i % UPDI_WRITE_STROKEN_LEN;
-                        buf[j] = (char)(strtol(tokens[i], NULL, 16) & 0xff);
+                        buf[j] = (char)(strtoll(tokens[i], NULL, 16) & 0xff);
                         dirty = true;
                         if (j + 1 == UPDI_WRITE_STROKEN_LEN)
                         {
@@ -3161,7 +3160,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
 
     if (!tk_s)
     {
-        DBG_INFO(UPDI_DEBUG, "Parse write str: %s failed", cmd);
+        DBG_INFO(UPDI_ERROR, "Parse write str: %s failed", cmd);
     }
     else
         free(tk_s);
@@ -3173,9 +3172,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
 UPDI Memory Write
     @nvm_ptr: updi_nvm_init() device handle
     @cmd: cmd string use for address and data.
-        Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]...
-            addr is hex type dig
-            dat is hex type dig
+        Format: [addr_hex]:[dat0_hex];[dat1_hex];[dat2_hex]|<next token>
     @check: whether readback data for double checking
     @returns 0 - success, other value failed code
 */
@@ -3202,7 +3199,7 @@ int updi_memtest(void *nvm_ptr, char *cmd, const device_info_t *dev)
 
     if (!nvm_in_progmode(nvm_ptr))
     {
-        DBG_INFO(UPDI_INFO, "Memory test should runing at program mode to avoid memory various!");
+        DBG_INFO(UPDI_WARN, "Memory test should runing at program mode to avoid memory various!");
     }
 
     // Get flash block information
@@ -3231,10 +3228,10 @@ int updi_memtest(void *nvm_ptr, char *cmd, const device_info_t *dev)
                     tokens = str_split(tk_w[m], ':');
                     if (tokens[0])
                     {
-                        addr = (int)strtol(tokens[0], NULL, 16);
+                        addr = (int)strtoll(tokens[0], NULL, 16);
                         if (tokens[1])
                         {
-                            len = (int)strtol(tokens[1], NULL, 0);
+                            len = (int)strtoll(tokens[1], NULL, 0);
                         }
                     }
 
@@ -3250,7 +3247,7 @@ int updi_memtest(void *nvm_ptr, char *cmd, const device_info_t *dev)
                 }
                 else if (m == 1)
                 {
-                    val = (unsigned int)(strtol(tk_w[m], NULL, 16));
+                    val = (unsigned int)(strtoll(tk_w[m], NULL, 16));
                     use_rand = false;
                 }
 
@@ -3338,7 +3335,7 @@ int updi_memtest(void *nvm_ptr, char *cmd, const device_info_t *dev)
 
     if (!tk_s)
     {
-        DBG_INFO(UPDI_DEBUG, "Parse write str: %s failed", cmd);
+        DBG_INFO(UPDI_ERROR, "Parse write str: %s failed", cmd);
     }
     else
     {
@@ -3421,16 +3418,16 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
                                         {
                                             if (elem_size == 4)
                                             {
-                                                ((int *)arr_val)[arr_i * each_arr_depth + k] = (int)strtol(tk_arr[k], NULL, 0);
+                                                ((int *)arr_val)[arr_i * each_arr_depth + k] = (int)strtoll(tk_arr[k], NULL, 0);
                                             }
                                             else if (elem_size == 2)
                                             {
-                                                ((short *)arr_val)[arr_i * each_arr_depth + k] = (short)strtol(tk_arr[k], NULL, 0);
+                                                ((short *)arr_val)[arr_i * each_arr_depth + k] = (short)strtoll(tk_arr[k], NULL, 0);
                                             }
                                             else /*elem_size == 1*/
                                             {
                                                 // Default minimum size
-                                                ((char *)arr_val)[arr_i * each_arr_depth + k] = (char)strtol(tk_arr[k], NULL, 0);
+                                                ((char *)arr_val)[arr_i * each_arr_depth + k] = (char)strtoll(tk_arr[k], NULL, 0);
                                             }
                                         }
 
@@ -3450,7 +3447,7 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
                             }
                             else
                             {
-                                tag_val[j] = (int)strtol(tk_w[1], NULL, 0);
+                                tag_val[j] = (int)strtoll(tk_w[1], NULL, 0);
                             }
 
                             break;
@@ -4177,11 +4174,11 @@ out:
 
     if (result)
     {
-        DBG_INFO(UPDI_ERROR, "Failed");
+        DBG_INFO(UPDI_INFO, "Failed");
     }
     else
     {
-        DBG_INFO(UPDI_ERROR, "Passed");
+        DBG_INFO(UPDI_INFO, "Passed");
     }
 
     return result;
