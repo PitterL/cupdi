@@ -103,7 +103,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19r"
+#define SOFTWARE_VERSION "A.19s"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
@@ -548,7 +548,7 @@ int main(int argc, const char *argv[])
     // debug show
     if (dbgview)
     {
-        result = updi_debugview(nvm_ptr, dbgview);
+        result = updi_debugview(nvm_ptr, dbgview, dev->type);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "Debugview failed %d", result);
@@ -3485,16 +3485,33 @@ static void _verbar_token_parse(char *cmd, const char *tag[], int *tag_val, int 
 }
 
 // Use 1/1000 pf as unit, the max value 675 * 8 = 54000, less than 16bit, but will show negative value in studio if more thant 32767
-#define CALCULATE_CAP_DIV_1000(_v) (((_v) & 0x0F) * 10 + (((_v) >> 4) & 0x0F) * 68 + (((_v) >> 8) & 0x0F) * 675 + (((_v) >> 12) & 0x03) * 6750 + (((_v) >> 14) & 0x03) * 6200)
+#define CALCULATE_TINY_CAP_DIV_1000(_v) (((_v) & 0x0F) * 10 + (((_v) >> 4) & 0x0F) * 68 + (((_v) >> 8) & 0x0F) * 675 + (((_v) >> 12) & 0x03) * 6750 + (((_v) >> 14) & 0x03) * 6200)
 
 // Use 1/100 pf as unit
-#define CALCULATE_CAP_DIV_100(_v) (((_v) & 0x0F) * 1 + (((_v) >> 4) & 0x0F) * 7 + (((_v) >> 8) & 0x0F) * 68 + (((_v) >> 12) & 0x03) * 675 + (((_v) >> 14) & 0x03) * 620)
+#define CALCULATE_TINY_CAP_DIV_100(_v) (((_v) & 0x0F) * 1 + (((_v) >> 4) & 0x0F) * 7 + (((_v) >> 8) & 0x0F) * 68 + (((_v) >> 12) & 0x03) * 675 + (((_v) >> 14) & 0x03) * 620)
 
 // Use 1/10 pf as unit
-#define CALCULATE_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 2) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + (((_v) >> 12) & 0x03) * 68 + (((_v) >> 14) & 0x03) * 62)
+#define CALCULATE_TINY_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 2) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + (((_v) >> 12) & 0x03) * 68 + (((_v) >> 14) & 0x03) * 62)
 
 // Use pf(float)
-#define CALCULATE_CAP_DIV(_v) (((_v) & 0x0F) * 0.01 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + (((_v) >> 12) & 0x03) * 6.75 + (((_v) >> 14) & 0x03) * 6.2)
+#define CALCULATE_TINY_CAP_DIV(_v) (((_v) & 0x0F) * 0.01 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + (((_v) >> 12) & 0x03) * 6.75 + (((_v) >> 14) & 0x03) * 6.2)
+
+// Use 1/10 pf as unit
+/*
+AVRDA: 1/32pf Unit (2^5 = 32 = 1pf)
+Self-Capacitance
+Sensor Capacitance value = (CC value + 1) * 0.03125 * 2 (use this formula)
+Mutual Capacitance
+Sensor Capacitance value = (CC value + 1) * 0.03125
+*/
+#define COEF 1 /* Mutual */
+
+# define __CALCULATE_AVRDA_CAP_DIV_1(_v) ((((_v) + 1)) >> (4 + COEF))
+# define __CALCULATE_AVRDA_CAP_DIV_10(_v) ((((_v) + 1) * 10) >> (4 + COEF))
+# define __CALCULATE_AVRDA_CAP_DIV_100(_v) ((((_v) + 1) * 100) >> (4 + COEF))
+
+#define CALCULATE_AVRDA_CAP_DIV_10(_v) __CALCULATE_AVRDA_CAP_DIV_10(_v)
+#define CALCULATE_AVRDA_CAP_DIV(_v) (((_v) + 1) * 0.03125 * COEF)
 
 static int _get_var_addr_data(void *nvm_ptr, varible_address_t *va)
 {
@@ -3668,7 +3685,7 @@ typedef struct cap_sample_value
     u8 node_acq_status;
 } cap_sample_value_t;
 
-static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_value_t *rsd)
+static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_value_t *rsd, u8 dev_type)
 {
     qtm_acq_node_data_t ptc_signal;
     qtm_touch_key_data_t ptc_ref;
@@ -3697,14 +3714,16 @@ static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_valu
     }
 
     val = (int16_t)lt_int16_to_cpu(ptc_signal.node_comp_caps);
-    cc_value = CALCULATE_CAP_DIV(val);
+    cc_value = dev_type == AVRDA ? 
+        CALCULATE_AVRDA_CAP_DIV(val) :CALCULATE_TINY_CAP_DIV(val);
     ref_value = (int16_t)lt_int16_to_cpu(ptc_ref.channel_reference);
     signal_value = (int16_t)lt_int16_to_cpu(ptc_signal.node_acq_signals);
     delta_value = signal_value - ref_value;
 
     if (rsd)
     {
-        rsd->cccap = CALCULATE_CAP_DIV_10(val); // CALCULATE_CAP_DIV_100
+        rsd->cccap = dev_type == AVRDA ? 
+            CALCULATE_AVRDA_CAP_DIV_10(val) : CALCULATE_TINY_CAP_DIV_10(val);
         rsd->cc_value = cc_value;
         rsd->reference = ref_value;
         rsd->signal = signal_value;
@@ -3761,7 +3780,7 @@ enum
     NUM_DBG_REGS_PARAM_TYPES
 };
 
-int updi_debugview(void *nvm_ptr, char *cmd)
+int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
 {
     cap_sample_value_t rsd_data;
     varible_address_t var_addr;
@@ -3829,7 +3848,7 @@ int updi_debugview(void *nvm_ptr, char *cmd)
         for (j = 0; j < params[DBG_KEY_CNT]; j++)
         {
             channel = params[DBG_KEY_START] + j;
-            result = _get_rsd_data(nvm_ptr, channel, params[DBG_SIGNAL_ADDR], params[DBG_REFERENCE_ADDR], &rsd_data);
+            result = _get_rsd_data(nvm_ptr, channel, params[DBG_SIGNAL_ADDR], params[DBG_REFERENCE_ADDR], &rsd_data, dev_type);
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "_get_rsd_data failed 0x%x", result);
@@ -4120,7 +4139,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
             channel = k + j;
             if (channel < ptc_acq.num_sensor_nodes)
             { // Check node count
-                result = _get_rsd_data(nvm_ptr, channel, var_addr.dsdr.data.ds, var_addr.dsdr.data.dr, &rsd_data);
+                result = _get_rsd_data(nvm_ptr, channel, var_addr.dsdr.data.ds, var_addr.dsdr.data.dr, &rsd_data, dev_type);
                 if (result)
                 {
                     DBG_INFO(UPDI_DEBUG, "_get_rsd_data failed 0x%x", result);

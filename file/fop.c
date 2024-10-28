@@ -210,8 +210,10 @@ int _search_defined_array_from_file(const char *file, fn_search_defined_buf fn_s
 
     f = fopen(file, "r");
     if (!f) {
+        /*
         fprintf(stderr, "Could not open '%s': %s.\n", file,
             strerror(errno));
+        */
         return -1;
     }
 
@@ -269,8 +271,10 @@ int search_defined_array_int_from_file(const char *file, const char *varname, un
 
     result = _search_defined_array_from_file(file, _search_defined_array_from_buf, pat_str, pat_value, output, outlen, invalid);
     if (result < 0) {
-        fprintf(stderr, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
+        /*
+        fprintf(stdout, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
             strerror(errno));
+        */
         return -3;
     }
 
@@ -308,8 +312,10 @@ int search_defined_value_int_from_file(const char *file, const char *varname, un
 
     result = _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, 0x0);
     if (result < 0) {
-        fprintf(stderr, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
+        /*
+        fprintf(stdout, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
             strerror(errno));
+        */
         return -3;
     }
 
@@ -339,8 +345,10 @@ int search_map_value_int_from_file(const char *file, const char *varname, unsign
 
     result = _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, (unsigned int)-1);
     if (result < 0) {
-        fprintf(stderr, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
+        /*
+        fprintf(stdout, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
             strerror(errno));
+        */
         return -3;
     }
 

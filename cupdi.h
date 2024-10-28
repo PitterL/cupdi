@@ -19,7 +19,7 @@ int updi_show_fuse(void *nvm_ptr);
 int updi_verifiy_infoblock(void *nvm_ptr);
 int updi_reset(void *nvm_ptr);
 int updi_storage(void *nvm_ptr, char *cmd);
-int updi_debugview(void *nvm_ptr, char *cmd);
+int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type);
 int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type);
 
 int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file, int pack, bool ipe_format);
