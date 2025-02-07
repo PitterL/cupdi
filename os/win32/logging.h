@@ -23,14 +23,17 @@ typedef enum {
     NVM_ERROR = 1,
     APP_ERROR = 1,
     LINK_ERROR = 1,
-    PHY_ERROR = 1,
-    SER_ERROR = 1,
+    PHY_ERROR = 2,
+    SER_ERROR = 2,
     OTHER_ERROR = 2,
     
     UPDI_WARN = 1,
-    
+    NVM_WARN = 2,
+
     UPDI_INFO = 1,
+    NVM_INFO = 2,
     APP_INFO = 2,
+    OTHER_INFO = 2,
 } verbose_e_t;
 
 void set_verbose_level(verbose_t level);

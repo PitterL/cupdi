@@ -66,6 +66,8 @@ char *trim_name_with_extesion(const char *pathname, const char a_delim, int orde
     }
     strncpy(new_name + mainsize, tailname, extsize + 1); // Copy 'NULL'
 
+    // fprintf(stderr, "Search: '%s'\n", new_name);
+
     return new_name;
 }
 

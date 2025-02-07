@@ -329,7 +329,7 @@ int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u32 address, u8 *dat
 
     if (!nvm->progmode)
     {
-        DBG_INFO(NVM_ERROR, "NVM area read at locked mode(may be denied)");
+        DBG_INFO(NVM_WARN, "NVM area read at locked mode(may be denied)");
         // return -2;
     }
 

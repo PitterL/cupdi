@@ -51,7 +51,7 @@ void *updi_physical_init(const char *port, int baud, int breaks)
 	size_t size;
     int result;
 
-    DBG_INFO(PHY_DEBUG, "<PHY> Opening port %s, baudrate %d", port, baud);
+    DBG_INFO(OTHER_INFO, "<PHY> Opening port `%s`, baudrate %d", port, baud);
     
     stat.baudRate = baud;
     stat.byteSize = 8;
@@ -83,7 +83,7 @@ void *updi_physical_init(const char *port, int baud, int breaks)
         }
     }
     else {
-        DBG_INFO(PHY_DEBUG, "<PHY> Init: OpenPort %s failed ", port);
+        DBG_INFO(PHY_ERROR, "<PHY> Init: OpenPort %s failed ", port);
     }
     
     DBG_INFO(PHY_DEBUG, "<PHY> Init: finished");

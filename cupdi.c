@@ -100,33 +100,39 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. trans_segment() search order change to avoid incorrectly repack the file without linear address
         <r> 1. add command 'memtest'
             2. change strtol() to strtoll() to avoid 32bit value overflow
+        <s> 1. add mplab board.h support
+            2. avrda compensation capacitance with 32pf base line 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19s"
+#define SOFTWARE_VERSION "A.19t"
 
 /* The firmware Version control file relatve directory to Hex file */
+#define VAR_FILE_RELATIVE_LOCAL "pack.h"
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
 #define VAR_FILE_RELATIVE_POS_1 "mpt\\board.h"
 #define VAR_FILE_RELATIVE_POS_2 "mpt2\\board.h"
 #define VAR_FILE_RELATIVE_POS_3 "mpt3\\board.h"
 #define VAR_FILE_RELATIVE_POS_MPLAB "..\\..\\mpt\\board.h"
-#define VAR_FILE_RELATIVE_LOCAL "pack.h"
+#define VAR_FILE_RELATIVE_POS_MPLAB_2 "..\\..\\..\\mpt3\\board.h"
 
 #define BOARD_FILES                  \
     {                                \
+        VAR_FILE_RELATIVE_LOCAL,       \
         VAR_FILE_RELATIVE_POS_0,     \
         VAR_FILE_RELATIVE_POS_1,     \
         VAR_FILE_RELATIVE_POS_2,     \
         VAR_FILE_RELATIVE_POS_3,     \
         VAR_FILE_RELATIVE_POS_MPLAB, \
-        VAR_FILE_RELATIVE_LOCAL}
+        VAR_FILE_RELATIVE_POS_MPLAB_2, \
+    }
 
-#define VAR_FILE_ORDER_IN_PARENTS_DIRECTORY 4
+#define VAR_FILE_ORDER_IN_LOCAL_DIRECTORY 0
+
 #define VAR_FILE_ORDER_LEVEL_OF_PARENTS 2
 #define VAR_FILE_ORDER_LEVEL_OF_LOCAL 1
 
-#define VCS_IPE_HEX_FILE_EXTENSION_NAME "ipe.ihex"
+#define VCS_IPE_HEX_FILE_EXTENSION_NAME "ipe.hex"
 #define VCS_STD_HEX_FILE_EXTENSION_NAME "std.ihex"
 #define VCS_HEX_FILE_EXTENSION_NAME "ihex"
 #define MAP_FILE_EXTENSION_NAME "map"
@@ -2124,7 +2130,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     for (i = 0; i < size; i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
         {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
         }
@@ -2151,7 +2157,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
 
     if (result)
     {
-        DBG_INFO(UPDI_DEBUG, "load_version_value_from_file failed %d", result);
+        DBG_INFO(OTHER_DEBUG, "load_version_value_from_file(error=%d)", result);
         result = -2;
         goto out;
     }
@@ -2331,7 +2337,7 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
         {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
         }
@@ -2459,7 +2465,7 @@ int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, ch
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
         {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
         }
@@ -2592,7 +2598,7 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
         // Give the searching order of the directory
-        if (i <= VAR_FILE_ORDER_IN_PARENTS_DIRECTORY)
+        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
         {
             order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
         }
@@ -2745,7 +2751,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
         seg = load_version_segment_from_file(dev, file, &dhex_info, pack);
         if (!seg)
         {
-            DBG_INFO(UPDI_ERROR, "load_version_segment_from_file, Skipped");
+            DBG_INFO(UPDI_ERROR, "No Version Content detected");
             // result = -7;
             // goto out;
         }
@@ -3491,7 +3497,7 @@ static void _verbar_token_parse(char *cmd, const char *tag[], int *tag_val, int 
 #define CALCULATE_TINY_CAP_DIV_100(_v) (((_v) & 0x0F) * 1 + (((_v) >> 4) & 0x0F) * 7 + (((_v) >> 8) & 0x0F) * 68 + (((_v) >> 12) & 0x03) * 675 + (((_v) >> 14) & 0x03) * 620)
 
 // Use 1/10 pf as unit
-#define CALCULATE_TINY_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 2) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + (((_v) >> 12) & 0x03) * 68 + (((_v) >> 14) & 0x03) * 62)
+#define CALCULATE_TINY_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 6) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + (((_v) >> 12) & 0x03) * 68 + (((_v) >> 14) & 0x03) * 62)
 
 // Use pf(float)
 #define CALCULATE_TINY_CAP_DIV(_v) (((_v) & 0x0F) * 0.01 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + (((_v) >> 12) & 0x03) * 6.75 + (((_v) >> 14) & 0x03) * 6.2)
@@ -3512,6 +3518,20 @@ Sensor Capacitance value = (CC value + 1) * 0.03125
 
 #define CALCULATE_AVRDA_CAP_DIV_10(_v) __CALCULATE_AVRDA_CAP_DIV_10(_v)
 #define CALCULATE_AVRDA_CAP_DIV(_v) (((_v) + 1) * 0.03125 * COEF)
+
+#define AVRDA_BASE_COMCAP 0 // 0x03FF
+
+int16_t avrda_comp(int16_t comcap)
+{
+    if (comcap & 0x8000) {
+        comcap = (AVRDA_BASE_COMCAP - (comcap & 0x03FF));
+    }
+    else{
+        comcap = (AVRDA_BASE_COMCAP + comcap);
+    }
+
+    return comcap;
+}
 
 static int _get_var_addr_data(void *nvm_ptr, varible_address_t *va)
 {
@@ -3715,7 +3735,7 @@ static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_valu
 
     val = (int16_t)lt_int16_to_cpu(ptc_signal.node_comp_caps);
     cc_value = dev_type == AVRDA ? 
-        CALCULATE_AVRDA_CAP_DIV(val) :CALCULATE_TINY_CAP_DIV(val);
+        CALCULATE_AVRDA_CAP_DIV(avrda_comp(val)) :CALCULATE_TINY_CAP_DIV(val);
     ref_value = (int16_t)lt_int16_to_cpu(ptc_ref.channel_reference);
     signal_value = (int16_t)lt_int16_to_cpu(ptc_signal.node_acq_signals);
     delta_value = signal_value - ref_value;
@@ -3723,7 +3743,7 @@ static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_valu
     if (rsd)
     {
         rsd->cccap = dev_type == AVRDA ? 
-            CALCULATE_AVRDA_CAP_DIV_10(val) : CALCULATE_TINY_CAP_DIV_10(val);
+            CALCULATE_AVRDA_CAP_DIV_10(avrda_comp(val)) : CALCULATE_TINY_CAP_DIV_10(val);
         rsd->cc_value = cc_value;
         rsd->reference = ref_value;
         rsd->signal = signal_value;
@@ -3758,7 +3778,7 @@ const char *dbg_token_tag[DBG_MAX_PARAM_NUM] = {
     "loop",
     "st",
     "keys",
-    "regs"};
+    "regs" /* {addr, size, mask_p, mask_n, off, ...} */};
 
 #pragma pack(1)
 typedef struct
@@ -3814,6 +3834,7 @@ int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
             }
             else
             {
+                // regs={addr, size, mask_p, mask_n, off, ...}
                 memset(dbg_regs, 0, size);
                 _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM,
                                          (void **)dbg_regs, 1, size, sizeof(u16), NULL);
