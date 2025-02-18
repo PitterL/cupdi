@@ -870,7 +870,7 @@ int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 dummy)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    nvm_rop rop, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem, nvm_read_lockbits};
+    nvm_rop rop = NULL, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem, nvm_read_lockbits};
     unsigned start, size;
     int i, result = 0;
 
@@ -900,29 +900,31 @@ int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 dummy)
             }
 
             rop = nvm_rops[i];
-            if (rop)
-            {
-                result = rop(nvm_ptr, address, data, len);
-                if (result)
-                {
-                    DBG_INFO(NVM_DEBUG, "<NVM> NVM rop return failed %d", result);
-                    return -3;
-                }
-
-                break;
-            }
-            else
-            {
-                DBG_INFO(NVM_DEBUG, "<NVM> Not support nvm op %d size %d", i, len);
-                return -4;
-            }
+            break;
         }
+    }
+
+    if (!rop) {
+        if (!len) {
+            DBG_INFO(NVM_DEBUG, "<NVM> Not support block op size %d", len);
+            return -3;
+        } else {
+            DBG_INFO(NVM_DEBUG, "<NVM> Default Mem Read op ize %d", len);
+            rop = nvm_read_mem;
+        }
+    }
+
+    result = rop(nvm_ptr, address, data, len);
+    if (result)
+    {
+        DBG_INFO(NVM_DEBUG, "<NVM> NVM rop return failed %d", result);
+        return -4;
     }
 
     if (i == NUM_NVM_EX_TYPES)
     {
         DBG_INFO(NVM_DEBUG, "<NVM> read auto no op found with (0x%x, %d)", address, len);
-        return -6;
+        return -5;
     }
 
     return 0;
@@ -1031,10 +1033,15 @@ int _nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, u8 flag
         }
     }
 
-    if (!wop || !len)
+    if (!wop)
     {
-        DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", wop, len);
-        return -3;
+        if (!len) {
+            DBG_INFO(NVM_DEBUG, "<NVM> Not support block size %d", len);
+            return -3;
+        } else {
+            DBG_INFO(NVM_DEBUG, "<NVM> Default Mem write op size %d", len);
+            wop = nvm_write_mem;
+        }
     }
 
     // Process data

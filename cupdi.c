@@ -105,7 +105,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19t"
+#define SOFTWARE_VERSION "A.19u"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
