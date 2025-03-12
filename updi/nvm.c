@@ -109,7 +109,7 @@ void updi_nvm_deinit(void *nvm_ptr)
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @return 0 successful, other value failed
 */
-int nvm_get_device_info(void *nvm_ptr)
+int nvm_get_device_info(void *nvm_ptr, DEV_TYPE_T type)
 {
     /*
         Reads device info
@@ -119,9 +119,9 @@ int nvm_get_device_info(void *nvm_ptr)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Reading device info");
+    DBG_INFO(NVM_DEBUG, "<NVM> Reading device info %d", type);
 
-    return app_device_info(APP(nvm));
+    return app_device_info(APP(nvm), type);
 }
 
 /*

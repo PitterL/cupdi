@@ -101,11 +101,13 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <r> 1. add command 'memtest'
             2. change strtol() to strtoll() to avoid 32bit value overflow
         <s> 1. add mplab board.h support
-            2. avrda compensation capacitance with 32pf base line 
+            2. avrda compensation capacitance with 32pf base line
+        <v> 1. default print Sermum
+            2. `dbgview` support keys=0 which means note show keys information
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19u"
+#define SOFTWARE_VERSION "A.19v"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -372,7 +374,7 @@ int main(int argc, const char *argv[])
     }
 
     // device id
-    result = updi_device_id(nvm_ptr);
+    result = updi_device_id(nvm_ptr, dev->type);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "updi_device_id in program failed %d", result);
@@ -602,9 +604,9 @@ out:
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @return 0 successful, other value failed
 */
-int updi_device_id(void *nvm_ptr)
+int updi_device_id(void *nvm_ptr, DEV_TYPE_T type)
 {
-    return nvm_get_device_info(nvm_ptr);
+    return nvm_get_device_info(nvm_ptr, type);
 }
 
 /*
@@ -3843,29 +3845,35 @@ int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
     }
 
     // Verify the input parameters
-    if (!params[DBG_SIGNAL_ADDR] || !params[DBG_REFERENCE_ADDR])
-    {
-        // No valid address, load from info block
-        result = _get_var_addr_data(nvm_ptr, &var_addr);
-        if (result)
+    if (params[DBG_KEY_CNT]) {
+        if (!params[DBG_SIGNAL_ADDR] || !params[DBG_REFERENCE_ADDR])
         {
-            DBG_INFO(UPDI_DEBUG, "_get_var_addr_data failed 0x%x", result);
-            result = -2;
-            goto out;
-        }
-        else
-        {
-            params[DBG_SIGNAL_ADDR] = var_addr.dsdr.data.ds;
-            params[DBG_REFERENCE_ADDR] = var_addr.dsdr.data.dr;
-        }
+            // No valid address, load from info block
+            result = _get_var_addr_data(nvm_ptr, &var_addr);
+            if (result)
+            {
+                DBG_INFO(UPDI_DEBUG, "_get_var_addr_data failed 0x%x", result);
+                result = -2;
+                goto out;
+            }
+            else
+            {
+                params[DBG_SIGNAL_ADDR] = var_addr.dsdr.data.ds;
+                params[DBG_REFERENCE_ADDR] = var_addr.dsdr.data.dr;
+            }
 
-        // Reset that mcu can continue to run
-        nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
+            // Reset that mcu can continue to run
+            nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
+        }
     }
 
     // if DBG_LOOP_CNT less than or qual 0: loop forever
     for (i = 0; params[DBG_LOOP_CNT] <= 0 || i < params[DBG_LOOP_CNT]; i++)
     {
+        time(&timer);
+        tm_info = localtime(&timer);
+        strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
+
         for (j = 0; j < params[DBG_KEY_CNT]; j++)
         {
             channel = params[DBG_KEY_START] + j;
@@ -3878,10 +3886,6 @@ int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
             }
             else
             {
-                time(&timer);
-                tm_info = localtime(&timer);
-                strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
-
                 DBG_INFO(DEFAULT_DEBUG, "%d, [%s], K%d, delta,%hd,\t ref,%hd, signal,%hd, cc,%hd,(%.2f,%04x), stat_s,%02x, stat_n,%02x", i, timebuf, j,
                          (int16_t)(rsd_data.signal - rsd_data.reference),
                          rsd_data.reference,
@@ -3891,72 +3895,72 @@ int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
                          rsd_data.comcap,
                          rsd_data.sensor_state,
                          rsd_data.node_acq_status);
+            }
+        }
 
-                if (dbg_regs)
+        if (dbg_regs)
+        {
+            for (k = 0; k < lim_count; k++)
+            {
+                addr = dbg_regs[k].addr;
+                size = dbg_regs[k].size;
+                if (size > ARRAY_SIZE(buf))
                 {
-                    for (k = 0; k < lim_count; k++)
-                    {
-                        addr = dbg_regs[k].addr;
-                        size = dbg_regs[k].size;
-                        if (size > ARRAY_SIZE(buf))
-                        {
-                            size = ARRAY_SIZE(buf);
-                        }
-                        mask_p = dbg_regs[k].mask_p & 0xFF;
-                        mask_n = dbg_regs[k].mask_n & 0xFF;
-                        off = dbg_regs[k].off & 0xFF;
+                    size = ARRAY_SIZE(buf);
+                }
+                mask_p = dbg_regs[k].mask_p & 0xFF;
+                mask_n = dbg_regs[k].mask_n & 0xFF;
+                off = dbg_regs[k].off & 0xFF;
 
-                        result = nvm_read_mem(nvm_ptr, addr, buf, size);
-                        if (result)
+                result = nvm_read_mem(nvm_ptr, addr, buf, size);
+                if (result)
+                {
+                    DBG_INFO(UPDI_DEBUG, "nvm_read_mem addr 0x%x size %d failed 0x%x", addr, size, result);
+                    result = -4;
+                    goto out;
+                }
+                else
+                {
+                    show = true;
+
+                    /*
+                        if `mask_n` is non-zero, `mask_p` and `mask_n` are test any mask bit matched
+                        if `mask_n` is zero, we only test `mask_p` if all bits matched of target value after masked
+                        if test condition is zero, we show the result directly
+                    */
+                    if (off < size)
+                    {
+                        val = buf[off];
+                        if (mask_n)
                         {
-                            DBG_INFO(UPDI_DEBUG, "nvm_read_mem addr 0x%x size %d failed 0x%x", addr, size, result);
-                            result = -4;
-                            goto out;
+                            if (val & mask_n)
+                            {
+                                show = false;
+                            }
+
+                            if (mask_p)
+                            {
+                                if (!(val & mask_p))
+                                {
+                                    show = false;
+                                }
+                            }
                         }
                         else
                         {
-                            show = true;
-
-                            /*
-                                if `mask_n` is non-zero, `mask_p` and `mask_n` are test any mask bit matched
-                                if `mask_n` is zero, we only test `mask_p` if all bits matched of target value after masked
-                                if test condition is zero, we show the result directly
-                            */
-                            if (off < size)
+                            if (mask_p)
                             {
-                                val = buf[off];
-                                if (mask_n)
+                                if ((val & mask_p) != mask_p)
                                 {
-                                    if (val & mask_n)
-                                    {
-                                        show = false;
-                                    }
-
-                                    if (mask_p)
-                                    {
-                                        if (!(val & mask_p))
-                                        {
-                                            show = false;
-                                        }
-                                    }
+                                    show = false;
                                 }
-                                else
-                                {
-                                    if (mask_p)
-                                    {
-                                        if ((val & mask_p) != mask_p)
-                                        {
-                                            show = false;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (show)
-                            {
-                                DBG(DEFAULT_DEBUG, "%d, [%s], REG(%04X):", buf, size, "%02x,", i, timebuf, addr);
                             }
                         }
+                    }
+
+                    if (show)
+                    {
+                        DBG(DEFAULT_DEBUG, "%d, [%s], REG(%04X):", buf, size, "%02x,", i, timebuf, addr);
                     }
                 }
             }

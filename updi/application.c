@@ -112,7 +112,7 @@ void updi_application_deinit(void *app_ptr)
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @return 0 successful, other value if failed
 */
-int app_device_info(void *app_ptr)
+int app_device_info(void *app_ptr, DEV_TYPE_T type)
 {
     /*
         Read out device information from various sources
@@ -120,7 +120,7 @@ int app_device_info(void *app_ptr)
     upd_application_t *app = (upd_application_t *)app_ptr;
     u8 sib[16];
     u8 pdi;
-    u8 sigrow[14];
+    u8 sigrow[16];
     u8 revid[1];
     int result;
 
@@ -149,22 +149,24 @@ int app_device_info(void *app_ptr)
     pdi = link_ldcs(LINK(app), UPDI_CS_STATUSA);
     DBG_INFO(APP_INFO, "[PDI Rev] is %d", (pdi >> 4));
 
-    if (app_in_prog_mode(app)) {
+    if (app_in_prog_mode(app) || (type >=  TINY321x)) {
         result = app_read_data(app, APP_REG(app, sigrow_address), sigrow, sizeof(sigrow));
         if (result) {
             DBG_INFO(APP_DEBUG, "app_read_data sigrow failed %d", result);
-            return -3;
+        } else {
+            DBG(APP_INFO, "[Sigrow]", sigrow, sizeof(sigrow), "%02x ");
+            DBG(APP_INFO, "[Device ID]", sigrow, 3, "%02x ");
+            DBG(APP_INFO, "[Sernum ID]", sigrow + 3, 10, "%02x ");
         }
 
         result = app_read_data(app, APP_REG(app, syscfg_address) + 1, revid, sizeof(revid));
         if (result) {
             DBG_INFO(APP_DEBUG, "app_read_data revid failed %d", result);
-            return -4;
+        } else {
+            DBG_INFO(APP_INFO, "[Device Rev] is %c", revid[0] + 'A');
         }
-
-        DBG(APP_INFO, "[Device ID]", sigrow, 3, "%02x ");
-        DBG(APP_INFO, "[Sernum ID]", sigrow + 3, 10, "%02x ");
-        DBG_INFO(APP_INFO, "[Device Rev] is %c", revid[0] + 'A');
+    } else {
+        DBG_INFO(APP_INFO, "[Skipped Sernum and Revid]", revid[0] + 'A');
     }
 
     return 0;
