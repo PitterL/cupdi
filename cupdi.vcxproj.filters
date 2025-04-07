@@ -129,6 +129,9 @@
     <ClInclude Include="os\win32\enum.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="array\array.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cupdi.c">
@@ -225,6 +228,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="os\win32\enum.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="array\array.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -310,14 +310,39 @@ int link_check(void *link_ptr)
     result = _link_ldcs(link_ptr, UPDI_CS_STATUSA, &resp);
     if (result) {
         DBG_INFO(LINK_DEBUG, "UPDI not ready");
-        return -2;
+        return -3;
     }
     
     if (resp == 0) {
         DBG_INFO(LINK_DEBUG, "UPDI not OK - reinitialisation required");
-        return -3;
+        return -4;
     }
-    
+
+    result = _link_ldcs(link_ptr, UPDI_ASI_CRC_STATUS, &resp);
+    if (result) {
+        DBG_INFO(LINK_DEBUG, "UPDI not check CRC status failed");
+        return -5;
+    }
+    resp &= UPDI_CRC_STATUS_MASK;
+
+    if (resp) {
+        DBG_INFO(LINK_DEBUG, "UPDI crc status %d", resp);
+
+        switch (resp) {
+        case UPDI_CRC_STATUS_BUSY:
+            DBG_INFO(LINK_INFO, "CRC Busy");
+            break;
+        case UPDI_CRC_STATUS_OK:
+            DBG_INFO(LINK_INFO, "[CRC OK]");
+            break;
+        case UPDI_CRC_STATUS_FAILED:
+            DBG_INFO(LINK_ERROR, "[CRC Failed]");
+            break;
+        default:
+            DBG_INFO(LINK_INFO, "CRC not enabled");
+        }
+    }
+
     DBG_INFO(LINK_DEBUG, "UPDI init OK (%02x)", resp);
     return 0;
 }

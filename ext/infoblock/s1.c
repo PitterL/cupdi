@@ -122,20 +122,20 @@ void ib_show_element_s1(information_header_t *head)
     if (!head || head->data.version.value != INFO_BLOCK_S1_VERSION)
         return;
 
-    DBG(UPDI_DEBUG, "Information Block Content(s1):", (u8 *)ib, sizeof(*ib), "%02X ");
+    DBG(UPDI_INFO, "Information Block Content(s1):", (u8 *)ib, sizeof(*ib), "%02X ");
 
-    DBG_INFO(UPDI_DEBUG, "fw_version: %c%c%c %hhx.%hhx",
+    DBG_INFO(UPDI_INFO, "fw_version: %c%c%c %hhx.%hhx",
         (char)ib_get_element_s1(head, IB_FW_VER_NAME_N0),
         (char)ib_get_element_s1(head, IB_FW_VER_NAME_N1),
         (char)ib_get_element_s1(head, IB_FW_VER_NAME_N2),
         (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MAJOR) & 0xF,
         (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MINOR) & 0xF);
 
-    DBG_INFO(UPDI_DEBUG, "fw_size: %d bytes(0x%x)",
+    DBG_INFO(UPDI_INFO, "fw_size: %d bytes(0x%x)",
         ib_get_element_s1(head, IB_FW_SIZE),
         ib_get_element_s1(head, IB_FW_SIZE));
 
-    DBG_INFO(UPDI_DEBUG, "fw_crc: 0x%06x",
+    DBG_INFO(UPDI_INFO, "fw_crc: 0x%06x",
         ib_get_element_s1(head, IB_CRC_FW));
 }
 
@@ -161,7 +161,7 @@ int ib_create_information_block_s1(information_container_t *info, int fw_crc24, 
     ib->fw_version.value = fw_version;
     ib->fw_size.value = fw_size;//len;
 
-    ib->crc.data.fw = fw_crc24;//calc_crc24(data, len);
+    ib->crc.data.fw = fw_crc24;//calc_crc24(data, len, CRC_CRC24_INIT);
     ib->crc.data.info = calc_crc8((unsigned char *)ib, sizeof(*ib) - 1);
 
     info->head = (information_header_t *)ib;

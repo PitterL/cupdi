@@ -65,6 +65,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include <file/fop.h>
 #include <crc/crc.h>
 #include <ext/ext.h>
+#include <array/array.h>
 #include "cupdi.h"
 
 /*
@@ -95,28 +96,49 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <k> 1. comport can be enumulated if not specified
         <l> 1. change dbgview output string format
         <m> 1. change the sram magicoffset to 0xFF to avoid combined with flash zone in format convert
-
+        <o> 1. add register content tap out in dbgview command
+        <p> 1. pack command with 'pack.h' in current directory support
+            2. trans_segment() search order change to avoid incorrectly repack the file without linear address
+        <r> 1. add command 'memtest'
+            2. change strtol() to strtoll() to avoid 32bit value overflow
+        <s> 1. add mplab board.h support
+            2. avrda compensation capacitance with 32pf base line
+        <v> 1. default print Sermum
+            2. `dbgview` support keys=0 which means note show keys information
+        <2> 1. `crc` command of setting CRC-16-CCITT at the end page of the data page
+            2. fix the multi segment id for large flash content 
+            3. adjust the chip info content order of `reg` and `crcinfo`
+            4. print `devid, sernum, osc` in sigrow
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.19m"
+#define SOFTWARE_VERSION "A.19w"
 
 /* The firmware Version control file relatve directory to Hex file */
+#define VAR_FILE_RELATIVE_LOCAL "pack.h"
 #define VAR_FILE_RELATIVE_POS_0 "qtouch\\pack.h"
 #define VAR_FILE_RELATIVE_POS_1 "mpt\\board.h"
 #define VAR_FILE_RELATIVE_POS_2 "mpt2\\board.h"
 #define VAR_FILE_RELATIVE_POS_3 "mpt3\\board.h"
 #define VAR_FILE_RELATIVE_POS_MPLAB "..\\..\\mpt\\board.h"
+#define VAR_FILE_RELATIVE_POS_MPLAB_2 "..\\..\\..\\mpt3\\board.h"
 
-#define BOARD_FILES                     \
-    {                                   \
-        VAR_FILE_RELATIVE_POS_0,        \
-            VAR_FILE_RELATIVE_POS_1,    \
-            VAR_FILE_RELATIVE_POS_2,    \
-            VAR_FILE_RELATIVE_POS_3,    \
-            VAR_FILE_RELATIVE_POS_MPLAB \
+#define BOARD_FILES                  \
+    {                                \
+        VAR_FILE_RELATIVE_LOCAL,       \
+        VAR_FILE_RELATIVE_POS_0,     \
+        VAR_FILE_RELATIVE_POS_1,     \
+        VAR_FILE_RELATIVE_POS_2,     \
+        VAR_FILE_RELATIVE_POS_3,     \
+        VAR_FILE_RELATIVE_POS_MPLAB, \
+        VAR_FILE_RELATIVE_POS_MPLAB_2, \
     }
 
-#define VCS_IPE_HEX_FILE_EXTENSION_NAME "ipe.ihex"
+#define VAR_FILE_ORDER_IN_LOCAL_DIRECTORY 0
+
+#define VAR_FILE_ORDER_LEVEL_OF_PARENTS 2
+#define VAR_FILE_ORDER_LEVEL_OF_LOCAL 1
+
+#define VCS_IPE_HEX_FILE_EXTENSION_NAME "ipe.hex"
 #define VCS_STD_HEX_FILE_EXTENSION_NAME "std.ihex"
 #define VCS_HEX_FILE_EXTENSION_NAME "ihex"
 #define MAP_FILE_EXTENSION_NAME "map"
@@ -153,6 +175,7 @@ enum
     PACK_BUILD_SELFTEST,
     PACK_BUILD_CFG_VER,
     PACK_SHOW,
+    PACK_CRC,
     PACK_REBUILD
 };
 
@@ -168,12 +191,13 @@ int main(int argc, const char *argv[])
     char *comport = NULL;
     int baudrate = 115200;
     int guard = 0;
-	int breaks = 2;
+    int breaks = 2;
     char *file = NULL;
     char *read = NULL;
     char *write = NULL;
     char *erase = NULL;
     char *dbgview = NULL;
+    char *memtest = NULL;
     char *selftest = NULL;
     char *storage = NULL;
     int flag = 0;
@@ -186,6 +210,9 @@ int main(int argc, const char *argv[])
     bool test = false;
     bool version = false;
     bool ipe_format = false;
+    bool crc = false;
+    // int pad = 0xFF;
+    // int gap = 0;
     int pack = 0;
 
     const device_info_t *dev = NULL;
@@ -214,9 +241,10 @@ int main(int argc, const char *argv[])
         OPT_BOOLEAN('i', "", &show_info, "Get Infoblock infomation of firmware"),
         OPT_BIT('-', "save", &flag, "Save flash to a VCS HEX file", NULL, (1 << FLAG_SAVE), 0),
         OPT_BIT('-', "dump", &flag, "Dump flash to a Intel HEX file", NULL, (1 << FLAG_DUMP), 0),
-        OPT_STRING('r', "read", &read, "Direct read from any memory [addr0:size]|[addre1:size]...  Note Address is Hex type dig, and Number is auto type dig"),
-        OPT_STRING('w', "write", &write, "Direct write to any memory [addr0]:[data0];[data1];[data1]|[addr1]... Note address and data format with Hex type dig"),
-        OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]", NULL, (intptr_t) ""),
+        OPT_STRING('r', "read", &read, "Direct read from any memory [addr_hex:len_auto]|<next token>..."),
+        OPT_STRING('w', "write", &write, "Direct write to any memory [addr_hex]:[dat0_hex];[dat1_hex];[dat2_hex]|<next token>..."),
+        OPT_STRING('-', "dbgview", &dbgview, "get ref/delta/cc value operation ds=[ptc_qtlib_node_stat1]|dr=[qtlib_key_data_set1]|loop=[n]|st=[n]|keys=[n]|regs={addr, size, mask_p, mask_n, off, ...}", NULL, (intptr_t) ""),
+        OPT_STRING('-', "memtest", &memtest, "test memory with give value [addr_hex]:[len_auto]=[test_32bit_hex]|<next token>...  if len_auto is ZERO indicated the whole SRAM space; if no test_32bit specified, we will use a rand value for test"),
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
@@ -226,6 +254,9 @@ int main(int argc, const char *argv[])
         OPT_BOOLEAN('t', "test", &test, "Test UPDI device"),
         OPT_BOOLEAN('-', "version", &version, "Show version"),
         OPT_BOOLEAN('-', "ipe", &ipe_format, "Using MPLAB IPE format HEX (of Magic offset)"),
+        OPT_BOOLEAN('-', "crc", &crc, "Set CRC-16-CCITT at last valid data page of the flash and adjust the bootend and append in fuse"),
+        // OPT_INTEGER('-', "pad", &pad, "To use Pad values to consolidate fragmented data into a coherent whole, Pad value defautl is 0xFF"),
+        // OPT_INTEGER('-', "gap", &gap, "The gap of fragmented data to pad, default 0 which is not pad"),
         OPT_BIT('-', "pack-build", &pack, "Pack info block to Intel HEX file, (macro FIRMWARE_VERSION at 'touch.h')save with extension'.ihex'", NULL, (1 << PACK_BUILD), 0),
         OPT_BIT('-', "pack-build-selftest", &pack, "Pack info block to ihex file with cfg selftest data", NULL, (1 << PACK_BUILD_SELFTEST), 0),
         OPT_BIT('-', "pack-build-cfg", &pack, "Pack info block to ihex file with pending cfg head only", NULL, (1 << PACK_BUILD_CFG_VER), 0),
@@ -283,6 +314,10 @@ int main(int argc, const char *argv[])
         return -2;
     }
 
+    if (crc) {
+        SET_BIT(pack, PACK_CRC);
+    }
+
     // covert hex file to ihex file
     if (pack)
     {
@@ -303,7 +338,7 @@ int main(int argc, const char *argv[])
 
             if (TEST_BIT(pack, PACK_SHOW))
             {
-                result = dev_vcs_hex_file_show_info(dev, file);
+                result = dev_vcs_hex_file_show_info(dev, file, !!TEST_BIT(pack, PACK_CRC));
                 if (result)
                 {
                     DBG_INFO(OTHER_ERROR, "Device show ihex file '%s' failed %d", file, result);
@@ -328,15 +363,6 @@ int main(int argc, const char *argv[])
         goto out;
     }
 
-    // check device id
-    result = nvm_get_device_info(nvm_ptr);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "nvm_get_device_info failed");
-        result = -4;
-        goto out;
-    }
-
     // unlock
     if (flag /* || read || write || erase || dbgview || selftest*/)
     {
@@ -351,19 +377,20 @@ int main(int argc, const char *argv[])
                 if (result)
                 {
                     DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
-                    result = -5;
+                    result = -4;
                     goto out;
                 }
             }
-
-            result = nvm_get_device_info(nvm_ptr);
-            if (result)
-            {
-                DBG_INFO(UPDI_DEBUG, "nvm_get_device_info in program failed %d", result);
-                result = -6;
-                goto out;
-            }
         }
+    }
+
+    // device id
+    result = updi_device_id(nvm_ptr, dev->type);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "updi_device_id in program failed %d", result);
+        result = -5;
+        goto out;
     }
 
     // erase
@@ -481,6 +508,17 @@ int main(int argc, const char *argv[])
         }
     }
 
+    if (memtest)
+    {
+        result = updi_memtest(nvm_ptr, memtest, dev);
+        if (result)
+        {
+            DBG_INFO(UPDI_DEBUG, "Write memtest %d", result);
+            result = -12;
+            goto out;
+        }
+    }
+
     // write
     if (write)
     {
@@ -529,7 +567,7 @@ int main(int argc, const char *argv[])
     // debug show
     if (dbgview)
     {
-        result = updi_debugview(nvm_ptr, dbgview);
+        result = updi_debugview(nvm_ptr, dbgview, dev->type);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "Debugview failed %d", result);
@@ -570,6 +608,16 @@ out:
     updi_nvm_deinit(nvm_ptr);
 
     return result;
+}
+
+/*
+    UPDI get device ID information
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @return 0 successful, other value failed
+*/
+int updi_device_id(void *nvm_ptr, DEV_TYPE_T type)
+{
+    return nvm_get_device_info(nvm_ptr, type);
 }
 
 /*
@@ -625,6 +673,85 @@ ihex_segment_t _block_segment_id(nvm_info_t *block, int flag)
     return sid;
 }
 
+/*
+    Get all segment id of the block
+    @dev: device info structure, get by get_chip_info()
+    @type: NVM type
+    @sids_arr: the output buffer of all sids
+    @sids_arr_size: the max size of the sids array
+    @return actual num of sids captured
+*/
+uint8_t block_segment_ids(const device_info_t *dev, NVM_TYPE_EX_T blockid, int flag, ihex_segment_t * sids_arr, uint8_t sids_arr_size)
+{
+    nvm_info_t iblock;
+    ihex_address_t base;
+    ihex_segment_t sid;
+    int size, result, sids_cnt = 0;
+
+
+    if (sids_arr_size < 1 || !sids_arr) {
+        return sids_cnt;
+    }
+
+    result = dev_get_nvm_info(dev, blockid, &iblock);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", blockid, result);
+        return sids_cnt;
+    }
+
+    base = iblock.nvm_mapped_start ? iblock.nvm_mapped_start : iblock.nvm_start;
+    size = iblock.nvm_size;
+    if (flag & SEG_EX_LINEAR_ADDRESS) {
+        if (iblock.nvm_magicoff) {
+            sid = iblock.nvm_magicoff;
+            size = 0; // End search
+        } else {
+            sid = ADDR_TO_EX_LINEAR_ID(base);
+        }
+    } else /* (flag & SEG_EX_SEGMENT_ADDRESS) */ {
+        sid = ADDR_TO_EX_SEGMENT_ID(base);
+    }
+    sids_arr[sids_cnt++] = sid;
+
+    // Increase sid value if more segments for th blocks
+    while (size > MAX_DATA_IN_ONE_SEGMENT) {
+        // Output buffer full    
+        if (sids_cnt >=  sids_arr_size) {
+            break;
+        }
+
+        size -= MAX_DATA_IN_ONE_SEGMENT;
+        if (flag & SEG_EX_LINEAR_ADDRESS) {
+            sid += NEXT_LINEAR_ID;
+        } else /* (flag & SEG_EX_SEGMENT_ADDRESS) */ {
+            sid += NEXT_SEGMENT_ID;
+        }
+        sids_arr[sids_cnt++] = sid;
+    }
+
+    return sids_cnt;
+}
+
+/*
+    Get first segment id of the block
+    @dev: device info structure, get by get_chip_info()
+    @type: NVM type
+    @return the sid value
+*/
+ihex_segment_t block_first_segment_id(const device_info_t *dev, int blockid, int flag)
+{
+    ihex_segment_t sid = 0;
+    int result;
+
+    result = block_segment_ids(dev, blockid, flag, &sid, 1);
+    if (result != 1) {
+        DBG_INFO(UPDI_DEBUG, "block_segment_ids failed %d", result);
+    }
+
+    return sid;
+}
+
 unsigned int _block_segment_offset(nvm_info_t *block, int flag)
 {
     unsigned int offset;
@@ -659,7 +786,7 @@ unsigned int _segment_id_to_address(ihex_segment_t sid, int flag)
     }
     else if (flag & SEG_EX_LINEAR_ADDRESS)
     {
-        //FIXME, not considerred the Magicoff type Linear address
+        // FIXME, not considerred the Magicoff type Linear address
 
         address = EX_LINEAR_ID_TO_ADDR(sid);
     }
@@ -690,86 +817,48 @@ unsigned int _block_start_address(nvm_info_t *block, int flag)
     return address;
 }
 
-int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag)
+/*
+    Translate segment title as target flag
+    @seg: segment data input
+    @param: dev handler
+    @to_flag: target segment type
+    @return 0 successful, other value failed
+*/
+int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_flag)
 {
     const device_info_t *dev = (const device_info_t *)param;
     nvm_info_t iblock;
     ihex_segment_t sid;
-    ihex_segment_t base;
-    unsigned int offset;
-    int i, result = 0;
+    ihex_address_t base;
+    unsigned int nvm_start, offset;
+    int i, bid, found = 0, result = 0;
 
-    if (!seg->flag)
+    if (seg->flag == SEG_EX_LINEAR_ADDRESS)
     {
-        // <1> No segment flag indicated, it's Flash area
-        result = dev_get_nvm_info_ext(dev, NVM_FLASH, &iblock, NULL);
-        if (result)
+        /* <1.1> SEG_EX_LINEAR_ADDRESS -> SEG_EX_LINEAR_ADDRESS */
+        if (to_flag == SEG_EX_SEGMENT_ADDRESS)
         {
-            DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type `NVM_FLASH` failed %d, set sid Zero", result);
-			sid = 0;
-        }
-        else
-        {
-			sid = _block_segment_id(&iblock, flag);
-        }
-        seg->sid = sid;
-        seg->flag = flag;
-    }
-    else if (seg->flag == SEG_EX_SEGMENT_ADDRESS)
-    {
-        // <2> Segment -> Segment or linear(magicoff) address
-        base = EX_SEGMENT_ID_TO_ADDR(seg->sid);
-
-        for (i = 0; i < NUM_NVM_EX_TYPES; i++)
-        {
-            result = dev_get_nvm_info_ext(dev, i, &iblock, NULL);
-            if (result)
-            {
-                DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", i, result);
-            }
-            else
-            {
-                if (base == iblock.nvm_start ||
-                    (iblock.nvm_mapped_start && base == iblock.nvm_mapped_start))
-                {
-                    seg->sid = _block_segment_id(&iblock, flag);
-                    seg->flag = flag;
-
-                    break;
-                }
-            }
-        }
-
-        if (i == NUM_NVM_EX_TYPES)
-        {
-            DBG_INFO(UPDI_ERROR, "Segment address 0x%x to Linear not found", base);
-            result = -2;
-        }
-    }
-    else if (seg->flag == SEG_EX_LINEAR_ADDRESS)
-    {
-        if (flag == SEG_EX_SEGMENT_ADDRESS)
-        {
-            // <3> Linear to Segment address
+            /* Linear -> Segment */
             if (LINEAR_ID_MAGIC(seg->sid))
             {
                 // Magicoff placement
                 for (i = 0; i < NUM_NVM_EX_TYPES; i++)
                 {
-                    result = dev_get_nvm_info_ext(dev, i, &iblock, NULL);
+                    bid = NUM_NVM_EX_TYPES - 1 - i;
+                    result = dev_get_nvm_info(dev, bid, &iblock);
                     if (result)
                     {
-                        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", i, result);
+                        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
                     }
                     else
                     {
                         if (iblock.nvm_magicoff && iblock.nvm_magicoff == seg->sid)
                         {
-                            seg->sid = _block_segment_id(&iblock, flag);
-                            seg->flag = flag;
+                            seg->sid = _block_segment_id(&iblock, to_flag);
+                            seg->flag = to_flag;
 
                             // Adjust the offset when cover to segment address, some packing is not segment aligned(Lockbits)
-                            offset = _block_segment_offset(&iblock, flag);
+                            offset = _block_segment_offset(&iblock, to_flag);
                             seg->addr_from += offset;
                             seg->addr_to += offset;
                             break;
@@ -780,14 +869,14 @@ int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag
                 if (i == NUM_NVM_EX_TYPES)
                 {
                     DBG_INFO(UPDI_ERROR, "Linear address(magic) 0x%x to Segment not found", seg->sid);
-                    result = -3;
+                    result = -2;
                 }
             }
             else
             {
                 // Actual Linear address, directly convert to Segment address
                 // Flash content only since linear address only record upper 16 bit
-                result = dev_get_nvm_info_ext(dev, NVM_FLASH, &iblock, NULL);
+                result = dev_get_nvm_info(dev, NVM_FLASH, &iblock);
                 if (result)
                 {
                     DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type `NVM_FLASH` failed %d, set sid Zero", result);
@@ -795,17 +884,117 @@ int align_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t flag
                 }
                 else
                 {
-                    sid = _block_segment_id(&iblock, flag);
+                    sid = _block_segment_id(&iblock, to_flag);
                 }
 
                 seg->sid = (seg->sid << (EX_LINEAR_ADDRESS_SHIFT - EX_SEGMENT_ADDRESS_SHIFT)) + sid;
-                seg->flag = flag;
+                seg->flag = to_flag;
             }
         }
-        else if (flag == SEG_EX_LINEAR_ADDRESS)
+        /* <1.2> SEG_EX_LINEAR_ADDRESS -> SEG_EX_LINEAR_ADDRESS */
+        else if (to_flag == SEG_EX_LINEAR_ADDRESS)
         {
             // Linear to Linear address
-            // Do nothing...
+            // Not supported
+        }
+    }
+    else if (seg->flag == SEG_EX_SEGMENT_ADDRESS)
+    {
+        // <2.1> Segment -> Segment or linear(magicoff) address
+        base = EX_SEGMENT_ID_TO_ADDR(seg->sid);
+
+        for (i = 0; i < NUM_NVM_EX_TYPES; i++)
+        {
+            bid = NUM_NVM_EX_TYPES - 1 - i;
+            result = dev_get_nvm_info(dev, bid, &iblock);
+            if (result)
+            {
+                DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
+            }
+            else
+            {
+                sid = _block_segment_id(&iblock, to_flag);
+                if (base >= iblock.nvm_start && base < iblock.nvm_start + iblock.nvm_size) {
+                    nvm_start = iblock.nvm_start;
+                    found = 1;
+                } else if (iblock.nvm_mapped_start && (base >= iblock.nvm_mapped_start && base < iblock.nvm_mapped_start + iblock.nvm_size)) {
+                    nvm_start = iblock.nvm_mapped_start;
+                    found = 1;
+                } else {
+                    found = 0;
+                }
+
+                // Increase sid value if segment size if full
+                if (found) {
+                    while(base >= nvm_start + MAX_DATA_IN_ONE_SEGMENT) {
+                        base -= MAX_DATA_IN_ONE_SEGMENT;
+                        sid += (MAX_DATA_IN_ONE_SEGMENT >> 4);
+                    }
+
+                    seg->sid = sid;
+                    seg->flag = to_flag;
+                    break;
+
+                }
+            }
+        }
+
+        if (i == NUM_NVM_EX_TYPES)
+        {
+            DBG_INFO(UPDI_ERROR, "Segment address 0x%x to Linear not found", base);
+            result = -3;
+        }
+    }
+    else
+    {
+        // <3> No segment flag indicated, search the range and set sid, flag
+        for (i = 0, found = 0; i < NUM_NVM_EX_TYPES; i++)
+        {
+            bid = NUM_NVM_EX_TYPES - 1 - i;
+            result = dev_get_nvm_info(dev, bid, &iblock);
+            if (result)
+            {
+                DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
+            }
+            else
+            {
+                if (seg->addr_from >= iblock.nvm_start && seg->addr_to <= iblock.nvm_start + iblock.nvm_size)
+                {
+                    /* Normal Address */
+                    found = 1;
+                    base = iblock.nvm_start;
+                }
+                else if (iblock.nvm_mapped_start &&
+                         seg->addr_from >= iblock.nvm_mapped_start && seg->addr_to <= iblock.nvm_mapped_start + iblock.nvm_size)
+                {
+                    /* Mapped address */
+                    found = 1;
+                    base = iblock.nvm_mapped_start;
+                }
+                else
+                {
+                    base = 0;
+                }
+
+                if (found)
+                {
+                    sid = _block_segment_id(&iblock, to_flag);
+                    // Some block like Lockbit is overlapped with fuse, so we need the offset
+                    offset = _block_segment_offset(&iblock, to_flag);
+
+                    seg->sid = sid;
+                    seg->flag = to_flag;
+                    seg->addr_from = seg->addr_from - base + offset;
+                    seg->addr_to = seg->addr_to - base + offset;
+                    break;
+                }
+            }
+        }
+
+        if (i == NUM_NVM_EX_TYPES)
+        {
+            DBG_INFO(UPDI_ERROR, "Segment address 0x%x not found in block table", seg->addr_from);
+            result = -4;
         }
     }
 
@@ -816,14 +1005,14 @@ int dev_hex_load(const device_info_t *dev, const char *file, hex_data_t *dhex)
 {
     int result;
 
-    result = load_segments_from_file(file, dhex);
+    result = dhex_load(file, dhex);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "load_hex_file '%s' failed %d", file, result);
         return -1;
     }
 
-    result = walk_segments_by_id(dhex, SEG_EX_SEGMENT_ADDRESS, align_segment, dev);
+    result = walk_segments_by_id(dhex, SEG_EX_SEGMENT_ADDRESS, trans_segment, dev);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "walk_segments_by_id '%s' failed %d", file, result);
@@ -837,7 +1026,7 @@ int dev_hex_save(const device_info_t *dev, const char *file, ihex_seg_type_t fla
 {
     int result;
 
-    result = walk_segments_by_id(dhex, flag, align_segment, dev);
+    result = walk_segments_by_id(dhex, flag, trans_segment, dev);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "walk_segments_by_id '%s' failed %d", file, result);
@@ -888,6 +1077,87 @@ int dev_hex_show(const device_info_t *dev, int type, hex_data_t *dhex)
     }
 
     return result;
+}
+
+/*
+    Align the flash size with CRC patch
+    @dev: device info structure, get by get_chip_info()
+    @pad_mask: the pad mask, must be (2^(n) - 1) aligned
+    @pad_value: pad_value
+    @dhex: hex data structure
+    @return fw size after padded if successful, negative means failed
+*/
+int32_t dev_hex_align_flash_crc(const device_info_t *dev, uint8_t pad_value, hex_data_t *dhex)
+{
+    ihex_segment_t sids[MAX_SEGMENT_COUNT_IN_RECORDS];
+    segment_buffer_t *seg, *last_seg = NULL;
+    ihex_data_t *buf;
+    ihex_address_t addr;
+    crc_src_t crcinfo;
+    uint8_t i, num_sids;
+    uint16_t pad_mask, size, size_rsv, crc = CRC_CRC16_CCITT_INIT;
+    int32_t total_size = 0;
+    int result;
+
+    result = dev_get_crc_info(dev, &crcinfo);
+    if (result) {
+        DBG_INFO(UPDI_ERROR, "dev_get_crc_info failed %d", result);
+        return -2;
+    }
+
+    num_sids = block_segment_ids(dev, NVM_FLASH, SEG_EX_SEGMENT_ADDRESS, sids, ARRAY_SIZE(sids));
+    for ( i = 0; i < ARRAY_SIZE(dhex->segments); i++ ) {
+        seg = &dhex->segments[i];
+        if (!VALID_SEG(seg)) {
+            break;
+        }
+
+        if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
+            last_seg = seg;
+            crc = crc16_ccitt(seg->data, seg->len, crc);
+            total_size += seg->len;
+        }
+    }
+
+    if (!last_seg) {
+        return -3;
+    } else {
+        pad_mask = crcinfo.page_size - 1;
+
+        addr = last_seg->addr_to;
+        size = addr & pad_mask;
+        if (size) {
+            size_rsv = pad_mask - size + 1;
+        } else {
+            size_rsv = 0;
+        }
+
+        if (size_rsv < sizeof(crc)) {
+            size_rsv += pad_mask + 1;
+        }
+
+        last_seg->data = realloc(last_seg->data, last_seg->len + size_rsv);
+        if (!last_seg->data) {
+            DBG_INFO(UPDI_ERROR, "Alloc seg align memory failed %d seg len %d, size rsv %d", last_seg->len, size_rsv);
+            return -4;
+        }
+
+        buf = last_seg->data + last_seg->len;
+        size = size_rsv - 2;
+        memset(buf, pad_value, size);
+        crc = crc16_ccitt(buf, size, crc);
+        buf[size] = (crc >> 8) & 0xFF;
+        buf[size + 1] = crc & 0xFF;
+
+        last_seg->len += size_rsv;
+        last_seg->addr_to += size_rsv;
+
+        total_size += size_rsv;
+
+        DBG_INFO(UPDI_INFO, "Aligned %d bytes with crc %04X, total size %X(%d)", size_rsv, crc, total_size, total_size);
+    }
+
+    return total_size;
 }
 
 /*
@@ -1090,7 +1360,7 @@ int get_ext_info_from_storage(void *nvm_ptr, void *contnr, B_BLOCK_TYPE btype)
     @size: data buffer size
     return 0 if success, else failed
 */
-int save_content_to_segment(void *nvm_ptr, int type, hex_data_t *dhex, ihex_address_t off, char *buf, int size)
+int _save_block_to_segment(void *nvm_ptr, int type, hex_data_t *dhex, ihex_address_t off, char *buf, int size)
 {
     nvm_info_t iblock;
     segment_buffer_t *seg;
@@ -1336,7 +1606,7 @@ int updi_check(void *nvm_ptr)
 
     // DBG(UPDI_DEBUG, "Flash data ", buf, len, "%02x ");
 
-    crc = calc_crc24(buf, len);
+    crc = calc_crc24(buf, len, CRC_CRC24_INIT);
     info_crc = ext_get(&info_container, IB_CRC_FW);
     if (info_crc <= 0 || info_crc != crc)
     {
@@ -1684,7 +1954,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     memset(&dhex_info, 0, sizeof(dhex_info));
     memset(&info_container, 0, sizeof(info_container));
 
-    // Get infoblock first
+    // <1> load info block first
     result = get_ext_info_from_storage(nvm_ptr, &info_container, BLOCK_INFO);
     if (result)
     {
@@ -1692,7 +1962,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         return -2;
     }
 
-    // Flash content
+    // <2> save flash content
     len = ib_get(&info_container, IB_FW_SIZE);
     if (len <= 0)
     {
@@ -1709,7 +1979,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         goto out;
     }
 
-    crc = calc_crc24(buf, len);
+    crc = calc_crc24(buf, len, CRC_CRC24_INIT);
     ecrc = ib_get(&info_container, IB_CRC_FW);
     if (ecrc == 0 || ecrc == -1 || ecrc != crc)
     {
@@ -1720,7 +1990,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         */
     }
 
-    result = save_content_to_segment(nvm_ptr, NVM_FLASH, &dhex_info, 0, buf, len);
+    result = _save_block_to_segment(nvm_ptr, NVM_FLASH, &dhex_info, 0, buf, len);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "save_flash_content_to_segment failed %d", result);
@@ -1730,7 +2000,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     free(buf);
     buf = NULL;
 
-    // Info block content
+    // <3> save info block
     len = ib_get(&info_container, B_HEAD_SIZE);
     if (len <= 0)
     {
@@ -1738,9 +2008,10 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         result = -6;
         goto out;
     }
+
     nvm_type = get_storage_type(BLOCK_INFO);
     offset = get_storage_offset(BLOCK_INFO);
-    result = save_content_to_segment(nvm_ptr, nvm_type, &dhex_info, offset, (char *)info_container.head, len);
+    result = _save_block_to_segment(nvm_ptr, nvm_type, &dhex_info, offset, (char *)info_container.head, len);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "save_eeprom_content_to_segment failed %d", result);
@@ -1748,6 +2019,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         goto out;
     }
 
+    // <4> save other blocks
     for (i = 0; i < NUM_NVM_TYPES; i++)
     {
         if (i == NVM_FLASH || i == MEM_SRAM || i == nvm_type)
@@ -1793,7 +2065,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     }
     buf = NULL;
 
-    // save hex content to file
+    // <5> output hex file
     save_file = trim_name_with_extesion(file, '.', 1, SAVE_FILE_EXTENSION_NAME);
     if (!save_file)
     {
@@ -1847,6 +2119,12 @@ int updi_dump(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     memset(&dhex_info, 0, sizeof(dhex_info));
     for (i = 0; i < NUM_NVM_TYPES; i++)
     {
+        if (i == MEM_SRAM)
+        {
+            // skip ram data
+            continue;
+        }
+
         result = nvm_get_block_info(nvm_ptr, i, &iblock);
         if (result)
         {
@@ -1922,11 +2200,11 @@ out:
 */
 segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const char *file, hex_data_t *dhex, int pack)
 {
-    nvm_info_t iblock;
+    ihex_segment_t sids[MAX_SEGMENT_COUNT_IN_RECORDS];
     segment_buffer_t *seg = NULL;
     ihex_segment_t sid;
     NVM_TYPE_T nvm_type;
-    int offset, i, size;
+    int offset, i, size, order, num_sids, crc = CRC_CRC24_INIT;
     information_container_t info_container;
     information_content_params_t info_params;
     const char *version_files[] = BOARD_FILES;
@@ -1938,9 +2216,20 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     memset(&info_params, 0, sizeof(info_params));
 
     // Version
-    for (i = 0; i < ARRAY_SIZE(version_files); i++)
+    size = ARRAY_SIZE(version_files);
+    for (i = 0; i < size; i++)
     {
-        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
+        // Give the searching order of the directory
+        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
+        {
+            order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
+        }
+        else
+        {
+            order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
+        }
+
+        vcs_file = trim_name_with_extesion(file, '\\', order, version_files[i]);
         if (!vcs_file)
         {
             DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed", version_files[i]);
@@ -1958,7 +2247,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
 
     if (result)
     {
-        DBG_INFO(UPDI_DEBUG, "load_version_value_from_file failed %d", result);
+        DBG_INFO(OTHER_DEBUG, "load_version_value_from_file(error=%d)", result);
         result = -2;
         goto out;
     }
@@ -1981,15 +2270,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     }
 
     // Fuse
-    result = dev_get_nvm_info(dev, NVM_FUSES, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -5;
-        goto out;
-    }
-
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
+    sid = block_first_segment_id(dev, NVM_FUSES, SEG_EX_SEGMENT_ADDRESS);
     seg = get_segment_by_id(dhex, sid);
     if (!seg)
     {
@@ -2008,15 +2289,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     if (TEST_BIT(pack, PACK_BUILD_SELFTEST))
     {
         nvm_type = get_storage_type(BLOCK_CFG);
-        result = dev_get_nvm_info(dev, nvm_type, &iblock);
-        if (result)
-        {
-            DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-            result = -7;
-            goto out;
-        }
-
-        sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
+        sid = block_first_segment_id(dev, nvm_type, SEG_EX_SEGMENT_ADDRESS);
         seg = get_segment_by_id(dhex, sid);
         if (!seg || seg->len < sizeof(config_information_t))
         {
@@ -2036,26 +2309,22 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
         info_params.config.data.version.value = CONFIG_BLOCK_C0_VERSION;
     }
 
-    // Firmware
-    result = dev_get_nvm_info(dev, NVM_FLASH, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -7;
-        goto out;
-    }
+    // Flash content CRC    
+    num_sids = block_segment_ids(dev, NVM_FLASH, SEG_EX_SEGMENT_ADDRESS, sids, ARRAY_SIZE(sids));
+    size = 0;
+    for ( i = 0; i < ARRAY_SIZE(dhex->segments); i++ ) {
+        seg = &dhex->segments[i];
+        if (!VALID_SEG(seg)) {
+            break;
+        }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    seg = get_segment_by_id(dhex, sid);
-    if (!seg)
-    {
-        DBG_INFO(UPDI_DEBUG, "get_segment_by_id(%d) failed %d", sid);
-        result = -8;
-        goto out;
+        if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
+            crc = calc_crc24(seg->data, seg->len, crc);
+            size += seg->len;
+        }
     }
-    info_params.fw_crc24 = calc_crc24(seg->data, seg->len);
-    info_params.fw_size = seg->len;
-    seg = NULL;
+    info_params.fw_crc24 = crc;
+    info_params.fw_size = size;
 
     // Build Info block
     result = ext_create_data_block(&info_container, &info_params, sizeof(info_params), BLOCK_INFO);
@@ -2076,16 +2345,11 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
 
     // Save to hex
     nvm_type = get_storage_type(BLOCK_INFO);
-    result = dev_get_nvm_info(dev, nvm_type, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(info) failed %d", result);
-        result = -11;
-        goto out;
+    sid = block_first_segment_id(dev, nvm_type, SEG_EX_SEGMENT_ADDRESS);
+    if (sid) {
+        unload_segment_by_sid(dhex, sid);
     }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    unload_segment_by_sid(dhex, sid);
     offset = get_storage_offset(BLOCK_INFO);
     seg = set_segment_data_by_id_addr(dhex, sid, offset, size, (char *)info_container.head, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
     if (!seg)
@@ -2104,29 +2368,33 @@ out:
     Load fuse segment from vcs file
     @dev: device info structure, get by get_chip_info()
     @file: vcs file name
+    @fw_size: firmware size
     @dhex: hex data structure
     return 0 means successful, other value failed
 */
-int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_data_t *dhex)
+int load_fuse_content_from_file(const device_info_t *dev, const char *file, int32_t fw_size, hex_data_t *dhex)
 {
-    nvm_info_t iblock, iblock_lockbits;
+    nvm_info_t iblock_fuse, iblock_lockbits;
     segment_buffer_t *seg = NULL;
     ihex_segment_t sid, sid_lockbits;
     unsigned char val;
     unsigned int *fuses_config = NULL;
-    const unsigned int invalid_value = 0x800;
+    const unsigned int invalid_value = 0x100;
     const char *version_files[] = BOARD_FILES;
     char *vcs_file = NULL;
-    int i, count = 0, result = 0;
+    int i, order, count = 0, result = 0;
+    uint8_t bootend;
+    crc_src_t crcinfo;
 
-    result = dev_get_nvm_info(dev, NVM_FUSES, &iblock);
+    // <1> load fuse from pack file first
+    result = dev_get_nvm_info(dev, NVM_FUSES, &iblock_fuse);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", NVM_FUSES, result);
         return -2;
     }
 
-    fuses_config = malloc(iblock.nvm_size * sizeof(*fuses_config));
+    fuses_config = malloc(iblock_fuse.nvm_size * sizeof(*fuses_config));
     if (!fuses_config)
     {
         DBG_INFO(UPDI_DEBUG, "malloc fuses_config failed %d");
@@ -2136,7 +2404,17 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
 
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
-        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
+        // Give the searching order of the directory
+        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
+        {
+            order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
+        }
+        else
+        {
+            order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
+        }
+
+        vcs_file = trim_name_with_extesion(file, '\\', order, version_files[i]);
         if (!vcs_file)
         {
             DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
@@ -2144,14 +2422,14 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
             goto out;
         }
 
-        result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock.nvm_size, invalid_value, HEX_FORMAT);
+        result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock_fuse.nvm_size, invalid_value, HEX_FORMAT);
         free(vcs_file);
         if (result == 0)
         {
             DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", version_files[i]);
             goto out;
         }
-        else if (result < 0 || (u32)result > iblock.nvm_size)
+        else if (result < 0 || (u32)result > iblock_fuse.nvm_size)
         {
             DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
             result = -5;
@@ -2164,20 +2442,26 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
         }
     }
 
-    if (result < 0 || (u32)result > iblock.nvm_size)
+    if (result < 0 || (u32)result > iblock_fuse.nvm_size)
     {
         DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
         result = -6;
         goto out;
     }
 
+    // <2.1> Not found in Pad file, using hex internal fuse content
     if (count == 0)
     {
         goto out;
     }
+
+    // <2.2> Found in pad file, remove the fuse, lockbits content in segment
+
     // Unload fuse
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    unload_segment_by_sid(dhex, sid);
+    sid = block_first_segment_id(dev, NVM_FUSES, SEG_EX_SEGMENT_ADDRESS);
+    if (sid) {
+        unload_segment_by_sid(dhex, sid);
+    }
 
     // Unload lockbits
     result = dev_get_nvm_info(dev, NVM_LOCKBITS, &iblock_lockbits);
@@ -2189,8 +2473,24 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     }
     else
     {
-        sid_lockbits = _block_segment_id(&iblock_lockbits, SEG_EX_SEGMENT_ADDRESS);
-        unload_segment_by_sid(dhex, sid_lockbits);
+        sid_lockbits = block_first_segment_id(dev, NVM_LOCKBITS, SEG_EX_SEGMENT_ADDRESS);
+        if (sid_lockbits) {
+            unload_segment_by_sid(dhex, sid_lockbits);
+        }
+    }
+
+    // Replace for crc range:
+    result = dev_get_crc_info(dev, &crcinfo);
+    if (result) {
+        DBG_INFO(UPDI_ERROR, "dev_get_crc_info failed %d", result);
+        return -8;
+    } else {
+        if (crcinfo.bootend < iblock_fuse.nvm_size && 
+            crcinfo.append < iblock_fuse.nvm_size) {
+            bootend = fw_size / crcinfo.page_size;
+            fuses_config[crcinfo.bootend] = bootend;
+            fuses_config[crcinfo.append] = bootend;
+        }
     }
 
     for (i = 0; i < count; i++)
@@ -2202,121 +2502,7 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
             if (!seg)
             {
                 DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed %d val 0x%02x", i, val);
-                result = -7;
-                goto out;
-            }
-        }
-        else
-        {
-            DBG_INFO(UPDI_DEBUG, "Fuse[%d]: %02x is not supported", i, val);
-            result = -8;
-            goto out;
-        }
-    }
-out:
-
-    if (fuses_config)
-        free(fuses_config);
-
-    return result;
-}
-
-int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, char* name, const char *file, hex_data_t *dhex)
-{
-    nvm_info_t iblock, iblock_lockbits;
-    segment_buffer_t *seg = NULL;
-    ihex_segment_t sid, sid_lockbits;
-    unsigned char val;
-    unsigned int *fuses_config = NULL;
-    const unsigned int invalid_value = 0x800;
-    const char *version_files[] = BOARD_FILES;
-    char *vcs_file = NULL;
-    int i, count = 0, result = 0;
-
-    result = dev_get_nvm_info(dev, type, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", type, result);
-        return -2;
-    }
-
-    fuses_config = malloc(iblock.nvm_size * sizeof(*fuses_config));
-    if (!fuses_config)
-    {
-        DBG_INFO(UPDI_DEBUG, "malloc fuses_config failed %d");
-        result = -3;
-        goto out;
-    }
-
-    for (i = 0; i < ARRAY_SIZE(version_files); i++)
-    {
-        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
-        if (!vcs_file)
-        {
-            DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
-            result = -4;
-            goto out;
-        }
-
-        result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock.nvm_size, invalid_value, HEX_FORMAT);
-        free(vcs_file);
-        if (result == 0)
-        {
-            DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", version_files[i]);
-            goto out;
-        }
-        else if (result < 0 || (u32)result > iblock.nvm_size)
-        {
-            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
-            result = -5;
-        }
-        else
-        {
-            DBG_INFO(UPDI_DEBUG, "search_defined_array_int_from_file (%s) successfully", version_files[i]);
-            count = result;
-            break;
-        }
-    }
-
-    if (result < 0 || (u32)result > iblock.nvm_size)
-    {
-        DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
-        result = -6;
-        goto out;
-    }
-
-    if (count == 0)
-    {
-        goto out;
-    }
-    // Unload fuse
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    unload_segment_by_sid(dhex, sid);
-
-    // Unload lockbits
-    result = dev_get_nvm_info(dev, NVM_LOCKBITS, &iblock_lockbits);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", NVM_LOCKBITS, result);
-        result = -7;
-        goto out;
-    }
-    else
-    {
-        sid_lockbits = _block_segment_id(&iblock_lockbits, SEG_EX_SEGMENT_ADDRESS);
-        unload_segment_by_sid(dhex, sid_lockbits);
-    }
-
-    for (i = 0; i < count; i++)
-    {
-        if (fuses_config[i] < invalid_value)
-        {
-            val = fuses_config[i] & 0xff;
-            seg = set_segment_data_by_id_addr(dhex, sid, i, 1, &val, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
-            if (!seg)
-            {
-                DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed %d val 0x%02x", i, val);
-                result = -7;
+                result = -9;
                 goto out;
             }
         }
@@ -2353,7 +2539,7 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
     s_elem_t *data = NULL;
     const char *version_files[] = BOARD_FILES;
     char *vcs_file = NULL;
-    int i, size, offset, count, len, result = 0;
+    int i, order, size, offset, count, len, result = 0;
 
     nvm_type = get_storage_type(BLOCK_CFG);
     result = dev_get_nvm_info(dev, nvm_type, &iblock);
@@ -2373,7 +2559,17 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
 
     for (i = 0; i < ARRAY_SIZE(version_files); i++)
     {
-        vcs_file = trim_name_with_extesion(file, '\\', 2, version_files[i]);
+        // Give the searching order of the directory
+        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
+        {
+            order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
+        }
+        else
+        {
+            order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
+        }
+
+        vcs_file = trim_name_with_extesion(file, '\\', order, version_files[i]);
         if (!vcs_file)
         {
             DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
@@ -2440,7 +2636,7 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
         goto out;
     }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
+    sid = block_first_segment_id(dev, nvm_type, SEG_EX_SEGMENT_ADDRESS);
     unload_segment_by_sid(dhex, sid);
     offset = get_storage_offset(BLOCK_INFO);
     seg = set_segment_data_by_id_addr(dhex, sid, offset, size, (char *)cfg_container.head, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
@@ -2488,14 +2684,24 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
     result = dev_hex_load(dev, file, &dhex_info);
     if (result)
     {
-        DBG_INFO(UPDI_DEBUG, "dev_hex_load failed %d", result);
+        DBG_INFO(UPDI_ERROR, "dev_hex_load failed %d", result);
         result = -3;
         goto out;
     }
 
     if (!TEST_BIT(pack, PACK_REBUILD))
     {
-        result = load_fuse_content_from_file(dev, file, &dhex_info);
+        if (TEST_BIT(pack, PACK_CRC)) {
+            result = dev_hex_align_flash_crc(dev, 0xFF, &dhex_info);
+            if (result < 0)
+            {
+                DBG_INFO(UPDI_ERROR, "dev_hex_align_flash_crc(error=%d)", result);
+                result = -4;
+                goto out;
+            }
+        }
+
+        result = load_fuse_content_from_file(dev, file, result, &dhex_info);
         if (result)
         {
             DBG_INFO(UPDI_ERROR, "load_fuse_content_from_file(error=%d), skipped", result);
@@ -2517,7 +2723,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
         seg = load_version_segment_from_file(dev, file, &dhex_info, pack);
         if (!seg)
         {
-            DBG_INFO(UPDI_ERROR, "load_version_segment_from_file, Skipped");
+            DBG_INFO(UPDI_ERROR, "No Version Content detected");
             // result = -7;
             // goto out;
         }
@@ -2543,7 +2749,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
     // Show the result
     if (!TEST_BIT(pack, PACK_REBUILD))
     {
-        dev_vcs_hex_file_show_info(dev, ihex_file);
+        dev_vcs_hex_file_show_info(dev, ihex_file, !!TEST_BIT(pack, PACK_CRC));
     }
 
     DBG_INFO(UPDI_DEBUG, "\nSaved Hex to \"%s\"", ihex_file);
@@ -2562,18 +2768,19 @@ out:
     Device show vcs Hex file info
     @dev: device info structure, get by get_chip_info()
     @file: raw Hex file path for input
+    @check_ccitt: check flash internal crc with ccitt-16 algorithm
     @returns 0 - success, other value failed code
 */
-int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file)
+int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file, bool check_ccitt)
 {
-    hex_data_t dhex_info;
+    hex_data_t *dhex, dhex_info;
     information_container_t file_info_container;
     config_container_t file_conf_container;
     information_header_t header, conf_header;
-    nvm_info_t iblock;
-    segment_buffer_t *seg;
-    ihex_segment_t sid;
-    int fw_size, fw_crc, crc;
+    segment_buffer_t *seg, *last_seg = NULL;
+    ihex_segment_t sids[MAX_SEGMENT_COUNT_IN_RECORDS];
+    int i, size, fw_size, num_sids, fw_crc, crc = CRC_CRC24_INIT;
+    uint16_t crc_ccitt = CRC_CRC16_CCITT_INIT;
     int result = 0;
 
     memset(&dhex_info, 0, sizeof(dhex_info));
@@ -2597,34 +2804,45 @@ int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file)
         goto out;
     }
 
-    // Get flash block information
-    result = dev_get_nvm_info(dev, NVM_FLASH, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -4;
-        goto out;
+    // Flash content    
+    num_sids = block_segment_ids(dev, NVM_FLASH, SEG_EX_SEGMENT_ADDRESS, sids, ARRAY_SIZE(sids));
+    size = 0;
+    dhex = &dhex_info;
+    for ( i = 0; i < ARRAY_SIZE(dhex->segments); i++ ) {
+        seg = &dhex->segments[i];
+        if (!VALID_SEG(seg)) {
+            break;
+        }
+
+        if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
+            crc = calc_crc24(seg->data, seg->len, crc);
+            if (check_ccitt) {
+                crc_ccitt = crc16_ccitt(seg->data, seg->len, crc_ccitt);
+                last_seg = seg;
+            }
+            size += seg->len;
+        }
     }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    seg = get_segment_by_id(&dhex_info, sid);
-    if (!seg)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -4;
-        goto out;
+    if (check_ccitt) {
+        if (crc_ccitt != 0) {
+            DBG_INFO(UPDI_DEBUG, "CCITT CRC calculated %04X incorrect, total size(%d)", crc_ccitt, size);
+            result = -4;
+            goto out;
+        } else {
+            DBG(UPDI_DEBUG, "CCITT Check Pass: ", &last_seg->data[last_seg->len - sizeof(crc_ccitt)], sizeof(crc_ccitt), "%02X ");
+        }
     }
 
     fw_size = ext_get(&file_info_container, IB_FW_SIZE);
-    if (fw_size <= 0 || seg->len < fw_size)
+    if (fw_size <= 0 || size != fw_size)
     {
-        DBG_INFO(UPDI_DEBUG, "seg size not enough, seg = %d, infoblock size %d", seg->len, fw_size);
+        DBG_INFO(UPDI_DEBUG, "seg size (%d) is mismatched with firmware size (%d)", size, fw_size);
         result = -5;
         goto out;
     }
 
     fw_crc = ext_get(&file_info_container, IB_CRC_FW);
-    crc = calc_crc24(seg->data, fw_size);
     if (fw_crc < 0 || crc < 0 || fw_crc != crc)
     {
         DBG_INFO(UPDI_DEBUG, "Info Block read file crc24 mismatch %06x(%06x)", fw_crc, crc);
@@ -2683,12 +2901,12 @@ int _updi_page_erase(void *nvm_ptr, char *cmd)
             if (result == 0)
             { // only work when no error occur
                 if (i == 0)
-                    address = (int)strtol(tk_w[i], NULL, 0);
+                    address = (int)strtoll(tk_w[i], NULL, 0);
                 else if (i == 1)
                 {
                     if (VALID_PTR(address))
                     {
-                        count = (int)(strtol(tk_w[i], NULL, 0)); // Max size 255 once
+                        count = (int)(strtoll(tk_w[i], NULL, 0)); // Max size 255 once
                         if (count > UPDI_PAGE_ERASE_STROKEN_COUNT)
                         {
                             count = UPDI_PAGE_ERASE_STROKEN_COUNT;
@@ -2744,16 +2962,14 @@ int updi_page_erase(void *nvm_ptr, char *cmd)
 /*
     Memory Read
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and count. 
-        Format: [addr0:size]|[addre1:size]...
-            addr is hex type dig
-            size is auto type dig
+    @cmd: cmd string use for address and count.
+        Format: [addr_hex:len_auto]|<next token>...
     @returns 0 - success, other value failed code
 */
 int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
 {
     char **tk_s, **tk_w; // token section, token words
-#define UPDI_READ_STROKEN_WORDS_LEN 1024
+#define UPDI_READ_STROKEN_WORDS_LEN 4096
     int address, len, copylen, outlen_left = outlen;
     char *buf;
     int i, k, result = 0;
@@ -2768,11 +2984,11 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
             { // only work when no error occur
                 if (i == 0)
                 {
-                    address = (int)strtol(tk_w[i], NULL, 16);
+                    address = (int)strtoll(tk_w[i], NULL, 16);
                 }
                 else if (i == 1)
                 {
-                    len = (int)(strtol(tk_w[i], NULL, 0)); // Max size 255 once
+                    len = (int)(strtoll(tk_w[i], NULL, 0)); // Max size 255 once
                     if (len > UPDI_READ_STROKEN_WORDS_LEN)
                     {
                         DBG_INFO(UPDI_DEBUG, "Read memory len %d over max, set to", len, UPDI_READ_STROKEN_WORDS_LEN);
@@ -2787,10 +3003,10 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
                         continue;
                     }
 
-                    result = nvm_read_auto(nvm_ptr, address, buf, len);
+                    result = nvm_read_mem(nvm_ptr, address, buf, len);
                     if (result)
                     {
-                        DBG_INFO(UPDI_DEBUG, "nvm_read_auto failed %d", result);
+                        DBG_INFO(UPDI_DEBUG, "nvm_read_mem failed %d", result);
                         result = -4;
                     }
                     else
@@ -2840,10 +3056,8 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
 /*
     UPDI Memory Read
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and count. 
-        Format: [addr0:size]|[addre1:size]...
-            addr is hex type dig
-            size is auto type dig
+    @cmd: cmd string use for address and count.
+        Format: [addr_hex:len_auto]|<next token>...
     @returns 0 - success, other value failed code
 */
 int updi_read(void *nvm_ptr, char *cmd)
@@ -2854,7 +3068,8 @@ int updi_read(void *nvm_ptr, char *cmd)
 /*
     Memory Write
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and data. Format: [addr];[dat0];[dat1];[dat2]|[addr1]...
+    @cmd: cmd string use for address and data. 
+        Format: [addr_hex]:[dat0_hex];[dat1_hex];[dat2_hex]|<next token>
     @op: operating function for write
     @check: whether readback data for double checking
     @returns 0 - success, other value failed code
@@ -2878,7 +3093,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
             { // only work when no error occur
                 if (m == 0)
                 {
-                    address = (int)strtol(tk_w[m], NULL, 16);
+                    address = (int)strtoll(tk_w[m], NULL, 16);
                 }
                 else if (m == 1)
                 {
@@ -2887,7 +3102,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
                     {
                         DBG_INFO(UPDI_DEBUG, "Write[%d]: %s", i, tokens[i]);
                         j = i % UPDI_WRITE_STROKEN_LEN;
-                        buf[j] = (char)(strtol(tokens[i], NULL, 16) & 0xff);
+                        buf[j] = (char)(strtoll(tokens[i], NULL, 16) & 0xff);
                         dirty = true;
                         if (j + 1 == UPDI_WRITE_STROKEN_LEN)
                         {
@@ -2935,7 +3150,7 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
 
     if (!tk_s)
     {
-        DBG_INFO(UPDI_DEBUG, "Parse write str: %s failed", cmd);
+        DBG_INFO(UPDI_ERROR, "Parse write str: %s failed", cmd);
     }
     else
         free(tk_s);
@@ -2946,16 +3161,183 @@ int _updi_write(void *nvm_ptr, char *cmd, nvm_wop opw, bool check)
 /*
 UPDI Memory Write
     @nvm_ptr: updi_nvm_init() device handle
-    @cmd: cmd string use for address and data. 
-        Format: [addr0]:[dat0];[dat1];[dat2]|[addr1]:...
-            addr is hex type dig
-            dat is hex type dig
+    @cmd: cmd string use for address and data.
+        Format: [addr_hex]:[dat0_hex];[dat1_hex];[dat2_hex]|<next token>
     @check: whether readback data for double checking
     @returns 0 - success, other value failed code
 */
 int updi_write(void *nvm_ptr, char *cmd, bool check)
 {
     return _updi_write(nvm_ptr, cmd, nvm_write_auto, check);
+}
+
+/*
+    Memory Test
+    @nvm_ptr: updi_nvm_init() device handle
+    @cmd: cmd string use for address and data. Format: [addr0]:[size0]=[dat0]|[addr1]...
+    @dev: device info structure, get by get_chip_info()
+    @returns 0 - success, other value failed code
+*/
+int updi_memtest(void *nvm_ptr, char *cmd, const device_info_t *dev)
+{
+    char **tk_s, **tk_w, **tokens;
+    int start, size, addr, len;
+    unsigned int val, val_read;
+    int i, k, m, result = 0;
+    bool use_rand = true;
+    nvm_info_t info;
+
+    if (!nvm_in_progmode(nvm_ptr))
+    {
+        DBG_INFO(UPDI_WARN, "Memory test should runing at program mode to avoid memory various!");
+    }
+
+    // Get flash block information
+    result = dev_get_nvm_info(dev, MEM_SRAM, &info);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
+        return -2;
+    }
+    else
+    {
+        start = info.nvm_mapped_start ? info.nvm_mapped_start : info.nvm_start;
+        size = (int)info.nvm_size;
+    }
+
+    tk_s = str_split(cmd, '|');
+    for (k = 0; tk_s && tk_s[k]; k++)
+    {
+        tk_w = str_split(tk_s[k], '=');
+        for (m = 0, addr = ERROR_PTR, len = 0; tk_w; m++)
+        {
+            if (tk_w[m])
+            {
+                if (m == 0)
+                {
+                    tokens = str_split(tk_w[m], ':');
+                    if (tokens[0])
+                    {
+                        addr = (int)strtoll(tokens[0], NULL, 16);
+                        if (tokens[1])
+                        {
+                            len = (int)strtoll(tokens[1], NULL, 0);
+                        }
+                    }
+
+                    for (i = 0; tokens && tokens[i]; i++)
+                    {
+                        free(tokens[i]);
+                    }
+
+                    if (tokens)
+                    {
+                        free(tokens);
+                    }
+                }
+                else if (m == 1)
+                {
+                    val = (unsigned int)(strtoll(tk_w[m], NULL, 16));
+                    use_rand = false;
+                }
+
+                free(tk_w[m]);
+            }
+            else
+            {
+                if (addr >= start &&
+                    addr + len <= start + size)
+                {
+                    if (!len)
+                    {
+                        len = start + size - addr;
+                    }
+
+                    // Step 1: test each bytes
+                    for (i = 0; i < len && result == 0; i += sizeof(val))
+                    {
+                        if (use_rand)
+                        {
+                            val = (rand() << 16 | rand());
+                        }
+
+                        result = nvm_write_mem(nvm_ptr, addr + i, (u8 *)&val, sizeof(val), 0);
+                        if (result != 0)
+                        {
+                            DBG_INFO(UPDI_DEBUG, "nvm_write_mem off 0x%X failed %d", i, result);
+                            result = -3;
+                        }
+                        else
+                        {
+                            result = nvm_read_mem(nvm_ptr, addr + i, (u8 *)&val_read, sizeof(val_read));
+                            if (result != 0)
+                            {
+                                DBG_INFO(UPDI_DEBUG, "nvm_read_mem off 0x%X failed %d", i, result);
+                                result = -4;
+                            }
+                            else
+                            {
+                                if (val != val_read)
+                                {
+                                    DBG_INFO(DEFAULT_ERROR, "#1: Value compare failed w(%X), r(%X), at offset %d(0x%X)", val, val_read, i, i);
+                                    result = -5;
+                                }
+                            }
+                        }
+                    }
+
+                    // Step 1: test all bytes
+                    if (!use_rand)
+                    {
+                        for (i = 0; i < len && result == 0; i += sizeof(val))
+                        {
+                            result = nvm_read_mem(nvm_ptr, addr + i, (u8 *)&val_read, sizeof(val_read));
+                            if (result != 0)
+                            {
+                                DBG_INFO(UPDI_DEBUG, "nvm_read_mem off 0x%X failed %d", i, result);
+                                result = -6;
+                            }
+                            else
+                            {
+                                if (val != val_read)
+                                {
+                                    DBG_INFO(UPDI_DEBUG, "#2: Value compare failed w(%X), r(%X), at offset %d(0x%X)", val, val_read, i, i);
+                                    result = -7;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                break;
+            }
+        }
+
+        if (!tk_w)
+        {
+            DBG_INFO(UPDI_DEBUG, "Parse write str: %s failed", tk_s[k]);
+        }
+        else
+            free(tk_w);
+
+        free(tk_s[k]);
+    }
+
+    if (!tk_s)
+    {
+        DBG_INFO(UPDI_ERROR, "Parse write str: %s failed", cmd);
+    }
+    else
+    {
+        free(tk_s);
+    }
+
+    if (result == 0)
+    {
+        DBG_INFO(UPDI_INFO, "Pass");
+    }
+
+    return result;
 }
 
 /*
@@ -2986,12 +3368,13 @@ int updi_reset(void *nvm_ptr)
 */
 static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val, int max_tag_count, void *arr_val[], int max_arr_count, int each_arr_depth, int elem_size, int *max_arr_depth_ptr)
 {
-    char **tk_s, **tk_w, **tk_arr, *str, *cmd_dup;// token section, token words
+    char **tk_s, **tk_w, **tk_arr, *str, *cmd_dup; // token section, token words
     int i, j, k, arr_i = 0;
     int max_each_arr_depth = 0;
 
     cmd_dup = __strndup(cmd, 255);
-    if (!cmd_dup) {
+    if (!cmd_dup)
+    {
         return;
     }
 
@@ -3012,37 +3395,49 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
                         {
                             // Check the value whether starting with '{', that an array
                             str = trim(tk_w[1]);
-                            if (str[0] == '{') {
+                            if (str[0] == '{')
+                            {
                                 // skip first '{'
                                 tk_arr = str_split(str + 1, ',');
-                                if (tk_arr) {
+                                if (tk_arr)
+                                {
                                     // array elements
-                                    for (k = 0; tk_arr[k]; k++) {
-                                        if (arr_val && arr_i < max_arr_count && k < each_arr_depth) {
-                                            if (elem_size == 4) {
-                                                ((int *)arr_val)[arr_i * each_arr_depth + k] = (int)strtol(tk_arr[k], NULL, 0);
-                                            }else if (elem_size == 2) {
-                                                ((short *)arr_val)[arr_i * each_arr_depth + k] = (short)strtol(tk_arr[k], NULL, 0);
-                                            }else /*elem_size == 1*/{
+                                    for (k = 0; tk_arr[k]; k++)
+                                    {
+                                        if (arr_val && arr_i < max_arr_count && k < each_arr_depth)
+                                        {
+                                            if (elem_size == 4)
+                                            {
+                                                ((int *)arr_val)[arr_i * each_arr_depth + k] = (int)strtoll(tk_arr[k], NULL, 0);
+                                            }
+                                            else if (elem_size == 2)
+                                            {
+                                                ((short *)arr_val)[arr_i * each_arr_depth + k] = (short)strtoll(tk_arr[k], NULL, 0);
+                                            }
+                                            else /*elem_size == 1*/
+                                            {
                                                 // Default minimum size
-                                                ((char *)arr_val)[arr_i * each_arr_depth + k] = (char)strtol(tk_arr[k], NULL, 0);
+                                                ((char *)arr_val)[arr_i * each_arr_depth + k] = (char)strtoll(tk_arr[k], NULL, 0);
                                             }
                                         }
 
                                         free(tk_arr[k]);
                                     }
 
-                                    if (max_each_arr_depth < k) {
+                                    if (max_each_arr_depth < k)
+                                    {
                                         max_each_arr_depth = k;
                                     }
 
                                     free(tk_arr);
                                 }
-                                
+
                                 tag_val[j] = arr_i;
                                 arr_i++;
-                            } else {
-                                tag_val[j] = (int)strtol(tk_w[1], NULL, 0);
+                            }
+                            else
+                            {
+                                tag_val[j] = (int)strtoll(tk_w[1], NULL, 0);
                             }
 
                             break;
@@ -3050,7 +3445,8 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
                     }
                 }
 
-                for (j = 0; tk_w[j]; j++) {
+                for (j = 0; tk_w[j]; j++)
+                {
                     free(tk_w[j]);
                 }
 
@@ -3062,11 +3458,13 @@ static void _verbar_token_parse_data(char *cmd, const char *tag[], int *tag_val,
         free(tk_s);
     }
 
-    if (max_arr_depth_ptr) {
+    if (max_arr_depth_ptr)
+    {
         *max_arr_depth_ptr = max_each_arr_depth;
     }
 
-    if (cmd_dup) {
+    if (cmd_dup)
+    {
         free(cmd_dup);
     }
 }
@@ -3077,16 +3475,47 @@ static void _verbar_token_parse(char *cmd, const char *tag[], int *tag_val, int 
 }
 
 // Use 1/1000 pf as unit, the max value 675 * 8 = 54000, less than 16bit, but will show negative value in studio if more thant 32767
-#define CALCULATE_CAP_DIV_1000(_v) (((_v) & 0x0F) * 10 + (((_v) >> 4) & 0x0F) * 68 + (((_v) >> 8) & 0x0F) * 675 + (((_v) >> 12) & 0x03) * 6750 + (((_v) >> 14) & 0x03) * 6200)
+#define CALCULATE_TINY_CAP_DIV_1000(_v) (((_v) & 0x0F) * 10 + (((_v) >> 4) & 0x0F) * 68 + (((_v) >> 8) & 0x0F) * 675 + (((_v) >> 12) & 0x03) * 6750 + (((_v) >> 14) & 0x03) * 6200)
 
 // Use 1/100 pf as unit
-#define CALCULATE_CAP_DIV_100(_v) (((_v) & 0x0F) * 1 + (((_v) >> 4) & 0x0F) * 7 + (((_v) >> 8) & 0x0F) * 68 + (((_v) >> 12) & 0x03) * 675 + (((_v) >> 14) & 0x03) * 620)
+#define CALCULATE_TINY_CAP_DIV_100(_v) (((_v) & 0x0F) * 1 + (((_v) >> 4) & 0x0F) * 7 + (((_v) >> 8) & 0x0F) * 68 + (((_v) >> 12) & 0x03) * 675 + (((_v) >> 14) & 0x03) * 620)
 
 // Use 1/10 pf as unit
-#define CALCULATE_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 2) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + (((_v) >> 12) & 0x03) * 68 + (((_v) >> 14) & 0x03) * 62)
+#define CALCULATE_TINY_CAP_DIV_10(_v) ((((_v) >> 3) & 0x01) * 1 + (((_v) >> 6) & 0x03) * 3 + (((_v) >> 8) & 0x0F) * 7 + (((_v) >> 12) & 0x03) * 68 + (((_v) >> 14) & 0x03) * 62)
 
 // Use pf(float)
-#define CALCULATE_CAP_DIV(_v) (((_v) & 0x0F) * 0.01 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + (((_v) >> 12) & 0x03) * 6.75 + (((_v) >> 14) & 0x03) * 6.2)
+#define CALCULATE_TINY_CAP_DIV(_v) (((_v) & 0x0F) * 0.01 + (((_v) >> 4) & 0x0F) * 0.0675 + (((_v) >> 8) & 0x0F) * 0.675 + (((_v) >> 12) & 0x03) * 6.75 + (((_v) >> 14) & 0x03) * 6.2)
+
+// Use 1/10 pf as unit
+/*
+AVRDA: 1/32pf Unit (2^5 = 32 = 1pf)
+Self-Capacitance
+Sensor Capacitance value = (CC value + 1) * 0.03125 * 2 (use this formula)
+Mutual Capacitance
+Sensor Capacitance value = (CC value + 1) * 0.03125
+*/
+#define COEF 1 /* Mutual */
+
+# define __CALCULATE_AVRDA_CAP_DIV_1(_v) ((((_v) + 1)) >> (4 + COEF))
+# define __CALCULATE_AVRDA_CAP_DIV_10(_v) ((((_v) + 1) * 10) >> (4 + COEF))
+# define __CALCULATE_AVRDA_CAP_DIV_100(_v) ((((_v) + 1) * 100) >> (4 + COEF))
+
+#define CALCULATE_AVRDA_CAP_DIV_10(_v) __CALCULATE_AVRDA_CAP_DIV_10(_v)
+#define CALCULATE_AVRDA_CAP_DIV(_v) (((_v) + 1) * 0.03125 * COEF)
+
+#define AVRDA_BASE_COMCAP 0 // 0x03FF
+
+int16_t avrda_comp(int16_t comcap)
+{
+    if (comcap & 0x8000) {
+        comcap = (AVRDA_BASE_COMCAP - (comcap & 0x03FF));
+    }
+    else{
+        comcap = (AVRDA_BASE_COMCAP + comcap);
+    }
+
+    return comcap;
+}
 
 static int _get_var_addr_data(void *nvm_ptr, varible_address_t *va)
 {
@@ -3260,7 +3689,7 @@ typedef struct cap_sample_value
     u8 node_acq_status;
 } cap_sample_value_t;
 
-static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_value_t *rsd)
+static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_value_t *rsd, u8 dev_type)
 {
     qtm_acq_node_data_t ptc_signal;
     qtm_touch_key_data_t ptc_ref;
@@ -3289,14 +3718,16 @@ static int _get_rsd_data(void *nvm_ptr, int idx, int ds, int dr, cap_sample_valu
     }
 
     val = (int16_t)lt_int16_to_cpu(ptc_signal.node_comp_caps);
-    cc_value = CALCULATE_CAP_DIV(val);
+    cc_value = dev_type == AVRDA ? 
+        CALCULATE_AVRDA_CAP_DIV(avrda_comp(val)) :CALCULATE_TINY_CAP_DIV(val);
     ref_value = (int16_t)lt_int16_to_cpu(ptc_ref.channel_reference);
     signal_value = (int16_t)lt_int16_to_cpu(ptc_signal.node_acq_signals);
     delta_value = signal_value - ref_value;
 
     if (rsd)
     {
-        rsd->cccap = CALCULATE_CAP_DIV_10(val); // CALCULATE_CAP_DIV_100
+        rsd->cccap = dev_type == AVRDA ? 
+            CALCULATE_AVRDA_CAP_DIV_10(avrda_comp(val)) : CALCULATE_TINY_CAP_DIV_10(val);
         rsd->cc_value = cc_value;
         rsd->reference = ref_value;
         rsd->signal = signal_value;
@@ -3321,6 +3752,7 @@ enum
     DBG_LOOP_CNT,
     DBG_KEY_START,
     DBG_KEY_CNT,
+    DBG_REGS,
     DBG_MAX_PARAM_NUM
 };
 
@@ -3329,9 +3761,30 @@ const char *dbg_token_tag[DBG_MAX_PARAM_NUM] = {
     "dr" /*qtlib_key_data_set1->ref value*/,
     "loop",
     "st",
-    "keys"};
+    "keys",
+    "regs" /* {addr, size, mask_p, mask_n, off, ...} */};
 
-int updi_debugview(void *nvm_ptr, char *cmd)
+#pragma pack(1)
+typedef struct
+{
+    u16 addr;
+    u16 size;
+    u16 mask_p;
+    u16 mask_n;
+    u16 off;
+} dbg_regs_t;
+#pragma pack()
+enum
+{
+    DBG_REGS_ADDR,
+    DBG_REGS_SIZE,
+    DBG_REGS_MASK_P,
+    DBG_REGS_MASK_N,
+    DBG_REGS_OFF,
+    NUM_DBG_REGS_PARAM_TYPES
+};
+
+int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
 {
     cap_sample_value_t rsd_data;
     varible_address_t var_addr;
@@ -3340,50 +3793,81 @@ int updi_debugview(void *nvm_ptr, char *cmd)
     time_t timer;
     char timebuf[26];
     struct tm *tm_info;
+    bool show;
+    int addr, size, lim_count, lim_elem_count = 0, i, j, k, channel, result = 0;
+    u8 val, mask_p, mask_n, off, buf[256];
 
-    int i, j, channel, result = 0;
+    dbg_regs_t *dbg_regs = NULL;
 
-    int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/}; // loop value default set to 1, keys default set to 1
+    int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/
+                                     ,
+                                     -1 /*DBG_REGS*/}; // loop value default set to 1, keys default set to 1
 
-    _verbar_token_parse(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM);
+    _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM,
+                             NULL, 0, 0, 0, &lim_elem_count);
+    if (params[DBG_REGS] >= 0)
+    {
+        lim_count = lim_elem_count / NUM_DBG_REGS_PARAM_TYPES;
+        if (lim_count)
+        {
+            size = lim_count * sizeof(dbg_regs_t);
+            dbg_regs = malloc(size);
+            if (!dbg_regs)
+            {
+                return -1;
+            }
+            else
+            {
+                // regs={addr, size, mask_p, mask_n, off, ...}
+                memset(dbg_regs, 0, size);
+                _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM,
+                                         (void **)dbg_regs, 1, size, sizeof(u16), NULL);
+            }
+        }
+    }
 
     // Verify the input parameters
-    if (!params[DBG_SIGNAL_ADDR] || !params[DBG_REFERENCE_ADDR])
-    {
-        // No valid address, load from info block
-        result = _get_var_addr_data(nvm_ptr, &var_addr);
-        if (result)
+    if (params[DBG_KEY_CNT]) {
+        if (!params[DBG_SIGNAL_ADDR] || !params[DBG_REFERENCE_ADDR])
         {
-            DBG_INFO(UPDI_DEBUG, "_get_var_addr_data failed 0x%x", result);
-            return -2;
-        }
-        else
-        {
-            params[DBG_SIGNAL_ADDR] = var_addr.dsdr.data.ds;
-            params[DBG_REFERENCE_ADDR] = var_addr.dsdr.data.dr;
-        }
+            // No valid address, load from info block
+            result = _get_var_addr_data(nvm_ptr, &var_addr);
+            if (result)
+            {
+                DBG_INFO(UPDI_DEBUG, "_get_var_addr_data failed 0x%x", result);
+                result = -2;
+                goto out;
+            }
+            else
+            {
+                params[DBG_SIGNAL_ADDR] = var_addr.dsdr.data.ds;
+                params[DBG_REFERENCE_ADDR] = var_addr.dsdr.data.dr;
+            }
 
-        // Reset that mcu can continue to run
-        nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
+            // Reset that mcu can continue to run
+            nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
+        }
     }
 
     // if DBG_LOOP_CNT less than or qual 0: loop forever
     for (i = 0; params[DBG_LOOP_CNT] <= 0 || i < params[DBG_LOOP_CNT]; i++)
     {
+        time(&timer);
+        tm_info = localtime(&timer);
+        strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
+
         for (j = 0; j < params[DBG_KEY_CNT]; j++)
         {
             channel = params[DBG_KEY_START] + j;
-            result = _get_rsd_data(nvm_ptr, channel, params[DBG_SIGNAL_ADDR], params[DBG_REFERENCE_ADDR], &rsd_data);
+            result = _get_rsd_data(nvm_ptr, channel, params[DBG_SIGNAL_ADDR], params[DBG_REFERENCE_ADDR], &rsd_data, dev_type);
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "_get_rsd_data failed 0x%x", result);
+                result = -3;
+                goto out;
             }
             else
             {
-                time(&timer);
-                tm_info = localtime(&timer);
-                strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
-
                 DBG_INFO(DEFAULT_DEBUG, "%d, [%s], K%d, delta,%hd,\t ref,%hd, signal,%hd, cc,%hd,(%.2f,%04x), stat_s,%02x, stat_n,%02x", i, timebuf, j,
                          (int16_t)(rsd_data.signal - rsd_data.reference),
                          rsd_data.reference,
@@ -3395,6 +3879,80 @@ int updi_debugview(void *nvm_ptr, char *cmd)
                          rsd_data.node_acq_status);
             }
         }
+
+        if (dbg_regs)
+        {
+            for (k = 0; k < lim_count; k++)
+            {
+                addr = dbg_regs[k].addr;
+                size = dbg_regs[k].size;
+                if (size > ARRAY_SIZE(buf))
+                {
+                    size = ARRAY_SIZE(buf);
+                }
+                mask_p = dbg_regs[k].mask_p & 0xFF;
+                mask_n = dbg_regs[k].mask_n & 0xFF;
+                off = dbg_regs[k].off & 0xFF;
+
+                result = nvm_read_mem(nvm_ptr, addr, buf, size);
+                if (result)
+                {
+                    DBG_INFO(UPDI_DEBUG, "nvm_read_mem addr 0x%x size %d failed 0x%x", addr, size, result);
+                    result = -4;
+                    goto out;
+                }
+                else
+                {
+                    show = true;
+
+                    /*
+                        if `mask_n` is non-zero, `mask_p` and `mask_n` are test any mask bit matched
+                        if `mask_n` is zero, we only test `mask_p` if all bits matched of target value after masked
+                        if test condition is zero, we show the result directly
+                    */
+                    if (off < size)
+                    {
+                        val = buf[off];
+                        if (mask_n)
+                        {
+                            if (val & mask_n)
+                            {
+                                show = false;
+                            }
+
+                            if (mask_p)
+                            {
+                                if (!(val & mask_p))
+                                {
+                                    show = false;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (mask_p)
+                            {
+                                if ((val & mask_p) != mask_p)
+                                {
+                                    show = false;
+                                }
+                            }
+                        }
+                    }
+
+                    if (show)
+                    {
+                        DBG(DEFAULT_DEBUG, "%d, [%s], REG(%04X):", buf, size, "%02x,", i, timebuf, addr);
+                    }
+                }
+            }
+        }
+    }
+
+out:
+    if (dbg_regs)
+    {
+        free(dbg_regs);
     }
 
     return result;
@@ -3465,8 +4023,7 @@ const char *sltest_token_tag[SLTEST_MAX_PARAM_NUM] = {
     "dr",
     "acq",
     "node",
-    "siglim"
-};
+    "siglim"};
 
 int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
 {
@@ -3475,22 +4032,24 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
     int16_t val;
     int i, j, k, size, lim_count, lim_elem_count = 0, channel, result = 0;
     signal_limit_data_t *siglim = NULL;
-   
+
     // debug varible
     qtm_acq_union_node_config_t ptc_node;
     qtm_acq_node_group_config_t ptc_acq;
     uint8_t node_gain;
-    int params[SLTEST_MAX_PARAM_NUM] = { 
-            0 /*SLTEST_DS_ADDR*/, 0 /*SLTEST_DR_ADDR*/, 
-            0 /*SLTEST_ACQ_ADDR*/, 0 /*SLTEST_NODE_ADDR*/, 
-            -1 /* SLTEST_SIGLIM_IDX */};
+    int params[SLTEST_MAX_PARAM_NUM] = {
+        0 /*SLTEST_DS_ADDR*/, 0 /*SLTEST_DR_ADDR*/,
+        0 /*SLTEST_ACQ_ADDR*/, 0 /*SLTEST_NODE_ADDR*/,
+        -1 /* SLTEST_SIGLIM_IDX */};
 
     // <1> Load test parameters from command, this will be higer priority than NVM setting
-    _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM, 
-            NULL, 0, 0, 0, &lim_elem_count);
-    if (params[SLTEST_SIGLIM_IDX] >= 0) {
+    _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM,
+                             NULL, 0, 0, 0, &lim_elem_count);
+    if (lim_elem_count >= NUM_SIGLIM_TYPES)
+    {
         lim_count = lim_elem_count / NUM_SIGLIM_TYPES;
-        if (lim_count) {
+        if (lim_count)
+        {
             size = lim_count * sizeof(signal_limit_data_t);
             siglim = malloc(size);
             if (!siglim)
@@ -3500,11 +4059,13 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
             else
             {
                 memset(siglim, 0, size);
-                _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM, 
-                    (void **)siglim, 1, size, sizeof(s_elem_t), NULL);
+                _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM,
+                                         (void **)siglim, 1, size, sizeof(s_elem_t), NULL);
             }
         }
-    } else {
+    }
+    else
+    {
         // <2> Load test count and range setting from NVM
         lim_count = _get_cfg_body_data(nvm_ptr, NULL, 0);
         if (lim_count <= 0)
@@ -3535,7 +4096,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
 
     // <3> Verify the input addr parameters
     if (params[SLTEST_DS_ADDR] && params[SLTEST_DR_ADDR] &&
-        params[SLTEST_ACQ_ADDR] && params[SLTEST_NODE_ADDR] ) 
+        params[SLTEST_ACQ_ADDR] && params[SLTEST_NODE_ADDR])
     {
         var_addr.dsdr.data.ds = (unsigned short)params[SLTEST_DS_ADDR];
         var_addr.dsdr.data.dr = (unsigned short)params[SLTEST_DR_ADDR];
@@ -3585,7 +4146,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
             channel = k + j;
             if (channel < ptc_acq.num_sensor_nodes)
             { // Check node count
-                result = _get_rsd_data(nvm_ptr, channel, var_addr.dsdr.data.ds, var_addr.dsdr.data.dr, &rsd_data);
+                result = _get_rsd_data(nvm_ptr, channel, var_addr.dsdr.data.ds, var_addr.dsdr.data.dr, &rsd_data, dev_type);
                 if (result)
                 {
                     DBG_INFO(UPDI_DEBUG, "_get_rsd_data failed 0x%x", result);
@@ -3603,7 +4164,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
                         if ((siglim[i].limit.sighi || siglim[i].limit.siglo) &&
                             (rsd_data.cccap > siglim[i].limit.sighi || rsd_data.cccap < siglim[i].limit.siglo))
                         {
-                            DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) signal(%d) out of range (%d~%d) ", i, channel, rsd_data.cccap, siglim[i].limit.siglo, siglim[i].limit.sighi);
+                            DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) cap(%d) out of Cap range (%d~%d) ", i, channel, rsd_data.reference, rsd_data.cccap, siglim[i].limit.siglo, siglim[i].limit.sighi);
                             result = -7;
                             goto out;
                         }
@@ -3614,7 +4175,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
                             if ((siglim[i].limit.range) &&
                                 (val > NODE_BASE_LINE + siglim[i].limit.range || val < NODE_BASE_LINE - siglim[i].limit.range))
                             {
-                                DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) gain(0x%02x), val %d out of variance (%d) ", i, channel, rsd_data.reference, node_gain, val, siglim[i].limit.range);
+                                DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) cap(%d) gain(0x%02x), val %d out of ref variance (%d) ", i, channel, rsd_data.reference, rsd_data.cccap, node_gain, val, siglim[i].limit.range);
                                 result = -8;
                                 goto out;
                             }
@@ -3639,11 +4200,11 @@ out:
 
     if (result)
     {
-        DBG_INFO(UPDI_ERROR, "Failed");
+        DBG_INFO(UPDI_INFO, "Failed");
     }
     else
     {
-        DBG_INFO(UPDI_ERROR, "Passed");
+        DBG_INFO(UPDI_INFO, "Passed");
     }
 
     return result;

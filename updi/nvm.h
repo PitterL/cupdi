@@ -3,7 +3,7 @@
 
 void *updi_nvm_init(const char *port, int baud, int guard, int breaks, const void *dev);
 void updi_nvm_deinit(void *nvm_ptr);
-int nvm_get_device_info(void *nvm_ptr);
+int nvm_get_device_info(void *nvm_ptr, DEV_TYPE_T type);
 int nvm_enter_progmode(void *nvm_ptr);
 int nvm_leave_progmode(void *nvm_ptr, bool reset_or_halt);
 bool nvm_in_progmode(void *nvm_ptr);

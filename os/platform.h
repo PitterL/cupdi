@@ -5,6 +5,34 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 
+typedef union {
+	struct {
+		u8 lo: 4;
+		u8 hi: 4;
+	};
+	u8 value;
+} nibble_t;
+
+typedef union {
+	struct {
+		u16 lo;
+		u16 hi;
+	};
+
+	u8 val[4];
+	u32 value;
+} uu32_t;
+
+typedef union {
+	struct {
+		u8 lo;
+		u8 hi;
+	};
+
+	u8 val[2];
+	u16 value;
+} uu16_t;
+
 //Don't use <stdbool.h>, it may use char as bool
 //#include <stdbool.h>
 #if defined bool

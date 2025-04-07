@@ -11,12 +11,22 @@ typedef struct _nvm_info
     unsigned char nvm_magicoff;
 } nvm_info_t;
 
-typedef struct _reg_info
+typedef struct _sys_info
 {
     unsigned short syscfg_address;
     unsigned short nvmctrl_address;
     unsigned short sigrow_address;
-} reg_info_t;
+} sys_info_t;
+
+typedef struct {
+    /* crc page size */
+    unsigned short page_size;
+
+    /* append of bootend in fuse offset */
+    unsigned char bootend;
+    /* append of append in fuse offset */
+    unsigned char append;
+} crc_src_t;
 
 typedef enum {
     TINY41x,
@@ -24,18 +34,20 @@ typedef enum {
     TINY161x,
     TINY321x,
     AVRDA,
+    AVRDU,
 } DEV_TYPE_T;
 
 typedef struct _chip_info
 {
     const char *dev_name;
     nvm_info_t flash;
-    reg_info_t reg;
     nvm_info_t fuse;
     nvm_info_t userrow;
     nvm_info_t eeprom;
     nvm_info_t sram;
     nvm_info_t lockbits;
+    sys_info_t reg;
+    crc_src_t crc;
 } chip_info_t;
 
 typedef struct _device_info
@@ -64,5 +76,6 @@ typedef enum _NVM_TYPE_EX
 
 int dev_get_nvm_info(const void *dev, NVM_TYPE_EX_T type, nvm_info_t *inf);
 int dev_get_nvm_info_ext(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *info, const char **pname);
+int dev_get_crc_info(const void *dev_ptr, crc_src_t *src);
 
 #endif

@@ -25,84 +25,141 @@
         0x83: LOCKBITS
         0x85: USER_SIGNATURES
 */
+
+const chip_info_t device_avr64du = {
+    //  avr64du28/32
+    "avr64dux",
+    {0, 64 * 1024, 512, 32 * 1024, 0x8000},
+    {0x1050, 11, 1, 0, 0, 0x82},
+    {0x1200, 32, 32, 0, 0, 0x85},
+    {0x1400, 512, 1, 0, 0, 0x81},
+    {0x6000, 8 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
+    {0x1040, 4, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1080},
+    {256, 7, 8}
+};
+
+const chip_info_t device_avr32du = {
+    //  avr32du14/20/28/32
+    "avr32dux",
+    {0, 32 * 1024, 512, 32 * 1024, 0x8000},
+    {0x1050, 11, 1, 0, 0, 0x82},
+    {0x1200, 32, 32, 0, 0, 0x85},
+    {0x1400, 512, 1, 0, 0, 0x81},
+    {0x7000, 4 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
+    {0x1040, 4, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1080},
+    {256, 7, 8}
+};
+
+const chip_info_t device_avr16du = {
+    //  avr16du14/20/28/32
+    "avr16dux",
+    {0, 16 * 1024, 512, 16 * 1024, 0x8000},
+    {0x1050, 11, 1, 0, 0, 0x82},
+    {0x1200, 32, 32, 0, 0, 0x85},
+    {0x1400, 512, 1, 0, 0, 0x81},
+    {0x7800, 4 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
+    {0x1040, 4, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1080},
+    {256, 7, 8}
+};
+    
 const chip_info_t device_avr128da = {
     //  avr128da28/32/48/64
     "avr128dax",
     {0, 128 * 1024, 512, 32 * 1024, 0x8000},
-    {0x0F00, 0x1000, 0x1100},
     {0x1050, 9, 1, 0, 0, 0x82},
     {0x1080, 32, 32, 0, 0, 0x85},
     {0x1400, 512, 1, 0, 0, 0x81},
     {0x4000, 16 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
-    {0x1040, 4, 1, 0, 0, 0x83}};
+    {0x1040, 4, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1100},
+    {256, 7, 8}
+};
 
 const chip_info_t device_avr64da = {
     //  avr64da28/32/48/64
     "avr64dax",
     {0, 64 * 1024, 512, 32 * 1024, 0x8000},
-    {0x0F00, 0x1000, 0x1100},
     {0x1050, 9, 1, 0, 0, 0x82},
     {0x1080, 32, 32, 0, 0, 0x85},
     {0x1400, 512, 1, 0, 0, 0x81},
     {0x4000, 8 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
-    {0x1040, 4, 1, 0, 0, 0x83}};
+    {0x1040, 4, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1100},
+    {256, 7, 8}
+};
 
 const chip_info_t device_avr32da = {
     //  avr32da28/32/48
     "avr32dax",
     {0, 32 * 1024, 512, 32 * 1024, 0x8000},
-    {0x0F00, 0x1000, 0x1100},
     {0x1050, 9, 1, 0, 0, 0x82},
     {0x1080, 32, 32, 0, 0, 0x85},
     {0x1400, 512, 1, 0, 0, 0x81},
     {0x4000, 4 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
-    {0x1040, 4, 1, 0, 0, 0x83}};
+    {0x1040, 4, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1100},
+    {256, 7, 8}
+};
 
 const chip_info_t device_tiny_321x = {
     //  tiny3217/tiny3216
     "tiny321x",
     {0, 32 * 1024, 128, 32 * 1024, 0x8000},
-    {0x0F00, 0x1000, 0x1100},
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 64, 64, 0, 0, 0x85},
     {0x1400, 256, 64, 0, 0, 0x81},
     {0x3800, 2 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
-    {0x128A, 1, 1, 0, 0, 0x83}};
+    {0x128A, 1, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1100},
+    {256, 7, 8}
+};
 
 const chip_info_t device_tiny_161x = {
     //  tiny1617/tiny1616
     "tiny161x",
     {0, 16 * 1024, 64, 16 * 1024, 0x8000},
-    {0x0F00, 0x1000, 0x1100},
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 32, 32, 0, 0, 0x85},
     {0x1400, 256, 32, 0, 0, 0x81},
     {0x3800, 2 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
-    {0x128A, 1, 1, 0, 0, 0x83}};
+    {0x128A, 1, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1100},
+    {256, 7, 8}
+};
 
 const chip_info_t device_tiny_81x = {
     //  tiny817/tiny816/tiny814
     "tiny81x",
     {0, 8 * 1024, 64, 8 * 1024, 0x8000},
-    {0x0F00, 0x1000, 0x1100},
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 32, 32, 0, 0, 0x85},
     {0x1400, 128, 32, 0, 0, 0x81},
     {0x3E00, 512, 512 /*dummy*/, 0, 0, 0xFF /*dummy*/},
-    {0x128A, 1, 1, 0, 0, 0x83}};
+    {0x128A, 1, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1100},
+    {256, 7, 8}
+};
 
 const chip_info_t device_tiny_41x = {
     //  tiny417
     "tiny41x",
     {0, 4 * 1024, 64, 4 * 1024, 0x8000},
-    {0x0F00, 0x1000, 0x1100},
     {0x1280, 11, 1, 0, 0, 0x82},
     {0x1300, 32, 32, 0, 0, 0x85},
     {0x1400, 128, 32, 0, 0, 0x81},
     {0x3F00, 256, 256 /*dummy*/, 0, 0, 0xFF /*dummy*/},
-    {0x128A, 1, 1, 0, 0, 0x83}};
+    {0x128A, 1, 1, 0, 0, 0x83},
+    {0x0F00, 0x1000, 0x1100},
+    {256, 7, 8}
+};
 
 static const device_info_t g_device_list[] = {
+    {"avr64du", AVRDU, &device_avr64du},
+    {"avr32du", AVRDU, &device_avr32du},
+    {"avr16du", AVRDU, &device_avr16du},
     {"avr128da", AVRDA, &device_avr128da},
     {"avr64da", AVRDA, &device_avr64da},
     {"avr32da", AVRDA, &device_avr32da},
@@ -146,7 +203,7 @@ const device_info_t *get_chip_info(const char *dev_name)
 
 /*
 Device get block info, this is defined in device.c
-    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @dev_ptr: device info structure pointer, get by get_chip_info()
     @type: NVM type
     @info: chip flash information
     @return 0 successful, other value failed
@@ -190,7 +247,7 @@ int dev_get_nvm_info(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *inf)
 
 /*
 Device get block info, this is defined in device.c
-    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @dev_ptr: device info structure pointer, get by get_chip_info()
     @type: NVM type
     @info: chip flash information
     @pname: output the nvm name string
@@ -209,4 +266,21 @@ int dev_get_nvm_info_ext(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *in
     }
 
     return result;
+}
+
+/*
+Device get crcsrc info, this is defined in device.c
+    @dev_ptr: device info structure pointer, get by get_chip_info()
+    @src: crcsrc information
+    @return 0 successful, other value failed
+*/
+int dev_get_crc_info(const void *dev_ptr, crc_src_t *src)
+{
+    const device_info_t *dev = (const device_info_t *)dev_ptr;
+
+    if (src) {
+        memcpy(src, &dev->mmap->crc, sizeof(*src));
+    }
+
+    return 0;
 }

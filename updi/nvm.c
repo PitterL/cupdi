@@ -109,7 +109,7 @@ void updi_nvm_deinit(void *nvm_ptr)
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @return 0 successful, other value failed
 */
-int nvm_get_device_info(void *nvm_ptr)
+int nvm_get_device_info(void *nvm_ptr, DEV_TYPE_T type)
 {
     /*
         Reads device info
@@ -119,9 +119,9 @@ int nvm_get_device_info(void *nvm_ptr)
     if (!VALID_NVM(nvm))
         return ERROR_PTR;
 
-    DBG_INFO(NVM_DEBUG, "<NVM> Reading device info");
+    DBG_INFO(NVM_DEBUG, "<NVM> Reading device info %d", type);
 
-    return app_device_info(APP(nvm));
+    return app_device_info(APP(nvm), type);
 }
 
 /*
@@ -258,7 +258,7 @@ int nvm_unlock_device(void *nvm_ptr)
     result = app_unlock(APP(nvm));
     if (result)
     {
-        DBG_INFO(NVM_DEBUG, "app_unlock failed %d", result);
+        DBG_INFO(NVM_ERROR, "app_unlock failed %d", result);
         return -2;
     }
 
@@ -329,7 +329,7 @@ int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u32 address, u8 *dat
 
     if (!nvm->progmode)
     {
-        DBG_INFO(NVM_ERROR, "NVM area read at locked mode(may be denied)");
+        DBG_INFO(NVM_WARN, "NVM area read at locked mode(may be denied)");
         // return -2;
     }
 
@@ -870,7 +870,7 @@ int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 dummy)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    nvm_rop rop, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem, nvm_read_lockbits};
+    nvm_rop rop = NULL, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem, nvm_read_lockbits};
     unsigned start, size;
     int i, result = 0;
 
@@ -900,29 +900,31 @@ int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 dummy)
             }
 
             rop = nvm_rops[i];
-            if (rop)
-            {
-                result = rop(nvm_ptr, address, data, len);
-                if (result)
-                {
-                    DBG_INFO(NVM_DEBUG, "<NVM> NVM rop return failed %d", result);
-                    return -3;
-                }
-
-                break;
-            }
-            else
-            {
-                DBG_INFO(NVM_DEBUG, "<NVM> Not support nvm op %d size %d", i, len);
-                return -4;
-            }
+            break;
         }
+    }
+
+    if (!rop) {
+        if (!len) {
+            DBG_INFO(NVM_DEBUG, "<NVM> Not support block op size %d", len);
+            return -3;
+        } else {
+            DBG_INFO(NVM_DEBUG, "<NVM> Default Mem Read op ize %d", len);
+            rop = nvm_read_mem;
+        }
+    }
+
+    result = rop(nvm_ptr, address, data, len);
+    if (result)
+    {
+        DBG_INFO(NVM_DEBUG, "<NVM> NVM rop return failed %d", result);
+        return -4;
     }
 
     if (i == NUM_NVM_EX_TYPES)
     {
         DBG_INFO(NVM_DEBUG, "<NVM> read auto no op found with (0x%x, %d)", address, len);
-        return -6;
+        return -5;
     }
 
     return 0;
@@ -1031,10 +1033,15 @@ int _nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, u8 flag
         }
     }
 
-    if (!wop || !len)
+    if (!wop)
     {
-        DBG_INFO(NVM_DEBUG, "<NVM> Not support block op %p size %d", wop, len);
-        return -3;
+        if (!len) {
+            DBG_INFO(NVM_DEBUG, "<NVM> Not support block size %d", len);
+            return -3;
+        } else {
+            DBG_INFO(NVM_DEBUG, "<NVM> Default Mem write op size %d", len);
+            wop = nvm_write_mem;
+        }
     }
 
     // Process data

@@ -4,7 +4,7 @@
 #include "kk_ihex_read.h"
 #include "kk_ihex_write.h"
 
-#define MAX_SEGMENT_COUNT_IN_RECORDS 64
+#define MAX_SEGMENT_COUNT_IN_RECORDS 16
 #define MAX_DATA_IN_ONE_SEGMENT 0x10000 // 16 bits address of hex data record
 
 typedef struct _segment_buffer
@@ -20,10 +20,10 @@ typedef struct _segment_buffer
     ihex_seg_type_t flag;
 
     ihex_address_t addr_from;
-    ihex_address_t addr_to;
+    ihex_address_t addr_to; // not included
 
-    char *data; // buffer pointer
-    int len;    // buffer data len
+    ihex_data_t *data; // buffer pointer
+    inhex_seg_size_t len;    // buffer length
 
 } segment_buffer_t;
 
@@ -61,11 +61,13 @@ typedef struct _hex_data
 
 #define EX_SEGMENT_ADDRESS_SHIFT 4
 #define ADDR_TO_EX_SEGMENT_ID(_addr) ((_addr) >> 4)
+#define NEXT_SEGMENT_ID     ADDR_TO_EX_SEGMENT_ID(MAX_DATA_IN_ONE_SEGMENT)
 #define ADDR_OFFSET_EX_SEGMENT(_addr) ((_addr) & 0xF)
 #define EX_SEGMENT_ID_TO_ADDR(_segid) ((_segid) << 4)
 
 #define EX_LINEAR_ADDRESS_SHIFT 16
 #define ADDR_TO_EX_LINEAR_ID(_addr) ((_addr) >> 16)
+#define NEXT_LINEAR_ID     ADDR_TO_EX_LINEAR_ID(MAX_DATA_IN_ONE_SEGMENT)
 #define ADDR_OFFSET_EX_LINEAR(_addr) ((_addr) & 0xFFFF)
 #define EX_LINEAR_ID_TO_ADDR(_segid) ((_segid) << 16)
 #define LINEAR_ID_MAGIC(_segid) ((_segid) & 0x80)
@@ -75,7 +77,7 @@ segment_buffer_t *get_segment_by_id_addr(hex_data_t *dhex, ihex_segment_t segmen
 //int set_default_segment_id(hex_data_t *dhex, ihex_segment_t source, ihex_segment_t target);
 int walk_segments_by_id(hex_data_t *dhex, ihex_seg_type_t flag, int (*cb)(segment_buffer_t *, const void *, ihex_seg_type_t), const void *param);
 
-int load_segments_from_file(const char *file, hex_data_t *dhex);
+int dhex_load(const char *file, hex_data_t *dhex);
 void unload_segment_by_sid(hex_data_t *dhex, ihex_segment_t segmentid);
 void unload_segments(hex_data_t *dhex);
 segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, char *data, int flag);

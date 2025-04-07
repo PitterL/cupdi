@@ -78,7 +78,7 @@ int walk_segments_by_id(hex_data_t *dhex, ihex_seg_type_t flag, int (*cb)(segmen
 }
 
 /*
-the body of create segment informantion by sgmentid, addr, len, and data,
+the body of create segment informantion by segmentid, addr, len, and data,
 if data is null, the seg only record sgmentid/from/to informantion
     The new segment may not combined together if address is increasing discontinously
 @dhex: hex_data_t created by create_dhex()
@@ -107,7 +107,7 @@ segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t 
         seg = &dhex->segments[i];
         //the segment exist, expand the address
         if (VALID_SEG(seg) && seg->sid == segmentid) {
-            if (addr >= seg->addr_from && addr <= seg->addr_to && addr + len < MAX_DATA_IN_ONE_SEGMENT) {   //in buffer, or continous at tail coul call realloc
+            if (addr >= seg->addr_from && addr <= seg->addr_to && addr + len <= MAX_DATA_IN_ONE_SEGMENT) {   //in buffer, or continous at tail coul call realloc
                 addr_to = addr + len;
                 addr_to = max(addr_to, seg->addr_to);
                 size = addr_to - seg->addr_from;
@@ -182,7 +182,7 @@ The new segment may not combined together is address if address is increasing di
     @segmentid: segment id
     @addr: addr for the new data
     @len: len for the new data
-    @sflag: indicate the segment flag
+    @sflag: segment flag, please check `ihex_flag_t`
 return seg pointer if success, NULl if failed
 */
 segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, ihex_seg_type_t sflag)
@@ -193,6 +193,7 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
     addr_from = addr;
     addr_to = addr + len;
 
+    // <1> check existed segment range if it can be aligned together
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
         seg = &dhex->segments[i];
         //the segment exist, expand the address
@@ -207,7 +208,7 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
         }
     }
 
-    //Not found existing segment in current list
+    // <2> use a new segment slot if it's not found in existed segment list
     for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++) {
         seg = &dhex->segments[i];
         //get an unused seg
@@ -227,18 +228,18 @@ segment_buffer_t *_set_segment_range_by_id_addr(hex_data_t *dhex, ihex_segment_t
 create segment informantion by sgmentid, addr, len, and data,
     if HEX_ALLOC_MEMORY is not set(or data is invalid), the seg only record sgmentid/from/to informantion
     @dhex: hex_data_t created by create_dhex()
-    @segmentid: segment id
+    @sid_st: the start of the segment id
     @addr: addr for the new data
-    @len: len for the new data
+    @len: len for the new data, if the data overlap one segment, the sid will also increased
     @data: data pointer
     @flag: flag options
         HEX_ALLOC_MEMORY: alloc memory
-    return seg pointer if success, NULl if failed
+    return seg pointer of last segment if success, NUll if failed
 */
-segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t segmentid, ihex_address_t addr, ihex_count_t len, char *data, int flag)
+segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t sid_st, ihex_address_t addr, ihex_count_t len, char *data, int flag)
 {
 	segment_buffer_t * seg = NULL;
-	ihex_segment_t sid = segmentid;
+	ihex_segment_t sid = sid_st;
     ihex_address_t st = addr, end, size;
     ihex_hex_flag_t hflag = GET_HEX_TYPE(flag);
     ihex_seg_type_t sflag = GET_SEG_TYPE(flag);
@@ -269,12 +270,13 @@ segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t s
             break;
         }
 
+        // increase sid if still has data left
         st = 0;
         data += size;
         if (sflag & SEG_EX_SEGMENT_ADDRESS) {
-		    sid += (MAX_DATA_IN_ONE_SEGMENT >> 4);
+		    sid += NEXT_SEGMENT_ID;
         } else/* if (sflag & SEG_EX_LINEAR_ADDRESS) */{
-            sid++;
+            sid += NEXT_LINEAR_ID;
         }
     } while (len);
 
@@ -357,7 +359,7 @@ Load file into hex data structure
     @dhex: dhex data structure
     return 0 if sucess else failed
 */
-int load_segments_from_file(const char *file, hex_data_t *dhex)
+int dhex_load(const char *file, hex_data_t *dhex)
 {
     FILE *infile = stdin;
     int result = 0;
@@ -430,7 +432,7 @@ hex_data_t * get_hex_info_from_file(const char *file)
 
     memset(dhex, 0, sizeof(*dhex));
 
-    result = load_segments_from_file(file, dhex);
+    result = dhex_load(file, dhex);
     if (result) {
         free(dhex);
         return NULL;

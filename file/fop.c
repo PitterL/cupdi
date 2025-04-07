@@ -14,54 +14,59 @@
 
 #include "fop.h"
 /*
-Combine the input <main name> + <ext name>, user should release the memory after use.
-@name: original name
+Combine the input <pathname after remove delimiter from end> + <ext name>,user should release the memory after use.
+@pathname: original name
 @a_delim: delimiter to trim
-@order: skip chars from begin
+@order: skip number of a_delim at the given `@name` from the end, Zero means directly set at end, Negative means search all the a_delim
 @tailname: extensition name
 @return new combined name, NULL means failed
 */
-char *trim_name_with_extesion(const char *name, const char a_delim, int order, const char *tailname)
+char *trim_name_with_extesion(const char *pathname, const char a_delim, int order, const char *tailname)
 {
     char *new_name;
     int i, size, mainsize, extsize, new_size;
     int found = 0;
 
-    if (!name || !tailname) {
+    if (!pathname || !tailname) {
         fprintf(stderr, "Name or Extname is Null\n");
         return NULL;
     }
 
-    if (order <= 0)
-        order = 1;
-
-    //search delimiter position
-    size = (int)strlen(name) + 1;
+    // search delimiter position
+    size = (int)strlen(pathname) + 1;
     extsize = (int)strlen(tailname);
-    for (i = -1; i >= -size; i--) {
-        if (name[size + i] == a_delim)
-            found++;
 
-        if (found == order)
-            break;
+    i = -1; // start at end position
+    if (order != 0) {   // Order 0 means not search
+        for (; i >= -size; i--) {
+            if (pathname[size + i] == a_delim)
+                found++;
+
+            if (found == order)
+                break;
+        }
     }
 
-    if (found != order) {
-        fprintf(stderr, "delimiter not found\n");
-        i = -1; // add extension directly
+    if (found) {
+        mainsize = size + i + 1;    // extra <trim>
+    } else {
+        mainsize = 0;
     }
 
-    mainsize = size + i;
-    new_size = mainsize + extsize + 2; /*<trim>[d]<tailname>[NULL]*/
+    new_size = mainsize + extsize + 1; // a 'NULL' at end
     new_name = malloc(new_size);
     if (!new_name) {
-        fprintf(stderr, "Not enough memory.\n");
+        fprintf(stderr, "Not enough memory for malloc size %d\n", new_size);
         return NULL;
     }
 
-    strncpy(new_name, name, mainsize);
-    new_name[mainsize] = a_delim;
-    strncpy(new_name + mainsize + 1, tailname, extsize + 1); //Copy 'NULL'
+    if (mainsize) {
+        strncpy(new_name, pathname, mainsize);
+        new_name[mainsize] = a_delim;
+    }
+    strncpy(new_name + mainsize, tailname, extsize + 1); // Copy 'NULL'
+
+    // fprintf(stderr, "Search: '%s'\n", new_name);
 
     return new_name;
 }
@@ -207,8 +212,10 @@ int _search_defined_array_from_file(const char *file, fn_search_defined_buf fn_s
 
     f = fopen(file, "r");
     if (!f) {
+        /*
         fprintf(stderr, "Could not open '%s': %s.\n", file,
             strerror(errno));
+        */
         return -1;
     }
 
@@ -250,7 +257,8 @@ int search_defined_array_int_from_file(const char *file, const char *varname, un
     const char *pat_raw[] = { "^#define", varname, "\\{[\\w\\s,]*\\}" };
     const char *space_delims = "\\s+";
     const char *pat_value;
-    
+    int result;
+
     if (type == HEX_FORMAT) {
         pat_value = "0x[0-9a-fA-F]{1,8}";
     } else if (type == DEC_FORMAT) {
@@ -263,7 +271,16 @@ int search_defined_array_int_from_file(const char *file, const char *varname, un
     pat_str[0] = '\0';
     str_join(pat_str, sizeof(pat_str), pat_raw, ARRAY_SIZE(pat_raw), space_delims);
 
-    return _search_defined_array_from_file(file, _search_defined_array_from_buf, pat_str, pat_value, output, outlen, invalid);
+    result = _search_defined_array_from_file(file, _search_defined_array_from_buf, pat_str, pat_value, output, outlen, invalid);
+    if (result < 0) {
+        /*
+        fprintf(stdout, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
+            strerror(errno));
+        */
+        return -3;
+    }
+
+	return result;
 }
 
 /*
@@ -281,6 +298,7 @@ int search_defined_value_int_from_file(const char *file, const char *varname, un
     const char *pat_raw[] = { "^#define", varname, "[\\w]{4,}" };
     const char *space_delims = "\\s+";
     const char *pat_value;
+    int result;
     
     if (type == HEX_FORMAT) {
         pat_value = "0x[0-9a-fA-F]{1,8}";
@@ -294,7 +312,16 @@ int search_defined_value_int_from_file(const char *file, const char *varname, un
     pat_str[0] = '\0';
     str_join(pat_str, sizeof(pat_str), pat_raw, ARRAY_SIZE(pat_raw), space_delims);
 
-    return _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, 0x0);
+    result = _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, 0x0);
+    if (result < 0) {
+        /*
+        fprintf(stdout, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
+            strerror(errno));
+        */
+        return -3;
+    }
+
+	return result;
 }
 
 /*
@@ -312,10 +339,20 @@ int search_map_value_int_from_file(const char *file, const char *varname, unsign
     const char *pat_raw[] = { "", "0x[0-9a-fA-F]{4,}", varname };
     const char *pat_value = "0x[0-9a-fA-F]{4,}";
     const char *space_delims = "\\s+";
+    int result;
 
     //create pattern to search
     pat_str[0] = '\0';
     str_join(pat_str, sizeof(pat_str), pat_raw, ARRAY_SIZE(pat_raw), space_delims);
 
-    return _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, (unsigned int)-1);
+    result = _search_defined_array_from_file(file, _search_defined_value_from_buf, pat_str, pat_value, output, 1, (unsigned int)-1);
+    if (result < 0) {
+        /*
+        fprintf(stdout, "_search_defined_array_from_file ERROR '%s': %s.\n", file,
+            strerror(errno));
+        */
+        return -3;
+    }
+
+	return result;
 }
