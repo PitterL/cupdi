@@ -143,7 +143,7 @@ int cb_create_configure_block_c0(config_container_t *cfg, char *data, int len)
     memcpy(body, data, len);
 
     tail = (config_crc_t * )(body + len);
-    tail->data.cfg = calc_crc24((unsigned char *)hdr, sizeof(config_header_t) + len);
+    tail->data.cfg = calc_crc24((unsigned char *)hdr, sizeof(config_header_t) + len, CRC_CRC24_INIT);
 
     cfg->head = (config_header_t *)hdr;
 	cfg->body_info.buf = (void *)body;

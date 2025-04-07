@@ -187,10 +187,10 @@ void ib_show_element_s3(information_header_t *head)
     if (!head || head->data.version.value != INFO_BLOCK_S3_VERSION)
         return;
 
-	DBG_INFO(UPDI_DEBUG, "");
-	DBG_INFO(UPDI_DEBUG, "==========================");
+	DBG_INFO(UPDI_INFO, "");
+	DBG_INFO(UPDI_INFO, "==========================");
 
-    DBG(UPDI_DEBUG, "Information Block Content(s3):", (u8 *)ib, sizeof(*ib), "%02X ");
+    DBG(UPDI_INFO, "Information Block Content(s3):", (u8 *)ib, sizeof(*ib), "%02X ");
 
 	n = (char)ib_get_element_s3(head, IB_FW_VER_NAME_N0);
 	n0 = n >= ' ' && n <= '~' ? n : ' ';
@@ -198,35 +198,35 @@ void ib_show_element_s3(information_header_t *head)
 	n1 = n >= ' ' && n <= '~' ? n : ' ';
 	n2 = (char)ib_get_element_s3(head, IB_FW_VER_NAME_N2);
 	
-    DBG_INFO(UPDI_DEBUG, "fw_version: <%c%c%02hhX> %hhX.%hhX",
+    DBG_INFO(UPDI_INFO, "fw_version: <%c%c%02hhX> %hhX.%hhX",
         n0,
         n1,
         n2,
         (unsigned char)ib_get_element_s3(head, IB_FW_VER_NAME_BUILD_MAJOR) & 0xF,
         (unsigned char)ib_get_element_s3(head, IB_FW_VER_NAME_BUILD_MINOR) & 0xF);
 
-    DBG_INFO(UPDI_DEBUG, "fw_size: %d bytes(0x%x)",
+    DBG_INFO(UPDI_INFO, "fw_size: %d bytes(0x%x)",
         ib_get_element_s3(head, IB_FW_SIZE),
         ib_get_element_s3(head, IB_FW_SIZE));
 
-    DBG_INFO(UPDI_DEBUG, "reg addr: ds 0x%04x dr 0x%04x",
+    DBG_INFO(UPDI_INFO, "reg addr: ds 0x%04x dr 0x%04x",
         ib_get_element_s3(head, IB_REG_SR_SIGNAL),
         ib_get_element_s3(head, IB_REG_SR_REF));
 
-    DBG_INFO(UPDI_DEBUG, "reg addr: acq 0x%04x node 0x%04x",
+    DBG_INFO(UPDI_INFO, "reg addr: acq 0x%04x node 0x%04x",
         ib_get_element_s3(head, IB_REG_AN_ACQ),
         ib_get_element_s3(head, IB_REG_AN_NODE));
 
-    DBG_INFO(UPDI_DEBUG, "Configure Block(%c%c) size %hd bytes",
+    DBG_INFO(UPDI_INFO, "Configure Block(%c%c) size %hd bytes",
         ib_get_element_s3(head, IB_CFG_VER_NAME),
         ib_get_element_s3(head, IB_CFG_VER_BUILD),
         ib_get_element_s3(head, IB_CFG_SIZE));
 
-    DBG_INFO(UPDI_DEBUG, "fuse: size %02x crc %02x",
+    DBG_INFO(UPDI_INFO, "fuse: size %02x crc %02x",
         ib_get_element_s3(head, IB_FUSE_SIZE),
         ib_get_element_s3(head, IB_FUSE_CRC));
 
-    DBG_INFO(UPDI_DEBUG, "crc : fw 0x%06x info %02x",
+    DBG_INFO(UPDI_INFO, "crc : fw 0x%06x info %02x",
         ib_get_element_s3(head, IB_CRC_FW),
         ib_get_element_s3(head, IB_CRC_INFO));
 }
@@ -261,7 +261,7 @@ int ib_create_information_block_s3(information_container_t *info, information_co
     ib->fuse.data.size = param->fuse.data.size;
     ib->fuse.data.crc = param->fuse.data.crc;
 
-    ib->crc.data.fw = param->fw_crc24;//calc_crc24(data, len);
+    ib->crc.data.fw = param->fw_crc24;//calc_crc24(data, len, CRC_CRC24_INIT);
     ib->crc.data.info = calc_crc8((unsigned char *)ib, sizeof(*ib) - 1);
 
     info->head = (information_header_t *)ib;

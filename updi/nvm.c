@@ -258,7 +258,7 @@ int nvm_unlock_device(void *nvm_ptr)
     result = app_unlock(APP(nvm));
     if (result)
     {
-        DBG_INFO(NVM_DEBUG, "app_unlock failed %d", result);
+        DBG_INFO(NVM_ERROR, "app_unlock failed %d", result);
         return -2;
     }
 

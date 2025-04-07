@@ -8,7 +8,7 @@ void _loginfo_i(char* format, ...);
 
 typedef enum {
     DEFAULT_DEBUG,
-    UPDI_DEBUG,
+    UPDI_DEBUG = 2,
     NVM_DEBUG, 
     APP_DEBUG, 
     LINK_DEBUG, 
@@ -33,6 +33,7 @@ typedef enum {
     UPDI_INFO = 1,
     NVM_INFO = 2,
     APP_INFO = 2,
+    LINK_INFO = 2,
     OTHER_INFO = 2,
 } verbose_e_t;
 

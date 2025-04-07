@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="argparse\argparse.h" />
+    <ClInclude Include="array\array.h" />
     <ClInclude Include="ext\cfgblock\c0.h" />
     <ClInclude Include="ext\ext.h" />
     <ClInclude Include="ext\cfgblock\c1.h" />
@@ -60,6 +61,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="argparse\argparse.c" />
+    <ClCompile Include="array\array.c" />
     <ClCompile Include="ext\cfgblock\c0.c" />
     <ClCompile Include="ext\ext.c" />
     <ClCompile Include="ext\cfgblock\c1.c" />

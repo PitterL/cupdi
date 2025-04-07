@@ -112,6 +112,27 @@ void updi_application_deinit(void *app_ptr)
     @app_ptr: APP object pointer, acquired from updi_application_init()
     @return 0 successful, other value if failed
 */
+#pragma pack(1)
+typedef struct sig_tiny {
+    u8 devid[3];
+    u8 sernum[10];
+    u8 rsv[21];
+    u8 osc[2];
+} sig_tiny_t;
+#pragma pack()
+
+#pragma pack(1)
+typedef struct sig_avrdx {
+    u8 devid[3];
+    u8 rsv1;
+    u16 temps[2];
+    u8 rsv2[8];
+    u8 sernum[16];
+} sig_avrdx_t;
+#pragma pack()
+
+#define MAX_SIGROW_SIZE max(sizeof(sig_tiny_t), sizeof(sig_avrdx_t))
+
 int app_device_info(void *app_ptr, DEV_TYPE_T type)
 {
     /*
@@ -120,7 +141,8 @@ int app_device_info(void *app_ptr, DEV_TYPE_T type)
     upd_application_t *app = (upd_application_t *)app_ptr;
     u8 sib[16];
     u8 pdi;
-    u8 sigrow[16];
+    u8 sigrow[MAX_SIGROW_SIZE];
+    u8 sigsize;
     u8 revid[1];
     int result;
 
@@ -149,14 +171,28 @@ int app_device_info(void *app_ptr, DEV_TYPE_T type)
     pdi = link_ldcs(LINK(app), UPDI_CS_STATUSA);
     DBG_INFO(APP_INFO, "[PDI Rev] is %d", (pdi >> 4));
 
-    if (app_in_prog_mode(app) || (type >=  TINY321x)) {
-        result = app_read_data(app, APP_REG(app, sigrow_address), sigrow, sizeof(sigrow));
+    if (app_in_prog_mode(app)) {
+        if (type <= TINY321x) {
+            sigsize = sizeof(sig_tiny_t);
+        } else if (type <= AVRDU) {
+            sigsize = sizeof(sig_avrdx_t);
+        } else {
+            sigsize = 16;
+        }
+
+        result = app_read_data(app, APP_REG(app, sigrow_address), sigrow, sigsize);
         if (result) {
             DBG_INFO(APP_DEBUG, "app_read_data sigrow failed %d", result);
         } else {
-            DBG(APP_INFO, "[Sigrow]", sigrow, sizeof(sigrow), "%02x ");
-            DBG(APP_INFO, "[Device ID]", sigrow, 3, "%02x ");
-            DBG(APP_INFO, "[Sernum ID]", sigrow + 3, 10, "%02x ");
+            if (type <= TINY321x) {
+                DBG(APP_INFO, "[Sigrow]", sigrow, sigsize, "%02x ");
+                DBG(APP_INFO, "[Device ID]", ((sig_tiny_t *)sigrow)->devid, sizeof(((sig_tiny_t *)sigrow)->devid), "%02x ");
+                DBG(APP_INFO, "[Sernum ID]", ((sig_tiny_t *)sigrow)->sernum, sizeof(((sig_tiny_t *)sigrow)->sernum), "%02x ");
+            } else if (type <= AVRDU) {
+                DBG(APP_INFO, "[Sigrow]", sigrow, sigsize, "%02x ");
+                DBG(APP_INFO, "[Device ID]", ((sig_avrdx_t *)sigrow)->devid, sizeof(((sig_avrdx_t *)sigrow)->devid), "%02x ");
+                DBG(APP_INFO, "[Sernum ID]", ((sig_avrdx_t *)sigrow)->sernum, sizeof(((sig_avrdx_t *)sigrow)->sernum), "%02x ");
+            }
         }
 
         result = app_read_data(app, APP_REG(app, syscfg_address) + 1, revid, sizeof(revid));
@@ -166,7 +202,7 @@ int app_device_info(void *app_ptr, DEV_TYPE_T type)
             DBG_INFO(APP_INFO, "[Device Rev] is %c", revid[0] + 'A');
         }
     } else {
-        DBG_INFO(APP_INFO, "[Skipped Sernum and Revid]", revid[0] + 'A');
+        DBG_INFO(APP_INFO, "[Skipped Sernum and Revid]");
     }
 
     return 0;

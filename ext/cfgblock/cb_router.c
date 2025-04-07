@@ -31,14 +31,14 @@ int cb_set_configure_block_data_ptr(config_container_t *cfg, char *data, int len
     switch (head->data.version.value) {
     case CONFIG_BLOCK_C0_VERSION:
         // CRC only data
-        crc24 = calc_crc24((unsigned char *)data + sizeof(config_header_t), head->data.size - sizeof(config_header_t) - sizeof(config_tail_t));
+        crc24 = calc_crc24((unsigned char *)data + sizeof(config_header_t), head->data.size - sizeof(config_header_t) - sizeof(config_tail_t), CRC_CRC24_INIT);
         if (crc24 != tail->data.cfg) {
             return -5;
         }
         return cb_set_configure_block_ptr_c0(cfg, data, head->data.size, flag);
     case CONFIG_BLOCK_C1_VERSION:
         // CRC include header
-        crc24 = calc_crc24((unsigned char *)data, head->data.size - sizeof(config_tail_t));
+        crc24 = calc_crc24((unsigned char *)data, head->data.size - sizeof(config_tail_t), CRC_CRC24_INIT);
         if (crc24 != tail->data.cfg) {
             return -6;
         }

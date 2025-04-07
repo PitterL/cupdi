@@ -65,6 +65,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include <file/fop.h>
 #include <crc/crc.h>
 #include <ext/ext.h>
+#include <array/array.h>
 #include "cupdi.h"
 
 /*
@@ -104,10 +105,13 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. avrda compensation capacitance with 32pf base line
         <v> 1. default print Sermum
             2. `dbgview` support keys=0 which means note show keys information
-
+        <2> 1. `crc` command of setting CRC-16-CCITT at the end page of the data page
+            2. fix the multi segment id for large flash content 
+            3. adjust the chip info content order of `reg` and `crcinfo`
+            4. print `devid, sernum, osc` in sigrow
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19v"
+#define SOFTWARE_VERSION "A.19w"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -171,6 +175,7 @@ enum
     PACK_BUILD_SELFTEST,
     PACK_BUILD_CFG_VER,
     PACK_SHOW,
+    PACK_CRC,
     PACK_REBUILD
 };
 
@@ -205,6 +210,7 @@ int main(int argc, const char *argv[])
     bool test = false;
     bool version = false;
     bool ipe_format = false;
+    bool crc = false;
     // int pad = 0xFF;
     // int gap = 0;
     int pack = 0;
@@ -248,6 +254,7 @@ int main(int argc, const char *argv[])
         OPT_BOOLEAN('t', "test", &test, "Test UPDI device"),
         OPT_BOOLEAN('-', "version", &version, "Show version"),
         OPT_BOOLEAN('-', "ipe", &ipe_format, "Using MPLAB IPE format HEX (of Magic offset)"),
+        OPT_BOOLEAN('-', "crc", &crc, "Set CRC-16-CCITT at last valid data page of the flash and adjust the bootend and append in fuse"),
         // OPT_INTEGER('-', "pad", &pad, "To use Pad values to consolidate fragmented data into a coherent whole, Pad value defautl is 0xFF"),
         // OPT_INTEGER('-', "gap", &gap, "The gap of fragmented data to pad, default 0 which is not pad"),
         OPT_BIT('-', "pack-build", &pack, "Pack info block to Intel HEX file, (macro FIRMWARE_VERSION at 'touch.h')save with extension'.ihex'", NULL, (1 << PACK_BUILD), 0),
@@ -307,6 +314,10 @@ int main(int argc, const char *argv[])
         return -2;
     }
 
+    if (crc) {
+        SET_BIT(pack, PACK_CRC);
+    }
+
     // covert hex file to ihex file
     if (pack)
     {
@@ -327,7 +338,7 @@ int main(int argc, const char *argv[])
 
             if (TEST_BIT(pack, PACK_SHOW))
             {
-                result = dev_vcs_hex_file_show_info(dev, file);
+                result = dev_vcs_hex_file_show_info(dev, file, !!TEST_BIT(pack, PACK_CRC));
                 if (result)
                 {
                     DBG_INFO(OTHER_ERROR, "Device show ihex file '%s' failed %d", file, result);
@@ -662,6 +673,85 @@ ihex_segment_t _block_segment_id(nvm_info_t *block, int flag)
     return sid;
 }
 
+/*
+    Get all segment id of the block
+    @dev: device info structure, get by get_chip_info()
+    @type: NVM type
+    @sids_arr: the output buffer of all sids
+    @sids_arr_size: the max size of the sids array
+    @return actual num of sids captured
+*/
+uint8_t block_segment_ids(const device_info_t *dev, NVM_TYPE_EX_T blockid, int flag, ihex_segment_t * sids_arr, uint8_t sids_arr_size)
+{
+    nvm_info_t iblock;
+    ihex_address_t base;
+    ihex_segment_t sid;
+    int size, result, sids_cnt = 0;
+
+
+    if (sids_arr_size < 1 || !sids_arr) {
+        return sids_cnt;
+    }
+
+    result = dev_get_nvm_info(dev, blockid, &iblock);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", blockid, result);
+        return sids_cnt;
+    }
+
+    base = iblock.nvm_mapped_start ? iblock.nvm_mapped_start : iblock.nvm_start;
+    size = iblock.nvm_size;
+    if (flag & SEG_EX_LINEAR_ADDRESS) {
+        if (iblock.nvm_magicoff) {
+            sid = iblock.nvm_magicoff;
+            size = 0; // End search
+        } else {
+            sid = ADDR_TO_EX_LINEAR_ID(base);
+        }
+    } else /* (flag & SEG_EX_SEGMENT_ADDRESS) */ {
+        sid = ADDR_TO_EX_SEGMENT_ID(base);
+    }
+    sids_arr[sids_cnt++] = sid;
+
+    // Increase sid value if more segments for th blocks
+    while (size > MAX_DATA_IN_ONE_SEGMENT) {
+        // Output buffer full    
+        if (sids_cnt >=  sids_arr_size) {
+            break;
+        }
+
+        size -= MAX_DATA_IN_ONE_SEGMENT;
+        if (flag & SEG_EX_LINEAR_ADDRESS) {
+            sid += NEXT_LINEAR_ID;
+        } else /* (flag & SEG_EX_SEGMENT_ADDRESS) */ {
+            sid += NEXT_SEGMENT_ID;
+        }
+        sids_arr[sids_cnt++] = sid;
+    }
+
+    return sids_cnt;
+}
+
+/*
+    Get first segment id of the block
+    @dev: device info structure, get by get_chip_info()
+    @type: NVM type
+    @return the sid value
+*/
+ihex_segment_t block_first_segment_id(const device_info_t *dev, int blockid, int flag)
+{
+    ihex_segment_t sid = 0;
+    int result;
+
+    result = block_segment_ids(dev, blockid, flag, &sid, 1);
+    if (result != 1) {
+        DBG_INFO(UPDI_DEBUG, "block_segment_ids failed %d", result);
+    }
+
+    return sid;
+}
+
 unsigned int _block_segment_offset(nvm_info_t *block, int flag)
 {
     unsigned int offset;
@@ -739,8 +829,8 @@ int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_f
     const device_info_t *dev = (const device_info_t *)param;
     nvm_info_t iblock;
     ihex_segment_t sid;
-    ihex_segment_t base;
-    unsigned int offset;
+    ihex_address_t base;
+    unsigned int nvm_start, offset;
     int i, bid, found = 0, result = 0;
 
     if (seg->flag == SEG_EX_LINEAR_ADDRESS)
@@ -823,12 +913,28 @@ int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_f
             }
             else
             {
-                if (base == iblock.nvm_start ||
-                    (iblock.nvm_mapped_start && base == iblock.nvm_mapped_start))
-                {
-                    seg->sid = _block_segment_id(&iblock, to_flag);
+                sid = _block_segment_id(&iblock, to_flag);
+                if (base >= iblock.nvm_start && base < iblock.nvm_start + iblock.nvm_size) {
+                    nvm_start = iblock.nvm_start;
+                    found = 1;
+                } else if (iblock.nvm_mapped_start && (base >= iblock.nvm_mapped_start && base < iblock.nvm_mapped_start + iblock.nvm_size)) {
+                    nvm_start = iblock.nvm_mapped_start;
+                    found = 1;
+                } else {
+                    found = 0;
+                }
+
+                // Increase sid value if segment size if full
+                if (found) {
+                    while(base >= nvm_start + MAX_DATA_IN_ONE_SEGMENT) {
+                        base -= MAX_DATA_IN_ONE_SEGMENT;
+                        sid += (MAX_DATA_IN_ONE_SEGMENT >> 4);
+                    }
+
+                    seg->sid = sid;
                     seg->flag = to_flag;
                     break;
+
                 }
             }
         }
@@ -895,105 +1001,6 @@ int trans_segment(segment_buffer_t *seg, const void *param, ihex_seg_type_t to_f
     return result;
 }
 
-/*
-int combine_segments(const device_info_t *dev, hex_data_t *dhex, uint8_t pad, uint8_t gap)
-{
-    hex_data_t *dhex = NULL;
-    nvm_info_t iblock;
-    ihex_segment_t sid, msid;
-
-    segment_buffer_t *seg = NULL, *old_seg = NULL;
-    int i, bid, found = 0, result = 0;
-
-    dhex = malloc(dhex, sizeof(*dhex));
-    if (!dhex)
-    {
-        DBG_INFO(UPDI_ERROR, "malloc dhex size %d failed", sizeof(*dhex));
-        return -1;
-    }
-
-    result = dev_get_nvm_info(dev, bid, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
-    }
-
-    for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++)
-    {
-        seg = &dhex->segments[i];
-        if (VALID_SEG(seg))
-        {
-            if (seg->sid == sid || seg->sid == msid) {
-                if (old_seg) {
-                    old_seg = set_segment_data_by_id_addr(dhex, sid, i, 1, &val, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
-                    if (!seg)
-                    {
-                        DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed %d val 0x%02x", i, val);
-                        result = -7;
-                        goto out;
-                    }
-                }
-
-                old_seg = seg;
-            }
-        } else {
-
-        }
-    }
-
-    for (i = 0; i < NUM_NVM_EX_TYPES; i++)
-    {
-        bid = NUM_NVM_EX_TYPES - 1 - i;
-        result = dev_get_nvm_info(dev, bid, &iblock);
-        if (result)
-        {
-            DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info type %d failed %d", bid, result);
-        }
-        else
-        {
-            sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-            msid = _block_segment_id(&iblock, SEG_EX_LINEAR_ADDRESS);
-
-            for (int i = 0; i < MAX_SEGMENT_COUNT_IN_RECORDS; i++)
-            {
-                seg = &dhex->segments[i];
-                if (VALID_SEG(seg))
-                {
-                    if (seg->sid == sid || seg->sid == msid) {
-                        if (old_seg) {
-                            old_seg = set_segment_data_by_id_addr(dhex, sid, i, 1, &val, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
-                            if (!seg)
-                            {
-                                DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed %d val 0x%02x", i, val);
-                                result = -7;
-                                goto out;
-                            }
-                        }
-
-                        old_seg = seg;
-                    }
-                } else {
-
-                }
-            }
-
-            if (iblock.nvm_magicoff && iblock.nvm_magicoff == seg->sid)
-            {
-                seg->sid = _block_segment_id(&iblock, to_flag);
-                seg->flag = to_flag;
-
-                // Adjust the offset when cover to segment address, some packing is not segment aligned(Lockbits)
-                offset = _block_segment_offset(&iblock, to_flag);
-                seg->addr_from += offset;
-                seg->addr_to += offset;
-                break;
-            }
-        }
-    }
-
-    return result;
-}
-*/
 int dev_hex_load(const device_info_t *dev, const char *file, hex_data_t *dhex)
 {
     int result;
@@ -1070,6 +1077,87 @@ int dev_hex_show(const device_info_t *dev, int type, hex_data_t *dhex)
     }
 
     return result;
+}
+
+/*
+    Align the flash size with CRC patch
+    @dev: device info structure, get by get_chip_info()
+    @pad_mask: the pad mask, must be (2^(n) - 1) aligned
+    @pad_value: pad_value
+    @dhex: hex data structure
+    @return fw size after padded if successful, negative means failed
+*/
+int32_t dev_hex_align_flash_crc(const device_info_t *dev, uint8_t pad_value, hex_data_t *dhex)
+{
+    ihex_segment_t sids[MAX_SEGMENT_COUNT_IN_RECORDS];
+    segment_buffer_t *seg, *last_seg = NULL;
+    ihex_data_t *buf;
+    ihex_address_t addr;
+    crc_src_t crcinfo;
+    uint8_t i, num_sids;
+    uint16_t pad_mask, size, size_rsv, crc = CRC_CRC16_CCITT_INIT;
+    int32_t total_size = 0;
+    int result;
+
+    result = dev_get_crc_info(dev, &crcinfo);
+    if (result) {
+        DBG_INFO(UPDI_ERROR, "dev_get_crc_info failed %d", result);
+        return -2;
+    }
+
+    num_sids = block_segment_ids(dev, NVM_FLASH, SEG_EX_SEGMENT_ADDRESS, sids, ARRAY_SIZE(sids));
+    for ( i = 0; i < ARRAY_SIZE(dhex->segments); i++ ) {
+        seg = &dhex->segments[i];
+        if (!VALID_SEG(seg)) {
+            break;
+        }
+
+        if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
+            last_seg = seg;
+            crc = crc16_ccitt(seg->data, seg->len, crc);
+            total_size += seg->len;
+        }
+    }
+
+    if (!last_seg) {
+        return -3;
+    } else {
+        pad_mask = crcinfo.page_size - 1;
+
+        addr = last_seg->addr_to;
+        size = addr & pad_mask;
+        if (size) {
+            size_rsv = pad_mask - size + 1;
+        } else {
+            size_rsv = 0;
+        }
+
+        if (size_rsv < sizeof(crc)) {
+            size_rsv += pad_mask + 1;
+        }
+
+        last_seg->data = realloc(last_seg->data, last_seg->len + size_rsv);
+        if (!last_seg->data) {
+            DBG_INFO(UPDI_ERROR, "Alloc seg align memory failed %d seg len %d, size rsv %d", last_seg->len, size_rsv);
+            return -4;
+        }
+
+        buf = last_seg->data + last_seg->len;
+        size = size_rsv - 2;
+        memset(buf, pad_value, size);
+        crc = crc16_ccitt(buf, size, crc);
+        buf[size] = (crc >> 8) & 0xFF;
+        buf[size + 1] = crc & 0xFF;
+
+        last_seg->len += size_rsv;
+        last_seg->addr_to += size_rsv;
+
+        total_size += size_rsv;
+
+        DBG_INFO(UPDI_INFO, "Aligned %d bytes with crc %04X, total size %X(%d)", size_rsv, crc, total_size, total_size);
+    }
+
+    return total_size;
 }
 
 /*
@@ -1518,7 +1606,7 @@ int updi_check(void *nvm_ptr)
 
     // DBG(UPDI_DEBUG, "Flash data ", buf, len, "%02x ");
 
-    crc = calc_crc24(buf, len);
+    crc = calc_crc24(buf, len, CRC_CRC24_INIT);
     info_crc = ext_get(&info_container, IB_CRC_FW);
     if (info_crc <= 0 || info_crc != crc)
     {
@@ -1891,7 +1979,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         goto out;
     }
 
-    crc = calc_crc24(buf, len);
+    crc = calc_crc24(buf, len, CRC_CRC24_INIT);
     ecrc = ib_get(&info_container, IB_CRC_FW);
     if (ecrc == 0 || ecrc == -1 || ecrc != crc)
     {
@@ -2112,11 +2200,11 @@ out:
 */
 segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const char *file, hex_data_t *dhex, int pack)
 {
-    nvm_info_t iblock;
+    ihex_segment_t sids[MAX_SEGMENT_COUNT_IN_RECORDS];
     segment_buffer_t *seg = NULL;
     ihex_segment_t sid;
     NVM_TYPE_T nvm_type;
-    int offset, i, size, order;
+    int offset, i, size, order, num_sids, crc = CRC_CRC24_INIT;
     information_container_t info_container;
     information_content_params_t info_params;
     const char *version_files[] = BOARD_FILES;
@@ -2182,15 +2270,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     }
 
     // Fuse
-    result = dev_get_nvm_info(dev, NVM_FUSES, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -5;
-        goto out;
-    }
-
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
+    sid = block_first_segment_id(dev, NVM_FUSES, SEG_EX_SEGMENT_ADDRESS);
     seg = get_segment_by_id(dhex, sid);
     if (!seg)
     {
@@ -2209,15 +2289,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     if (TEST_BIT(pack, PACK_BUILD_SELFTEST))
     {
         nvm_type = get_storage_type(BLOCK_CFG);
-        result = dev_get_nvm_info(dev, nvm_type, &iblock);
-        if (result)
-        {
-            DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-            result = -7;
-            goto out;
-        }
-
-        sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
+        sid = block_first_segment_id(dev, nvm_type, SEG_EX_SEGMENT_ADDRESS);
         seg = get_segment_by_id(dhex, sid);
         if (!seg || seg->len < sizeof(config_information_t))
         {
@@ -2237,26 +2309,22 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
         info_params.config.data.version.value = CONFIG_BLOCK_C0_VERSION;
     }
 
-    // Firmware
-    result = dev_get_nvm_info(dev, NVM_FLASH, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -7;
-        goto out;
-    }
+    // Flash content CRC    
+    num_sids = block_segment_ids(dev, NVM_FLASH, SEG_EX_SEGMENT_ADDRESS, sids, ARRAY_SIZE(sids));
+    size = 0;
+    for ( i = 0; i < ARRAY_SIZE(dhex->segments); i++ ) {
+        seg = &dhex->segments[i];
+        if (!VALID_SEG(seg)) {
+            break;
+        }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    seg = get_segment_by_id(dhex, sid);
-    if (!seg)
-    {
-        DBG_INFO(UPDI_DEBUG, "get_segment_by_id(%d) failed %d", sid);
-        result = -8;
-        goto out;
+        if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
+            crc = calc_crc24(seg->data, seg->len, crc);
+            size += seg->len;
+        }
     }
-    info_params.fw_crc24 = calc_crc24(seg->data, seg->len);
-    info_params.fw_size = seg->len;
-    seg = NULL;
+    info_params.fw_crc24 = crc;
+    info_params.fw_size = size;
 
     // Build Info block
     result = ext_create_data_block(&info_container, &info_params, sizeof(info_params), BLOCK_INFO);
@@ -2277,16 +2345,11 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
 
     // Save to hex
     nvm_type = get_storage_type(BLOCK_INFO);
-    result = dev_get_nvm_info(dev, nvm_type, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(info) failed %d", result);
-        result = -11;
-        goto out;
+    sid = block_first_segment_id(dev, nvm_type, SEG_EX_SEGMENT_ADDRESS);
+    if (sid) {
+        unload_segment_by_sid(dhex, sid);
     }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    unload_segment_by_sid(dhex, sid);
     offset = get_storage_offset(BLOCK_INFO);
     seg = set_segment_data_by_id_addr(dhex, sid, offset, size, (char *)info_container.head, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
     if (!seg)
@@ -2305,12 +2368,13 @@ out:
     Load fuse segment from vcs file
     @dev: device info structure, get by get_chip_info()
     @file: vcs file name
+    @fw_size: firmware size
     @dhex: hex data structure
     return 0 means successful, other value failed
 */
-int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_data_t *dhex)
+int load_fuse_content_from_file(const device_info_t *dev, const char *file, int32_t fw_size, hex_data_t *dhex)
 {
-    nvm_info_t iblock, iblock_lockbits;
+    nvm_info_t iblock_fuse, iblock_lockbits;
     segment_buffer_t *seg = NULL;
     ihex_segment_t sid, sid_lockbits;
     unsigned char val;
@@ -2319,16 +2383,18 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     const char *version_files[] = BOARD_FILES;
     char *vcs_file = NULL;
     int i, order, count = 0, result = 0;
+    uint8_t bootend;
+    crc_src_t crcinfo;
 
     // <1> load fuse from pack file first
-    result = dev_get_nvm_info(dev, NVM_FUSES, &iblock);
+    result = dev_get_nvm_info(dev, NVM_FUSES, &iblock_fuse);
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", NVM_FUSES, result);
         return -2;
     }
 
-    fuses_config = malloc(iblock.nvm_size * sizeof(*fuses_config));
+    fuses_config = malloc(iblock_fuse.nvm_size * sizeof(*fuses_config));
     if (!fuses_config)
     {
         DBG_INFO(UPDI_DEBUG, "malloc fuses_config failed %d");
@@ -2356,14 +2422,14 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
             goto out;
         }
 
-        result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock.nvm_size, invalid_value, HEX_FORMAT);
+        result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock_fuse.nvm_size, invalid_value, HEX_FORMAT);
         free(vcs_file);
         if (result == 0)
         {
             DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", version_files[i]);
             goto out;
         }
-        else if (result < 0 || (u32)result > iblock.nvm_size)
+        else if (result < 0 || (u32)result > iblock_fuse.nvm_size)
         {
             DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
             result = -5;
@@ -2376,7 +2442,7 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
         }
     }
 
-    if (result < 0 || (u32)result > iblock.nvm_size)
+    if (result < 0 || (u32)result > iblock_fuse.nvm_size)
     {
         DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
         result = -6;
@@ -2392,8 +2458,10 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     // <2.2> Found in pad file, remove the fuse, lockbits content in segment
 
     // Unload fuse
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    unload_segment_by_sid(dhex, sid);
+    sid = block_first_segment_id(dev, NVM_FUSES, SEG_EX_SEGMENT_ADDRESS);
+    if (sid) {
+        unload_segment_by_sid(dhex, sid);
+    }
 
     // Unload lockbits
     result = dev_get_nvm_info(dev, NVM_LOCKBITS, &iblock_lockbits);
@@ -2405,8 +2473,24 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
     }
     else
     {
-        sid_lockbits = _block_segment_id(&iblock_lockbits, SEG_EX_SEGMENT_ADDRESS);
-        unload_segment_by_sid(dhex, sid_lockbits);
+        sid_lockbits = block_first_segment_id(dev, NVM_LOCKBITS, SEG_EX_SEGMENT_ADDRESS);
+        if (sid_lockbits) {
+            unload_segment_by_sid(dhex, sid_lockbits);
+        }
+    }
+
+    // Replace for crc range:
+    result = dev_get_crc_info(dev, &crcinfo);
+    if (result) {
+        DBG_INFO(UPDI_ERROR, "dev_get_crc_info failed %d", result);
+        return -8;
+    } else {
+        if (crcinfo.bootend < iblock_fuse.nvm_size && 
+            crcinfo.append < iblock_fuse.nvm_size) {
+            bootend = fw_size / crcinfo.page_size;
+            fuses_config[crcinfo.bootend] = bootend;
+            fuses_config[crcinfo.append] = bootend;
+        }
     }
 
     for (i = 0; i < count; i++)
@@ -2418,131 +2502,7 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, hex_
             if (!seg)
             {
                 DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed %d val 0x%02x", i, val);
-                result = -7;
-                goto out;
-            }
-        }
-        else
-        {
-            DBG_INFO(UPDI_DEBUG, "Fuse[%d]: %02x is not supported", i, val);
-            result = -8;
-            goto out;
-        }
-    }
-out:
-
-    if (fuses_config)
-        free(fuses_config);
-
-    return result;
-}
-
-int _load_fuse_lockbits_content_from_file(const device_info_t *dev, int type, char *name, const char *file, hex_data_t *dhex)
-{
-    nvm_info_t iblock, iblock_lockbits;
-    segment_buffer_t *seg = NULL;
-    ihex_segment_t sid, sid_lockbits;
-    unsigned char val;
-    unsigned int *fuses_config = NULL;
-    const unsigned int invalid_value = 0x800;
-    const char *version_files[] = BOARD_FILES;
-    char *vcs_file = NULL;
-    int i, order, count = 0, result = 0;
-
-    result = dev_get_nvm_info(dev, type, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", type, result);
-        return -2;
-    }
-
-    fuses_config = malloc(iblock.nvm_size * sizeof(*fuses_config));
-    if (!fuses_config)
-    {
-        DBG_INFO(UPDI_DEBUG, "malloc fuses_config failed %d");
-        result = -3;
-        goto out;
-    }
-
-    for (i = 0; i < ARRAY_SIZE(version_files); i++)
-    {
-        // Give the searching order of the directory
-        if (i > VAR_FILE_ORDER_IN_LOCAL_DIRECTORY)
-        {
-            order = VAR_FILE_ORDER_LEVEL_OF_PARENTS;
-        }
-        else
-        {
-            order = VAR_FILE_ORDER_LEVEL_OF_LOCAL;
-        }
-
-        vcs_file = trim_name_with_extesion(file, '\\', order, version_files[i]);
-        if (!vcs_file)
-        {
-            DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", version_files[i], result);
-            result = -4;
-            goto out;
-        }
-
-        result = search_defined_array_int_from_file(vcs_file, "FUSES_CONTENT", fuses_config, iblock.nvm_size, invalid_value, HEX_FORMAT);
-        free(vcs_file);
-        if (result == 0)
-        {
-            DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", version_files[i]);
-            goto out;
-        }
-        else if (result < 0 || (u32)result > iblock.nvm_size)
-        {
-            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
-            result = -5;
-        }
-        else
-        {
-            DBG_INFO(UPDI_DEBUG, "search_defined_array_int_from_file (%s) successfully", version_files[i]);
-            count = result;
-            break;
-        }
-    }
-
-    if (result < 0 || (u32)result > iblock.nvm_size)
-    {
-        DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
-        result = -6;
-        goto out;
-    }
-
-    if (count == 0)
-    {
-        goto out;
-    }
-    // Unload fuse
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    unload_segment_by_sid(dhex, sid);
-
-    // Unload lockbits
-    result = dev_get_nvm_info(dev, NVM_LOCKBITS, &iblock_lockbits);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info(%d) failed %d", NVM_LOCKBITS, result);
-        result = -7;
-        goto out;
-    }
-    else
-    {
-        sid_lockbits = _block_segment_id(&iblock_lockbits, SEG_EX_SEGMENT_ADDRESS);
-        unload_segment_by_sid(dhex, sid_lockbits);
-    }
-
-    for (i = 0; i < count; i++)
-    {
-        if (fuses_config[i] < invalid_value)
-        {
-            val = fuses_config[i] & 0xff;
-            seg = set_segment_data_by_id_addr(dhex, sid, i, 1, &val, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
-            if (!seg)
-            {
-                DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr failed %d val 0x%02x", i, val);
-                result = -7;
+                result = -9;
                 goto out;
             }
         }
@@ -2676,7 +2636,7 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
         goto out;
     }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
+    sid = block_first_segment_id(dev, nvm_type, SEG_EX_SEGMENT_ADDRESS);
     unload_segment_by_sid(dhex, sid);
     offset = get_storage_offset(BLOCK_INFO);
     seg = set_segment_data_by_id_addr(dhex, sid, offset, size, (char *)cfg_container.head, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
@@ -2724,14 +2684,24 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
     result = dev_hex_load(dev, file, &dhex_info);
     if (result)
     {
-        DBG_INFO(UPDI_DEBUG, "dev_hex_load failed %d", result);
+        DBG_INFO(UPDI_ERROR, "dev_hex_load failed %d", result);
         result = -3;
         goto out;
     }
 
     if (!TEST_BIT(pack, PACK_REBUILD))
     {
-        result = load_fuse_content_from_file(dev, file, &dhex_info);
+        if (TEST_BIT(pack, PACK_CRC)) {
+            result = dev_hex_align_flash_crc(dev, 0xFF, &dhex_info);
+            if (result < 0)
+            {
+                DBG_INFO(UPDI_ERROR, "dev_hex_align_flash_crc(error=%d)", result);
+                result = -4;
+                goto out;
+            }
+        }
+
+        result = load_fuse_content_from_file(dev, file, result, &dhex_info);
         if (result)
         {
             DBG_INFO(UPDI_ERROR, "load_fuse_content_from_file(error=%d), skipped", result);
@@ -2779,7 +2749,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
     // Show the result
     if (!TEST_BIT(pack, PACK_REBUILD))
     {
-        dev_vcs_hex_file_show_info(dev, ihex_file);
+        dev_vcs_hex_file_show_info(dev, ihex_file, !!TEST_BIT(pack, PACK_CRC));
     }
 
     DBG_INFO(UPDI_DEBUG, "\nSaved Hex to \"%s\"", ihex_file);
@@ -2798,18 +2768,19 @@ out:
     Device show vcs Hex file info
     @dev: device info structure, get by get_chip_info()
     @file: raw Hex file path for input
+    @check_ccitt: check flash internal crc with ccitt-16 algorithm
     @returns 0 - success, other value failed code
 */
-int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file)
+int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file, bool check_ccitt)
 {
-    hex_data_t dhex_info;
+    hex_data_t *dhex, dhex_info;
     information_container_t file_info_container;
     config_container_t file_conf_container;
     information_header_t header, conf_header;
-    nvm_info_t iblock;
-    segment_buffer_t *seg;
-    ihex_segment_t sid;
-    int fw_size, fw_crc, crc;
+    segment_buffer_t *seg, *last_seg = NULL;
+    ihex_segment_t sids[MAX_SEGMENT_COUNT_IN_RECORDS];
+    int i, size, fw_size, num_sids, fw_crc, crc = CRC_CRC24_INIT;
+    uint16_t crc_ccitt = CRC_CRC16_CCITT_INIT;
     int result = 0;
 
     memset(&dhex_info, 0, sizeof(dhex_info));
@@ -2833,34 +2804,45 @@ int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file)
         goto out;
     }
 
-    // Get flash block information
-    result = dev_get_nvm_info(dev, NVM_FLASH, &iblock);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -4;
-        goto out;
+    // Flash content    
+    num_sids = block_segment_ids(dev, NVM_FLASH, SEG_EX_SEGMENT_ADDRESS, sids, ARRAY_SIZE(sids));
+    size = 0;
+    dhex = &dhex_info;
+    for ( i = 0; i < ARRAY_SIZE(dhex->segments); i++ ) {
+        seg = &dhex->segments[i];
+        if (!VALID_SEG(seg)) {
+            break;
+        }
+
+        if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
+            crc = calc_crc24(seg->data, seg->len, crc);
+            if (check_ccitt) {
+                crc_ccitt = crc16_ccitt(seg->data, seg->len, crc_ccitt);
+                last_seg = seg;
+            }
+            size += seg->len;
+        }
     }
 
-    sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-    seg = get_segment_by_id(&dhex_info, sid);
-    if (!seg)
-    {
-        DBG_INFO(UPDI_DEBUG, "dev_get_nvm_info failed %d", result);
-        result = -4;
-        goto out;
+    if (check_ccitt) {
+        if (crc_ccitt != 0) {
+            DBG_INFO(UPDI_DEBUG, "CCITT CRC calculated %04X incorrect, total size(%d)", crc_ccitt, size);
+            result = -4;
+            goto out;
+        } else {
+            DBG(UPDI_DEBUG, "CCITT Check Pass: ", &last_seg->data[last_seg->len - sizeof(crc_ccitt)], sizeof(crc_ccitt), "%02X ");
+        }
     }
 
     fw_size = ext_get(&file_info_container, IB_FW_SIZE);
-    if (fw_size <= 0 || seg->len < fw_size)
+    if (fw_size <= 0 || size != fw_size)
     {
-        DBG_INFO(UPDI_DEBUG, "seg size not enough, seg = %d, infoblock size %d", seg->len, fw_size);
+        DBG_INFO(UPDI_DEBUG, "seg size (%d) is mismatched with firmware size (%d)", size, fw_size);
         result = -5;
         goto out;
     }
 
     fw_crc = ext_get(&file_info_container, IB_CRC_FW);
-    crc = calc_crc24(seg->data, fw_size);
     if (fw_crc < 0 || crc < 0 || fw_crc != crc)
     {
         DBG_INFO(UPDI_DEBUG, "Info Block read file crc24 mismatch %06x(%06x)", fw_crc, crc);
@@ -4063,7 +4045,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
     // <1> Load test parameters from command, this will be higer priority than NVM setting
     _verbar_token_parse_data(cmd, sltest_token_tag, params, SLTEST_MAX_PARAM_NUM,
                              NULL, 0, 0, 0, &lim_elem_count);
-    if (params[SLTEST_SIGLIM_IDX] >= 0)
+    if (lim_elem_count >= NUM_SIGLIM_TYPES)
     {
         lim_count = lim_elem_count / NUM_SIGLIM_TYPES;
         if (lim_count)
@@ -4182,7 +4164,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
                         if ((siglim[i].limit.sighi || siglim[i].limit.siglo) &&
                             (rsd_data.cccap > siglim[i].limit.sighi || rsd_data.cccap < siglim[i].limit.siglo))
                         {
-                            DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) signal(%d) out of range (%d~%d) ", i, channel, rsd_data.cccap, siglim[i].limit.siglo, siglim[i].limit.sighi);
+                            DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) cap(%d) out of Cap range (%d~%d) ", i, channel, rsd_data.reference, rsd_data.cccap, siglim[i].limit.siglo, siglim[i].limit.sighi);
                             result = -7;
                             goto out;
                         }
@@ -4193,7 +4175,7 @@ int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type)
                             if ((siglim[i].limit.range) &&
                                 (val > NODE_BASE_LINE + siglim[i].limit.range || val < NODE_BASE_LINE - siglim[i].limit.range))
                             {
-                                DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) gain(0x%02x), val %d out of variance (%d) ", i, channel, rsd_data.reference, node_gain, val, siglim[i].limit.range);
+                                DBG_INFO(UPDI_ERROR, "Group[%d]: key(%d) ref(%d) cap(%d) gain(0x%02x), val %d out of ref variance (%d) ", i, channel, rsd_data.reference, rsd_data.cccap, node_gain, val, siglim[i].limit.range);
                                 result = -8;
                                 goto out;
                             }

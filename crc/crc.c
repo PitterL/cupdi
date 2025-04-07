@@ -1,4 +1,6 @@
 
+#include "crc.h"
+
 /*
 calculate one byte input value with CRC 8 Bit
     @crc: last crc value
@@ -71,9 +73,8 @@ Calculate buffer with crc24
     @size: data size
     @returns calculated crc value, only bit[0~23] is valid
 */
-unsigned int calc_crc24(const unsigned char *base, int size)
+unsigned int calc_crc24(const unsigned char *base, int size, uint32_t crc)
 {
-    unsigned int crc = 0;
     const unsigned char *ptr = base;
     const unsigned char *last_val = base + size - 1;
 
@@ -88,6 +89,26 @@ unsigned int calc_crc24(const unsigned char *base, int size)
 
     /* Mask to 24-bit */
     crc &= 0x00FFFFFF;
+
+    return crc;
+}
+
+// CRC-16-CCITT 算法实现
+uint16_t crc16_ccitt(const uint8_t *data, size_t length, uint16_t crc) {
+    uint16_t polynomial = 0x1021; // 多项式 x^16 + x^12 + x^5 + 1
+
+    for (size_t i = 0; i < length; i++) {
+        crc ^= (uint16_t)data[i] << 8; // 将当前字节与 CRC 的高字节异或
+
+        for (uint8_t bit = 0; bit < 8; bit++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ polynomial; // 如果最高位为 1，左移并与多项式异或
+            }
+            else {
+                crc <<= 1; // 否则直接左移
+            }
+        }
+    }
 
     return crc;
 }

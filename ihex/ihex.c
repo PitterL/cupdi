@@ -107,7 +107,7 @@ segment_buffer_t *_set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t 
         seg = &dhex->segments[i];
         //the segment exist, expand the address
         if (VALID_SEG(seg) && seg->sid == segmentid) {
-            if (addr >= seg->addr_from && addr <= seg->addr_to && addr + len < MAX_DATA_IN_ONE_SEGMENT) {   //in buffer, or continous at tail coul call realloc
+            if (addr >= seg->addr_from && addr <= seg->addr_to && addr + len <= MAX_DATA_IN_ONE_SEGMENT) {   //in buffer, or continous at tail coul call realloc
                 addr_to = addr + len;
                 addr_to = max(addr_to, seg->addr_to);
                 size = addr_to - seg->addr_from;
@@ -274,9 +274,9 @@ segment_buffer_t *set_segment_data_by_id_addr(hex_data_t *dhex, ihex_segment_t s
         st = 0;
         data += size;
         if (sflag & SEG_EX_SEGMENT_ADDRESS) {
-		    sid += (MAX_DATA_IN_ONE_SEGMENT >> 4);
+		    sid += NEXT_SEGMENT_ID;
         } else/* if (sflag & SEG_EX_LINEAR_ADDRESS) */{
-            sid++;
+            sid += NEXT_LINEAR_ID;
         }
     } while (len);
 

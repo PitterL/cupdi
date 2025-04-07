@@ -116,8 +116,10 @@ typedef bool ihex_bool_t;
 typedef uint_fast8_t ihex_bool_t;
 #endif
 
+typedef uint8_t ihex_data_t;
 typedef uint_least32_t ihex_address_t;
 typedef uint_least16_t ihex_segment_t;
+typedef uint_least16_t inhex_seg_size_t;
 typedef uint_least16_t ihex_seg_type_t;
 typedef uint_least16_t ihex_hex_flag_t;
 typedef uint_least16_t ihex_offset_t;
