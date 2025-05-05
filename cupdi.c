@@ -105,13 +105,17 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. avrda compensation capacitance with 32pf base line
         <v> 1. default print Sermum
             2. `dbgview` support keys=0 which means note show keys information
-        <2> 1. `crc` command of setting CRC-16-CCITT at the end page of the data page
+        <w> 1. `crc` command of setting CRC-16-CCITT at the end page of the data page
             2. fix the multi segment id for large flash content 
             3. adjust the chip info content order of `reg` and `crcinfo`
             4. print `devid, sernum, osc` in sigrow
+        <x> 1. support `avrdu` device
+            2. support `-s` paramenter to assign infoblock packing type
+            3. change eeprom page size to larger
+
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19w"
+#define SOFTWARE_VERSION "A.19x"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -121,6 +125,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #define VAR_FILE_RELATIVE_POS_3 "mpt3\\board.h"
 #define VAR_FILE_RELATIVE_POS_MPLAB "..\\..\\mpt\\board.h"
 #define VAR_FILE_RELATIVE_POS_MPLAB_2 "..\\..\\..\\mpt3\\board.h"
+#define VAR_FILE_RELATIVE_POS_MPLAB_3 "..\\..\\app\\pack.h"
 
 #define BOARD_FILES                  \
     {                                \
@@ -131,6 +136,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
         VAR_FILE_RELATIVE_POS_3,     \
         VAR_FILE_RELATIVE_POS_MPLAB, \
         VAR_FILE_RELATIVE_POS_MPLAB_2, \
+        VAR_FILE_RELATIVE_POS_MPLAB_3, \
     }
 
 #define VAR_FILE_ORDER_IN_LOCAL_DIRECTORY 0
@@ -214,6 +220,7 @@ int main(int argc, const char *argv[])
     // int pad = 0xFF;
     // int gap = 0;
     int pack = 0;
+    int ibver = 0;
 
     const device_info_t *dev = NULL;
     void *nvm_ptr = NULL;
@@ -247,6 +254,7 @@ int main(int argc, const char *argv[])
         OPT_STRING('-', "memtest", &memtest, "test memory with give value [addr_hex]:[len_auto]=[test_32bit_hex]|<next token>...  if len_auto is ZERO indicated the whole SRAM space; if no test_32bit specified, we will use a rand value for test"),
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
+        OPT_INTEGER('s', "", &ibver, "Pack information block version, [default 0]: version s3"),
         OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
         OPT_BOOLEAN('-', "reset", &reset, "UPDI reset device"),
         OPT_BOOLEAN('-', "halt", &halt, "UPDI halt device"),
@@ -328,7 +336,7 @@ int main(int argc, const char *argv[])
                 TEST_BIT(pack, PACK_BUILD_CFG_VER) ||
                 TEST_BIT(pack, PACK_REBUILD))
             {
-                result = dev_pack_to_vcs_hex_file(dev, file, pack, ipe_format);
+                result = dev_pack_to_vcs_hex_file(dev, file, pack, ibver, ipe_format);
                 if (result)
                 {
                     DBG_INFO(UPDI_DEBUG, "Device pack hex file '%s' failed %d", file, result);
@@ -654,7 +662,11 @@ ihex_segment_t _block_segment_id(nvm_info_t *block, int flag)
 
     if (flag & SEG_EX_SEGMENT_ADDRESS)
     {
-        address = block->nvm_mapped_start ? block->nvm_mapped_start : block->nvm_start;
+        if (/* block->nvm_size == block->nvm_blocksize && */block->nvm_mapped_start) {
+            address = block->nvm_mapped_start;
+        } else {
+            address = block->nvm_start;
+        }
         sid = ADDR_TO_EX_SEGMENT_ID(address);
     }
     else if (flag & SEG_EX_LINEAR_ADDRESS)
@@ -1114,7 +1126,7 @@ int32_t dev_hex_align_flash_crc(const device_info_t *dev, uint8_t pad_value, hex
 
         if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
             last_seg = seg;
-            crc = crc16_ccitt(seg->data, seg->len, crc);
+            crc = calc_crc16(seg->data, seg->len, crc);
             total_size += seg->len;
         }
     }
@@ -1145,7 +1157,7 @@ int32_t dev_hex_align_flash_crc(const device_info_t *dev, uint8_t pad_value, hex
         buf = last_seg->data + last_seg->len;
         size = size_rsv - 2;
         memset(buf, pad_value, size);
-        crc = crc16_ccitt(buf, size, crc);
+        crc = calc_crc16(buf, size, crc);
         buf[size] = (crc >> 8) & 0xFF;
         buf[size + 1] = crc & 0xFF;
 
@@ -1190,7 +1202,7 @@ int _get_ext_info_from_hex_info(nvm_info_t *block, int offset, hex_data_t *dhex,
         if (size >= sizeof(*head))
         {
             head = (ext_header_t *)(seg->data + off);
-            result = ext_info_set_data_ptr(output, (char *)head, size, BIT_MASK(MEM_SHARE) | BIT_MASK(btype));
+            result = ext_info_set_data_ptr(output, (char *)head, size, BIT_MASK(MEM_SHARE) | BIT_MASK(MAJOR(btype)));
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "Info Block matching failed, failed %d", result);
@@ -1206,7 +1218,7 @@ int _get_ext_info_from_hex_info(nvm_info_t *block, int offset, hex_data_t *dhex,
     }
     else
     {
-        DBG_INFO(OTHER_ERROR, "Block segmentid 0x%x not found", sid);
+        DBG_INFO(OTHER_DEBUG, "Block %d segmentid 0x%x not found", btype, sid);
         result = -6;
     }
 
@@ -1312,7 +1324,7 @@ int get_ext_info_from_storage(void *nvm_ptr, void *contnr, B_BLOCK_TYPE btype)
 
     if (!VALID_HEADER(header.data))
     {
-        DBG_INFO(UPDI_ERROR, "Ext header(%hhd %hhd) is invalid in NVM-%d",
+        DBG_INFO(UPDI_ERROR, "Ext header Ver(%hhu %hhu) is invalid in NVM-%d",
                  _VER(header.data, 0), _VER(header.data, 1),
                  nvm_type);
         return -5;
@@ -1339,7 +1351,7 @@ int get_ext_info_from_storage(void *nvm_ptr, void *contnr, B_BLOCK_TYPE btype)
         return -8;
     }
 
-    result = ext_info_set_data_ptr(contnr, buf, len, BIT_MASK(MEM_SHARE_RELEASE) | BIT_MASK(btype));
+    result = ext_info_set_data_ptr(contnr, buf, len, BIT_MASK(MEM_SHARE_RELEASE) | BIT_MASK(MAJOR(btype)));
     if (result)
     {
         DBG_INFO(UPDI_ERROR, "Ext Block(nvm-%d) set data ptr failed %d", nvm_type, result);
@@ -1405,7 +1417,7 @@ int load_version_value_from_file(const char *file, int *ver)
     result = search_defined_value_int_from_file(file, "PROJECT_CODE", &version, HEX_FORMAT);
     if (result != 1)
     {
-        DBG_INFO(OTHER_ERROR, "search_defined_value_int_from_file fw version failed %d", result);
+        DBG_INFO(OTHER_ERROR, "search_defined_value_int_from_file [PROJECT_CODE] not found %d: %s", result, file);
         return -2;
     }
 
@@ -1958,7 +1970,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     result = get_ext_info_from_storage(nvm_ptr, &info_container, BLOCK_INFO);
     if (result)
     {
-        DBG_INFO(UPDI_DEBUG, "get_ext_info_from_storage failed", result);
+        DBG_INFO(UPDI_DEBUG, "get_ext_info_from_storage [BLOCK_INFO] failed %d", result);
         return -2;
     }
 
@@ -2196,9 +2208,10 @@ out:
     @file: vcs file name
     @dhex: hex data structure
     @pack: pack type
+    @ibver: the infoblcok version to pack
     return flash segment if sucessful, else NULL
 */
-segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const char *file, hex_data_t *dhex, int pack)
+segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const char *file, hex_data_t *dhex, int pack, int ibver)
 {
     ihex_segment_t sids[MAX_SEGMENT_COUNT_IN_RECORDS];
     segment_buffer_t *seg = NULL;
@@ -2327,7 +2340,7 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     info_params.fw_size = size;
 
     // Build Info block
-    result = ext_create_data_block(&info_container, &info_params, sizeof(info_params), BLOCK_INFO);
+    result = ext_create_data_block(&info_container, &info_params, sizeof(info_params), GP_BLOCK_TYPE(BLOCK_INFO, ibver));
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "ib_create_information_block failed %d", result);
@@ -2431,7 +2444,7 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, int3
         }
         else if (result < 0 || (u32)result > iblock_fuse.nvm_size)
         {
-            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
+            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file [FUSES_CONTENT] not found %d: %s", result, version_files[i]);
             result = -5;
         }
         else
@@ -2444,7 +2457,7 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, int3
 
     if (result < 0 || (u32)result > iblock_fuse.nvm_size)
     {
-        DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
+        DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file [FUSES_CONTENT] failed %d", result);
         result = -6;
         goto out;
     }
@@ -2586,7 +2599,7 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
         }
         else if (result < 0 || (u32)result > iblock.nvm_size)
         {
-            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
+            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file [SELFTEST_CONTENT] failed %d: %s", result, version_files[i]);
             result = -5;
         }
         else
@@ -2598,7 +2611,7 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
 
     if (result < 0 || (u32)result > iblock.nvm_size)
     {
-        DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file failed %d", result);
+        DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file [SELFTEST_CONTENT] failed %d", result);
         result = -6;
         goto out;
     }
@@ -2666,10 +2679,11 @@ out:
     @dev: device info structure, get by get_chip_info()
     @file: raw Hex file path for input
     @pack: pack type
+    @ibver: the infoblcok version to pack
     @ipe_format: using mplab ipe format hex file
     @returns 0 - success, other value failed code
 */
-int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pack, bool ipe_format)
+int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pack, int ibver, bool ipe_format)
 {
     hex_data_t dhex_info;
     segment_buffer_t *seg;
@@ -2704,7 +2718,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
         result = load_fuse_content_from_file(dev, file, result, &dhex_info);
         if (result)
         {
-            DBG_INFO(UPDI_ERROR, "load_fuse_content_from_file(error=%d), skipped", result);
+            DBG_INFO(OTHER_ERROR, "No Fuse content detected");
             // result = -4;
             // goto out;
         }
@@ -2720,7 +2734,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
             }
         }
 
-        seg = load_version_segment_from_file(dev, file, &dhex_info, pack);
+        seg = load_version_segment_from_file(dev, file, &dhex_info, pack, ibver);
         if (!seg)
         {
             DBG_INFO(UPDI_ERROR, "No Version Content detected");
@@ -2817,7 +2831,7 @@ int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file, bool 
         if (in_array(sids, num_sids, sizeof(sids[0]), seg->sid)) {
             crc = calc_crc24(seg->data, seg->len, crc);
             if (check_ccitt) {
-                crc_ccitt = crc16_ccitt(seg->data, seg->len, crc_ccitt);
+                crc_ccitt = calc_crc16(seg->data, seg->len, crc_ccitt);
                 last_seg = seg;
             }
             size += seg->len;
@@ -3528,7 +3542,7 @@ static int _get_var_addr_data(void *nvm_ptr, varible_address_t *va)
     result = get_ext_info_from_storage(nvm_ptr, &info_container, BLOCK_INFO);
     if (result)
     {
-        DBG_INFO(UPDI_DEBUG, "get_ext_info_from_storage failed", result);
+        DBG_INFO(UPDI_DEBUG, "get_ext_info_from_storage [BLOCK_INFO] failed %d", result);
         result = -2;
         goto out;
     }
@@ -3604,7 +3618,7 @@ int get_storage_type(B_BLOCK_TYPE btype)
 {
     int nvm_type = NUM_NVM_TYPES;
 
-    if (btype == BLOCK_INFO)
+    if (MAJOR(btype) == BLOCK_INFO)
     {
         if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
         {
@@ -3615,7 +3629,7 @@ int get_storage_type(B_BLOCK_TYPE btype)
             nvm_type = NVM_USERROW;
         }
     }
-    else if (btype == BLOCK_CFG)
+    else if (MAJOR(btype) == BLOCK_CFG)
     {
         if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
         {
@@ -3638,7 +3652,7 @@ int get_storage_offset(B_BLOCK_TYPE btype)
 {
     int id = STORAGE_USERROW_OFFSET;
 
-    if (btype == BLOCK_INFO)
+    if (MAJOR(btype) == BLOCK_INFO)
     {
         if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
         {
@@ -3649,7 +3663,7 @@ int get_storage_offset(B_BLOCK_TYPE btype)
             id = STORAGE_USERROW_OFFSET;
         }
     }
-    else if (btype == BLOCK_CFG)
+    else if (MAJOR(btype) == BLOCK_CFG)
     {
         if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
         {

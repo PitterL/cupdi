@@ -231,7 +231,7 @@ void ib_show_element_s3(information_header_t *head)
         ib_get_element_s3(head, IB_CRC_INFO));
 }
 
-int ib_create_information_block_s3(information_container_t *info, information_content_params_t *param, int len)
+int ib_create_information_block_s3(information_container_t *info, information_content_params_t *param)
 {
     information_block_s3_t *ib;
     unsigned short size;
@@ -251,7 +251,7 @@ int ib_create_information_block_s3(information_container_t *info, information_co
     ib->header.data.size = size;
 
     ib->fw_version.value = param->fw_version;
-    ib->fw_size.value = param->fw_size;//len;
+    ib->fw_size.value = param->fw_size;
     memcpy(&ib->var_addr, &param->var_addr, sizeof(ib->var_addr));
 
     ib->conf.value = param->config.value;

@@ -137,7 +137,7 @@ typedef struct {
     config_information_t config;
 }information_content_params_t;
 
-int ib_create_information_block(information_container_t *info, information_content_params_t *param, int len);
+int ib_create_information_block(information_container_t *info, information_content_params_t *param, int len, unsigned char ver);
 int ib_set_information_block_data_ptr(information_container_t *info, char *data, int len, unsigned short flag);
 void ib_destory(information_container_t *info);
 int ib_max_block_size(void);

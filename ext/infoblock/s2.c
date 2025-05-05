@@ -175,13 +175,13 @@ void ib_show_element_s2(information_header_t *head)
 	DBG_INFO(UPDI_INFO, "==========================");
 }
 
-int ib_create_information_block_s2(information_container_t *info, int fw_crc24, int fw_size, int fw_version, int dsdr_addr)
+int ib_create_information_block_s2(information_container_t *info, information_content_params_t *param)
 {
     // information_container_t *info = (information_container_t *)info_ptr;
     information_block_s2_t *ib;
     unsigned short size;
 
-    if (!info)
+    if (!info || !param)
         return -2;
 
     size = (unsigned short)sizeof(information_block_s2_t);
@@ -194,12 +194,12 @@ int ib_create_information_block_s2(information_container_t *info, int fw_crc24, 
     ib->header.data.version.value = INFO_BLOCK_S2_VERSION;
     ib->header.data.size = size;
 
-    ib->fw_version.value = fw_version;
-    ib->fw_size.value = fw_size;//len;
+    ib->fw_version.value = param->fw_version;
+    ib->fw_size.value = param->fw_size;
 
-    ib->dsdr.value = dsdr_addr;
+    ib->dsdr.value = param->var_addr.dsdr.value;
 
-    ib->crc.data.fw = fw_crc24;//calc_crc24(data, len, CRC_CRC24_INIT);
+    ib->crc.data.fw = param->fw_crc24;//calc_crc24(data, len, CRC_CRC24_INIT);
     ib->crc.data.info = calc_crc8((unsigned char *)ib, sizeof(*ib) - 1);
 
     info->head = (information_header_t *)ib;

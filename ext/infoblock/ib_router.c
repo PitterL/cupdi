@@ -2,7 +2,7 @@
 #include <crc/crc.h>
 #include "ib.h"
 
-int ib_create_information_block(information_container_t *info, information_content_params_t *param, int len)
+int ib_create_information_block(information_container_t *info, information_content_params_t *param, int len, unsigned char ver)
 {
     if (!info || !param)
         return -2;
@@ -11,7 +11,17 @@ int ib_create_information_block(information_container_t *info, information_conte
         return -3;
     }
 
-    return ib_create_information_block_s3(info, param, len);
+    switch (ver) {
+        case 1:
+            return ib_create_information_block_s1(info, param);
+            break;
+        case 2:
+            return ib_create_information_block_s2(info, param);
+            break;
+        case 3:
+        default:
+            return ib_create_information_block_s3(info, param);
+    }
 }
 
 int ib_set_information_block_data_ptr(information_container_t *info, char *data, int len, unsigned short flag)

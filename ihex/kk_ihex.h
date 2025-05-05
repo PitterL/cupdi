@@ -119,11 +119,11 @@ typedef uint_fast8_t ihex_bool_t;
 typedef uint8_t ihex_data_t;
 typedef uint_least32_t ihex_address_t;
 typedef uint_least16_t ihex_segment_t;
-typedef uint_least16_t inhex_seg_size_t;
+typedef uint_least32_t inhex_seg_size_t;
 typedef uint_least16_t ihex_seg_type_t;
 typedef uint_least16_t ihex_hex_flag_t;
 typedef uint_least16_t ihex_offset_t;
-typedef int ihex_count_t;
+typedef uint_least32_t ihex_count_t;
 
 #ifndef IHEX_SEGMENT_VALUE_MAX
 #define IHEX_SEGMENT_VALUE_MAX (uint_least16_t)(-1)

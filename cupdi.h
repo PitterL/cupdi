@@ -22,7 +22,7 @@ int updi_storage(void *nvm_ptr, char *cmd);
 int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type);
 int updi_selftest(void *nvm_ptr, char *cmd, u8 dev_type);
 
-int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file, int pack, bool ipe_format);
+int dev_pack_to_vcs_hex_file(const device_info_t * dev, const char *file, int pack, int ibver, bool ipe_format);
 int dev_vcs_hex_file_show_info(const device_info_t * dev, const char *file, bool check_ccitt);
 
 #endif

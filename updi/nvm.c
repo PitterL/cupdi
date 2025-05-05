@@ -465,8 +465,9 @@ int nvm_write_flash(void *nvm_ptr, u32 address, const u8 *data, int len, bool er
     for (i = 0, off = 0; i < pages; i++)
     {
         size = len - off;
-        if (size > page_size)
+        if (size > page_size) {
             size = page_size;
+        }
 
         block_start = address + off - info.nvm_mapped_start;
         bid = block_start / block_size;
@@ -845,7 +846,7 @@ int nvm_read_mem(void *nvm_ptr, u32 address, u8 *data, int len)
         DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
     }
 
-    DBG_INFO(NVM_DEBUG, "Reading Memory %d(0x%x) bytes at address 0x%x", len, len, address);
+    DBG_INFO(NVM_DEBUG, "Reading Memory %d(%02X) bytes at 0x%04X", len, len, address);
 
     result = app_read_data_bytes(APP(nvm), address, data, len);
     if (result)
@@ -1166,7 +1167,7 @@ int nvm_erase_flash_page(void *nvm_ptr, u32 address, int count)
     result = app_erase_flash_page(APP(nvm), bid, address, count);
     if (result)
     {
-        DBG_INFO(NVM_DEBUG, "app_write_flash failed %d", result);
+        DBG_INFO(NVM_DEBUG, "nvm_erase_flash_page failed %d", result);
         return -5;
     }
 

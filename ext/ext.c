@@ -5,10 +5,11 @@
 int ext_create_data_block(void *contnr, void *data, int len, B_BLOCK_TYPE btype)
 {
     int result = -2;
+    unsigned char ver = MINOR(btype);
 
-    if (btype == BLOCK_INFO) {
-        result = ib_create_information_block(contnr, data, len);
-    } else if (btype == BLOCK_CFG) {
+    if (MAJOR(btype) == BLOCK_INFO) {
+        result = ib_create_information_block(contnr, data, len, ver);
+    } else if (MAJOR(btype) == BLOCK_CFG) {
         result = cb_create_configure_block(contnr, data, len);
     } else {
         /* Not support */
@@ -54,9 +55,9 @@ int ext_info_max_size(B_BLOCK_TYPE btype)
 {
     int result = 0;
 
-    if (btype == BLOCK_INFO) {
+    if (MAJOR(btype) == BLOCK_INFO) {
         result = ib_max_block_size();
-    } else if (btype == BLOCK_CFG) {
+    } else if (MAJOR(btype) == BLOCK_CFG) {
         result = cb_max_block_size();
     } else {
         /* Not support */
@@ -70,9 +71,9 @@ bool ext_is(void *contnr, B_BLOCK_TYPE btype)
     container_header_t *head = contnr;
     bool result = false;
 
-    if (btype == BLOCK_INFO) {
+    if (MAJOR(btype) == BLOCK_INFO) {
         result = ib_is_container(head);
-    } else if (btype == BLOCK_CFG) {
+    } else if (MAJOR(btype) == BLOCK_CFG) {
         result = cb_is_container(head);
     } else {
         /* Not support */

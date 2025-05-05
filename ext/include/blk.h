@@ -45,7 +45,12 @@ typedef enum {MEM_ALLOC, MEM_SHARE, MEM_SHARE_RELEASE, TYPES_MEM_OPS} B_MEM_TYPE
     BLOCK_INFO: it's information block
     BLOCK_CFG: it's config block
 */
-typedef enum {BLOCK_INFO = TYPES_MEM_OPS, BLOCK_CFG, TYPES_BLOCKS} B_BLOCK_TYPE;
+enum {BLOCK_INFO = TYPES_MEM_OPS, BLOCK_CFG, TYPES_BLOCKS};
+typedef uint8_t B_BLOCK_TYPE;
+
+#define MAJOR(_t) ((_t) & 0xF)
+#define MINOR(_t) (((_t) >> 4) & 0xF)
+#define GP_BLOCK_TYPE(_ma, _mi) (((_mi) << 4)| (_ma))
 
 #include "vardef.h"
 

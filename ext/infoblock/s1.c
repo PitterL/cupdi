@@ -118,11 +118,28 @@ uint32_t ib_get_element_s1(information_header_t *head, int type)
 void ib_show_element_s1(information_header_t *head)
 {
     information_block_s1_t *ib = (information_block_s1_t *)head;
+    char n, n0, n1, n2;
     
     if (!head || head->data.version.value != INFO_BLOCK_S1_VERSION)
         return;
 
+	DBG_INFO(UPDI_INFO, "");
+	DBG_INFO(UPDI_INFO, "==========================");
+
     DBG(UPDI_INFO, "Information Block Content(s1):", (u8 *)ib, sizeof(*ib), "%02X ");
+
+	n = (char)ib_get_element_s1(head, IB_FW_VER_NAME_N0);
+	n0 = n >= ' ' && n <= '~' ? n : ' ';
+	n = (char)ib_get_element_s1(head, IB_FW_VER_NAME_N1);
+	n1 = n >= ' ' && n <= '~' ? n : ' ';
+	n2 = (char)ib_get_element_s1(head, IB_FW_VER_NAME_N2);
+	
+    DBG_INFO(UPDI_INFO, "fw_version: <%c%c%02hhX> %hhX.%hhX",
+        n0,
+        n1,
+        n2,
+        (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MAJOR) & 0xF,
+        (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MINOR) & 0xF);
 
     DBG_INFO(UPDI_INFO, "fw_version: %c%c%c %hhx.%hhx",
         (char)ib_get_element_s1(head, IB_FW_VER_NAME_N0),
@@ -139,7 +156,7 @@ void ib_show_element_s1(information_header_t *head)
         ib_get_element_s1(head, IB_CRC_FW));
 }
 
-int ib_create_information_block_s1(information_container_t *info, int fw_crc24, int fw_size, int fw_version)
+int ib_create_information_block_s1(information_container_t *info, information_content_params_t *param)
 {
     //information_container_t *info = (information_container_t *)info_ptr;
     information_block_s1_t *ib;
@@ -158,10 +175,10 @@ int ib_create_information_block_s1(information_container_t *info, int fw_crc24, 
     ib->header.data.version.value = INFO_BLOCK_S1_VERSION;
     ib->header.data.size = size;
 
-    ib->fw_version.value = fw_version;
-    ib->fw_size.value = fw_size;//len;
+    ib->fw_version.value = param->fw_version;
+    ib->fw_size.value = param->fw_size;
 
-    ib->crc.data.fw = fw_crc24;//calc_crc24(data, len, CRC_CRC24_INIT);
+    ib->crc.data.fw = param->fw_crc24;//calc_crc24(data, len, CRC_CRC24_INIT);
     ib->crc.data.info = calc_crc8((unsigned char *)ib, sizeof(*ib) - 1);
 
     info->head = (information_header_t *)ib;

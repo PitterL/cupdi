@@ -94,7 +94,7 @@ unsigned int calc_crc24(const unsigned char *base, int size, uint32_t crc)
 }
 
 // CRC-16-CCITT 算法实现
-uint16_t crc16_ccitt(const uint8_t *data, size_t length, uint16_t crc) {
+uint16_t calc_crc16(const uint8_t *data, size_t length, uint16_t crc) {
     uint16_t polynomial = 0x1021; // 多项式 x^16 + x^12 + x^5 + 1
 
     for (size_t i = 0; i < length; i++) {

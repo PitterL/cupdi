@@ -22,10 +22,11 @@ typedef struct {
     /* crc page size */
     unsigned short page_size;
 
-    /* append of bootend in fuse offset */
-    unsigned char bootend;
     /* append of append in fuse offset */
     unsigned char append;
+
+    /* append of bootend in fuse offset */
+    unsigned char bootend;
 } crc_src_t;
 
 typedef enum {
@@ -68,6 +69,7 @@ typedef enum _NVM_TYPE
     MEM_SRAM,
     NUM_NVM_TYPES
 } NVM_TYPE_T;
+
 typedef enum _NVM_TYPE_EX
 {
     NVM_LOCKBITS = NUM_NVM_TYPES,

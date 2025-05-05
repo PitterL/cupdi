@@ -28,9 +28,30 @@ limitations under the License.
     @dev: point chip dev object
 */
 typedef enum { 
-    APP_VERSION_V0,     // 16 bit address
-    APP_VERSION_V1  // 24bit address
+    /* Attiny */
+    NVM_VERSION_V0,     // 16 bit address
+
+    /* AVRDA */
+    NVM_VERSION_V1,      // 24bit address
+
+    /* AVRDU */
+    NVM_VERSION_V2,
+
+    NUM_NVM_VERS
 } APP_VERSION_T;
+
+enum { NVM_CTRLA, NVM_CTRLB, NVM_CTRLC, NVM_STATUS, NVM_INTCTRL, NVM_INTFLAGS, NVM_DATA, NVM_ADDR, NUM_NVM_REGS };
+
+u8 nvm_reg_offs[NUM_NVM_VERS][NUM_NVM_REGS] = {
+    // NVM_VERSION_V0
+    { NVMV0_CTRL_CTRLA, NVMV0_CTRL_CTRLB, NVMV0_CTRL_CTRLC, NVMV0_CTRL_STATUS, NVMV0_CTRL_INTCTRL, NVMV0_CTRL_INTFLAGS, NVMV0_CTRL_DATAL, NVMV0_CTRL_ADDRL },
+    // NVM_VERSION_V1
+    { NVMV0_CTRL_CTRLA, NVMV0_CTRL_CTRLB, NVMV0_CTRL_CTRLC, NVMV0_CTRL_STATUS, NVMV0_CTRL_INTCTRL, NVMV0_CTRL_INTFLAGS, NVMV0_CTRL_DATAL, NVMV0_CTRL_ADDRL },
+    // NVM_VERSION_V2
+    { NVMV2_CTRL_CTRLA, NVMV2_CTRL_CTRLB, NVMV2_CTRL_CTRLC, NVMV2_CTRL_STATUS, NVMV2_CTRL_INTCTRL, NVMV2_CTRL_INTFLAGS, NVMV2_CTRL_DATAL, NVMV2_CTRL_ADDRL }
+};
+
+#define NVM_REG_OFF(_app, _r) ((NVM_VER(_app) < NUM_NVM_VERS) ? ((_r) < NUM_NVM_REGS) ? nvm_reg_offs[NVM_VER(_app)][_r]: INVALID_CTRLREG: INVALID_CTRLREG)
 
 typedef struct _upd_application {
 #define UPD_APPLICATION_MAGIC_WORD 0xB4B4 //'uapp'
@@ -38,10 +59,13 @@ typedef struct _upd_application {
     void *link;
 	APP_VERSION_T version;
     const device_info_t *dev;
-}upd_application_t;
+} upd_application_t;
 
-#define APP_V0(_app) ((_app)->version == APP_VERSION_V0)
-#define APP_V1(_app) ((_app)->version == APP_VERSION_V1)
+#define NVM_VER(_app) ((_app)->version)
+#define NVM_V0(_app) (NVM_VER(_app) == NVM_VERSION_V0)
+#define NVM_V1(_app) (NVM_VER(_app) == NVM_VERSION_V1)
+#define NVM_V1_V2(_app) (NVM_VER(_app) >= NVM_VERSION_V1)
+#define NVM_24BIT_ADDR(_app) (NVM_V1_V2(_app))
 
 /*
     Macro definition of APP level
@@ -84,7 +108,7 @@ void *updi_application_init(const char *port, int baud, int guard, int breaks, c
 		memset(app, 0, size);
 		app->mgwd = UPD_APPLICATION_MAGIC_WORD;
 		app->link = (void *)link;
-		app->version = APP_VERSION_V0;
+		app->version = NVM_VERSION_V0;  // Default
 		app->dev = (const device_info_t *)dev;
     }
 
@@ -163,8 +187,16 @@ int app_device_info(void *app_ptr, DEV_TYPE_T type)
 	if (!strncmp(sib + 8, "P:2", 3)) {
 		// 24bit link address
 		DBG_INFO(APP_INFO, "[NVM Version P2, Using 24bit address mode]");
-		app->version = APP_VERSION_V1;
-	}
+		app->version = NVM_VERSION_V1;
+	} else if (!strncmp(sib + 8, "P:4", 3)) {
+        // 24bit link address
+        DBG_INFO(APP_INFO, "[NVM Version P4, Using 24bit address mode]");
+        app->version = NVM_VERSION_V2;
+    } else {
+        DBG_INFO(APP_INFO, "[NVM Version Unknown]");
+        // app->version = NVM_VERSION_V0;
+    }
+
     DBG(APP_INFO, "[OCD revision]", sib + 11, 3, "%c");
     DBG_INFO(APP_INFO, "[PDI OSC] is %cMHz", sib[15]);
 
@@ -561,21 +593,21 @@ int app_wait_flash_ready(void *app_ptr, int timeout)
     DBG_INFO(APP_DEBUG, "<APP> Wait flash ready");
 
     do {
-        result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_STATUS, &status, APP_V1(app));
+        result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_STATUS), &status, NVM_24BIT_ADDR(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "Wait flash ready _link_ld() failed(%d)", result);
             result = -2;
             break;
         }
         else {
-            if (APP_V0(app)) {
+            if (NVM_V0(app)) {
                 // V0
                 if (status & (1 << UPDI_NVM_V0_STATUS_WRITE_ERROR)) {
                     DBG_INFO(APP_DEBUG, "Waiting for flash ready Write Error, status = 0x%x", status);
                     result = -3;
                     break;
                 }
-            } else if (APP_V1(app)) {
+            } else if (NVM_V1_V2(app)) {
                 if (status & (UPDI_NVM_V1_STATUS_WRITE_ERROR_MASK << UPDI_NVM_V1_STATUS_WRITE_ERROR_SHIFT)) {
                     DBG_INFO(APP_DEBUG, "Waiting for flash ready Write Error, status = 0x%x", status);
                     result = -4;
@@ -622,9 +654,9 @@ int app_execute_nvm_command(void *app_ptr, u8 command)
     DBG_INFO(APP_DEBUG, "<APP> NVMCMD %d executing", command);
 
     /*
-    if (APP_V1(app)) {
+    if (NVM_V1_V2(app)) {
         if (command != UPDI_V1_NVMCTRL_CTRLA_NOCMD) {
-            val = link_ld(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLA, false);
+            val = link_ld(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_CTRLA), false);
             if (val) {
                 DBG_INFO(APP_DEBUG, "<APP> NVMCMD %d executing but collision (0x%x)", command, val);
             }
@@ -632,7 +664,7 @@ int app_execute_nvm_command(void *app_ptr, u8 command)
     }
     */
 
-    return link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLA, command, APP_V1(app));
+    return link_st(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_CTRLA), command, NVM_24BIT_ADDR(app));
 }
 
 /*
@@ -659,7 +691,7 @@ int app_set_nvm_flashmap(void *app_ptr, u8 blockid)
         return -2;
     }
 
-    result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLB, &val, APP_V1(app));
+    result = _link_ld(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_CTRLB), &val, NVM_24BIT_ADDR(app));
     if (result) {
         DBG_INFO(APP_DEBUG, "Read NVM ctrl B _link_ld() failed(%d)", result);
         result = -3;
@@ -672,7 +704,7 @@ int app_set_nvm_flashmap(void *app_ptr, u8 blockid)
             val_set = val & ~(UPDI_V1_NVMCTRL_CTRLB_FLMAP_MASK << UPDI_V1_NVMCTRL_CTRLB_FLMAP_SHIFT);
             val_set |= blockid << UPDI_V1_NVMCTRL_CTRLB_FLMAP_SHIFT;
             if (val != val_set) {
-                result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_CTRLB, val_set, true);
+                result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_CTRLB), val_set, true);
                 if (result) {
                     DBG_INFO(APP_DEBUG, "Set NVM ctrl B from 0x%x to 0x%x, link_st() failed(%d)", val, val_set, result);
                     result = -5;
@@ -713,7 +745,7 @@ int app_chip_erase(void *app_ptr)
     }
 
     //Erase
-	if (APP_V1(app)) {
+	if (NVM_V1_V2(app)) {
 		command = UPDI_V1_NVMCTRL_CTRLA_CHIP_ERASE;
 	}
 	else {
@@ -726,7 +758,7 @@ int app_chip_erase(void *app_ptr)
         return -3;
     }
 
-    if (APP_V1(app)) {
+    if (NVM_V1_V2(app)) {
         result = app_execute_nvm_command(app, UPDI_V1_NVMCTRL_CTRLA_NOCMD);
         if (result) {
             DBG_INFO(APP_DEBUG, "app_execute_nvm_command clear failed %d", result);
@@ -767,7 +799,7 @@ int _app_read_data_words(void *app_ptr, u32 address, u8 *data, int len)
 
     // Special-case of 1 word
     if (len == 2) {
-        result = _link_ld16(LINK(app), address, (u16 *)data, APP_V1(app));
+        result = _link_ld16(LINK(app), address, (u16 *)data, NVM_24BIT_ADDR(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "_link_ld16 failed %d", result);
             return -2;
@@ -783,7 +815,7 @@ int _app_read_data_words(void *app_ptr, u32 address, u8 *data, int len)
     }
 
     // Store the address
-    result = link_st_ptr(LINK(app), address, APP_V1(app));
+    result = link_st_ptr(LINK(app), address, NVM_24BIT_ADDR(app));
     if (result) {
         DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -4;
@@ -867,7 +899,7 @@ int _app_read_data_bytes(void *app_ptr, u32 address, u8 *data, int len)
 
     // Special-case of 1 byte
     if (len == 1) {
-        result = _link_ld(LINK(app), address, data, APP_V1(app));
+        result = _link_ld(LINK(app), address, data, NVM_24BIT_ADDR(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "_link_ld failed %d", result);
             return -2;
@@ -883,7 +915,7 @@ int _app_read_data_bytes(void *app_ptr, u32 address, u8 *data, int len)
     }
 
     // Store the address
-    result = link_st_ptr(LINK(app), address, APP_V1(app));
+    result = link_st_ptr(LINK(app), address, NVM_24BIT_ADDR(app));
     if (result) {
         DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
         return -4;
@@ -1038,7 +1070,7 @@ int _app_write_data_words(void *app_ptr, u32 address, const u8 *data, int len)
     
     // Special-case of 1 word
     if (len == 2) {
-        result = link_st16(LINK(app), address, data[0] + (data[1] << 8), APP_V1(app));
+        result = link_st16(LINK(app), address, data[0] + (data[1] << 8), NVM_24BIT_ADDR(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -3;
@@ -1053,7 +1085,7 @@ int _app_write_data_words(void *app_ptr, u32 address, const u8 *data, int len)
 		}
 
 		// Store the address
-		result = link_st_ptr(LINK(app), address, APP_V1(app));
+		result = link_st_ptr(LINK(app), address, NVM_24BIT_ADDR(app));
 		if (result) {
 			DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
 			return -4;
@@ -1137,7 +1169,7 @@ int _app_write_data_bytes(void *app_ptr, u32 address, const u8 *data, int len)
 
     // Special-case of 1 byte
     if (len == 1) {
-        result = link_st(LINK(app), address, data[0], APP_V1(app));
+        result = link_st(LINK(app), address, data[0], NVM_24BIT_ADDR(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "link_st16 failed %d", result);
             return -2;
@@ -1152,7 +1184,7 @@ int _app_write_data_bytes(void *app_ptr, u32 address, const u8 *data, int len)
 		}
 
 		// Store the address
-		result = link_st_ptr(LINK(app), address, APP_V1(app));
+		result = link_st_ptr(LINK(app), address, NVM_24BIT_ADDR(app));
 		if (result) {
 			DBG_INFO(APP_DEBUG, "link_st_ptr failed %d", result);
 			return -4;
@@ -1405,7 +1437,7 @@ int app_write_flash(void *app_ptr, u8 blockid, u32 address, const u8 *data, int 
 	if (!VALID_APP(app))
 		return ERROR_PTR;
 
-	if (APP_V1(app)) {
+	if (NVM_V1_V2(app)) {
 		return _app_write_nvm_v1(app_ptr, blockid, address, data, len, UPDI_V1_NVMCTRL_CTRLA_FLASH_WRITE, use_word_access);
 	}
 	else {
@@ -1427,14 +1459,15 @@ int app_write_flash(void *app_ptr, u8 blockid, u32 address, const u8 *data, int 
 int app_erase_write_flash(void *app_ptr, u8 blockid, u32 address, const u8 *data, int len, bool use_word_access)
 {
 	upd_application_t *app = (upd_application_t *)app_ptr;
+    const num_erase_pages = 1;
     int result;
 
 	if (!VALID_APP(app))
 		return ERROR_PTR;
 
-	if (APP_V1(app)) {
+	if (NVM_V1_V2(app)) {
 		// DBG_INFO(APP_DEBUG, "app_erase_write_flash P2 version not support Erase Write Command");
-        result = app_erase_flash_page(app_ptr, blockid, address, 1);
+        result = app_erase_flash_page(app_ptr, blockid, address, num_erase_pages);
         if (result) {
             DBG_INFO(APP_DEBUG, "app_erase_flash_page block(%d) addr 0x%x len %d(%x) failed(%d)", blockid, address, len, len, result);
             return -2;
@@ -1467,7 +1500,7 @@ int app_erase_flash_page(void *app_ptr, u8 blockid, u32 address, int pages)
         return -2;
 
     do {
-        if (APP_V1(app)) {
+        if (NVM_V1_V2(app)) {
             if (pages >= 32) {
                 cmd = UPDI_V1_NVMCTRL_CTRLA_FLASH_PAGE32_EARSE;
             } else if (pages >= 16) {
@@ -1519,7 +1552,7 @@ int app_erase_eeprom(void *app_ptr, u32 address, int size)
 	if (!VALID_APP(app))
 		return ERROR_PTR;
 
-	if (APP_V1(app)) {
+	if (NVM_V1_V2(app)) {
 		for (i = 0; i < size % 32; i += 32) {
 		    result = _app_write_nvm_v1(app_ptr, 0, address, &value, sizeof(value), UPDI_V1_NVMCTRL_CTRLA_EEPROM_BYTE32_ERASE, false);
             if (result) {
@@ -1548,7 +1581,7 @@ int app_erase_write_eeprom(void *app_ptr, u32 address, const u8 *data, int len)
 	if (!VALID_APP(app))
 		return ERROR_PTR;
 
-	if (APP_V1(app)) {
+	if (NVM_V1_V2(app)) {
 		return _app_write_nvm_v1(app_ptr, 0, address, data, len, UPDI_V1_NVMCTRL_CTRLA_EEPROM_ERASE_WRITE, false);
 	}
 	else {
@@ -1571,7 +1604,7 @@ int app_erase_write_userrow(void *app_ptr, u32 address, const u8 *data, int len)
 	if (!VALID_APP(app))
 		return ERROR_PTR;
 
-	if (APP_V1(app)) {
+	if (NVM_V1_V2(app)) {
         return app_erase_write_flash(app_ptr, BLOCK_ID_NA, address, data, len, true);
 	}
 	else {
@@ -1607,19 +1640,19 @@ int _app_write_fuse_v0(void *app_ptr, u32 address, const u8 value)
 		return -2;
 	}
 
-	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_ADDRL, (u8)address, false);
+	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_ADDR), (u8)address, false);
 	if (result) {
 		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse address L %04x failed %d", address, result);
 		return -3;
 	}
 
-	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_ADDRM, (u8)(address >> 8), false);
+	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_ADDR) + 1, (u8)(address >> 8), false);
 	if (result) {
 		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse address M %04x failed %d", (u8)(address >> 8), result);
 		return -4;
 	}
 
-	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + UPDI_NVMCTRL_DATAL, value, false);
+	result = link_st(LINK(app), APP_REG(app, nvmctrl_address) + NVM_REG_OFF(app, NVM_DATA), value, false);
 	if (result) {
 		DBG_INFO(NVM_DEBUG, "app_write_data_bytes fuse data %02x failed %d", value, result);
 		return -5;
@@ -1649,7 +1682,7 @@ int app_write_fuse(void *app_ptr, u32 address, const u8 value)
 	if (!VALID_APP(app))
 		return ERROR_PTR;
 
-	if (APP_V1(app)) {
+	if (NVM_V1_V2(app)) {
 		return _app_write_nvm_v1(app_ptr, 0, address, &value, 1, UPDI_V1_NVMCTRL_CTRLA_EEPROM_ERASE_WRITE, false);
 	}
 	else {
@@ -1674,7 +1707,7 @@ int app_ld_reg(void *app_ptr, u32 address, u8* data, int len)
     int i, result;
 
     for (i = 0; i < len; i++) {
-        result = _link_ld(LINK(app), address + i, data + i, APP_V1(app));
+        result = _link_ld(LINK(app), address + i, data + i, NVM_24BIT_ADDR(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "_link_ld(%x) +%d failed %d", address, i, result);
             return -2;
@@ -1702,7 +1735,7 @@ int app_st_reg(void *app_ptr, u32 address, const u8 *data, int len)
     int i, result;
 
     for (i = 0; i < len; i++) {
-        result = link_st(LINK(app), address + i, data[i], APP_V1(app));
+        result = link_st(LINK(app), address + i, data[i], NVM_24BIT_ADDR(app));
         if (result) {
             DBG_INFO(APP_DEBUG, "link_st(%x) +%d failed %d", address, i, result);
             return -2;
