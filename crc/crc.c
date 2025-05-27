@@ -7,11 +7,11 @@ calculate one byte input value with CRC 8 Bit
     @data: data input
     @returns calculated crc value
 */
-unsigned char crc8(unsigned char crc, unsigned char data)
+uint8_t __crc8(uint8_t crc, uint8_t data)
 {
-    static const unsigned char crcpoly = 0x8C;
-    unsigned char index;
-    unsigned char fb;
+    static const uint8_t crcpoly = 0x8C;
+    uint8_t index;
+    uint8_t fb;
     index = 8;
     
     do
@@ -32,14 +32,15 @@ Calculate buffer with crc8
     @size: data size
     @returns calculated crc value
 */
-unsigned char calc_crc8(const unsigned char *base, int size)
+uint8_t calc_crc8(const void *data_ptr, size_t size)
 {
-    unsigned char crc = 0;
-    const unsigned char *ptr = base;
-    const unsigned char *last_val = base + size - 1;
+    const uint8_t *data = (const uint8_t *)data_ptr;
+    uint8_t crc = 0;
+    const uint8_t *ptr = data;
+    const uint8_t *last_val = data + size - 1;
 
     while (ptr <= last_val) {
-        crc = crc8(crc, *ptr);
+        crc = __crc8(crc, *ptr);
         ptr++;
     }
 
@@ -53,12 +54,12 @@ calculate two byte input value with CRC 24 Bit
     @secondbyte: byte 2
     @returns calculated crc value
 */
-unsigned int crc24(unsigned int crc, unsigned char firstbyte, unsigned char secondbyte)
+uint32_t __crc24(uint32_t crc, uint8_t firstbyte, uint8_t secondbyte)
 {
-    static const unsigned int crcpoly = 0x80001B;
-    unsigned int data_word;
+    static const uint32_t crcpoly = 0x80001B;
+    uint32_t data_word;
 
-    data_word = ((unsigned short)secondbyte << 8) | firstbyte;
+    data_word = ((uint16_t)secondbyte << 8) | firstbyte;
     crc = ((crc << 1) ^ data_word);
 
     if (crc & 0x1000000)
@@ -73,28 +74,30 @@ Calculate buffer with crc24
     @size: data size
     @returns calculated crc value, only bit[0~23] is valid
 */
-unsigned int calc_crc24(const unsigned char *base, int size, uint32_t crc)
-{
-    const unsigned char *ptr = base;
-    const unsigned char *last_val = base + size - 1;
+uint32_t calc_crc24(const void *data_ptr, size_t len, uint32_t crc) {
+    const uint8_t *data = (const uint8_t *)data_ptr;
+    const uint8_t *end = data + len;  // 指向末尾后一个字节
+    const uint8_t *ptr = data;
 
-    while (ptr < last_val) {
-        crc = crc24(crc, *ptr, *(ptr + 1));
+    if (len == 0) return crc;  // 处理 len=0
+
+    // 每次处理 2 字节，确保 ptr + 1 < end
+    while (ptr + 1 < end) {
+        crc = __crc24(crc, *ptr, *(ptr + 1));
         ptr += 2;
     }
 
-    /* if len is odd, fill the last byte with 0 */
-    if (ptr == last_val)
-        crc = crc24(crc, *ptr, 0);
+    // 处理剩余 1 字节（如果有）
+    if (ptr < end) {
+        crc = __crc24(crc, *ptr, 0);
+    }
 
-    /* Mask to 24-bit */
-    crc &= 0x00FFFFFF;
-
-    return crc;
+    return crc & 0x00FFFFFF;
 }
 
-// CRC-16-CCITT 算法实现
-uint16_t calc_crc16(const uint8_t *data, size_t length, uint16_t crc) {
+// CRC-16-CCITT 算法实现 (Big end)
+uint16_t calc_crc16(const void *data_ptr, size_t length, uint16_t crc) {
+    const uint8_t *data = (const uint8_t *)data_ptr;
     uint16_t polynomial = 0x1021; // 多项式 x^16 + x^12 + x^5 + 1
 
     for (size_t i = 0; i < length; i++) {

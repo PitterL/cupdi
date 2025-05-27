@@ -115,7 +115,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19x"
+#define SOFTWARE_VERSION "A.19y"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -255,7 +255,7 @@ int main(int argc, const char *argv[])
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_INTEGER('s', "", &ibver, "Pack information block version, [default 0]: version s3"),
-        OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
+        OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom, 2: bootrow]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
         OPT_BOOLEAN('-', "reset", &reset, "UPDI reset device"),
         OPT_BOOLEAN('-', "halt", &halt, "UPDI halt device"),
         OPT_BOOLEAN('-', "disable", &disable, "UPDI disable"),
@@ -1158,6 +1158,8 @@ int32_t dev_hex_align_flash_crc(const device_info_t *dev, uint8_t pad_value, hex
         size = size_rsv - 2;
         memset(buf, pad_value, size);
         crc = calc_crc16(buf, size, crc);
+
+        // crc16 value will be covered to small end
         buf[size] = (crc >> 8) & 0xFF;
         buf[size + 1] = crc & 0xFF;
 
@@ -2032,9 +2034,9 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     }
 
     // <4> save other blocks
-    for (i = 0; i < NUM_NVM_TYPES; i++)
+    for (i = 0; i < NUM_NVM_EX_TYPES; i++)
     {
-        if (i == NVM_FLASH || i == MEM_SRAM || i == nvm_type)
+        if (i == NVM_FLASH || i == MEM_SRAM || i == NVM_LOCKBITS || i == nvm_type)
             continue;
 
         result = nvm_get_block_info(nvm_ptr, i, &iblock);
@@ -2129,7 +2131,7 @@ int updi_dump(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
     unsigned int start;
 
     memset(&dhex_info, 0, sizeof(dhex_info));
-    for (i = 0; i < NUM_NVM_TYPES; i++)
+    for (i = 0; i < NUM_NVM_EX_TYPES; i++)
     {
         if (i == MEM_SRAM)
         {
@@ -2266,20 +2268,22 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     }
 
     // Varibles
-    map_file = trim_name_with_extesion(file, '.', 1, MAP_FILE_EXTENSION_NAME);
-    if (!map_file)
-    {
-        DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", MAP_FILE_EXTENSION_NAME, result);
-        result = -3;
-        goto out;
-    }
+    if (ibver >= IB_VER2) {
+        map_file = trim_name_with_extesion(file, '.', 1, MAP_FILE_EXTENSION_NAME);
+        if (!map_file)
+        {
+            DBG_INFO(UPDI_DEBUG, "trim_name_with_extesion %s failed %d", MAP_FILE_EXTENSION_NAME, result);
+            result = -3;
+            goto out;
+        }
 
-    result = load_varible_address_from_file(map_file, &info_params.var_addr);
-    if (result)
-    {
-        DBG_INFO(UPDI_DEBUG, "load_varible_address_from_file(failed %d), SKipped", result);
-        // result = -4;
-        // goto out;
+        result = load_varible_address_from_file(map_file, &info_params.var_addr);
+        if (result)
+        {
+            DBG_INFO(UPDI_WARN, "No Varibles data packed");
+            // result = -4;
+            // goto out;
+        }
     }
 
     // Fuse
@@ -2287,9 +2291,9 @@ segment_buffer_t *load_version_segment_from_file(const device_info_t *dev, const
     seg = get_segment_by_id(dhex, sid);
     if (!seg)
     {
-        DBG_INFO(UPDI_DEBUG, "failed to pack the FUSES data");
-        result = -6;
-        goto out;
+        DBG_INFO(UPDI_WARN, "No FUSES data packed");
+        // result = -6;
+        // goto out;
     }
     else
     {
@@ -2980,7 +2984,7 @@ int updi_page_erase(void *nvm_ptr, char *cmd)
         Format: [addr_hex:len_auto]|<next token>...
     @returns 0 - success, other value failed code
 */
-int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
+int _updi_read(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
 {
     char **tk_s, **tk_w; // token section, token words
 #define UPDI_READ_STROKEN_WORDS_LEN 4096
@@ -3017,7 +3021,7 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
                         continue;
                     }
 
-                    result = nvm_read_mem(nvm_ptr, address, buf, len);
+                    result = nvm_read_auto(nvm_ptr, address, buf, len);
                     if (result)
                     {
                         DBG_INFO(UPDI_DEBUG, "nvm_read_mem failed %d", result);
@@ -3076,7 +3080,7 @@ int _updi_read_mem(void *nvm_ptr, char *cmd, u8 *outbuf, int outlen)
 */
 int updi_read(void *nvm_ptr, char *cmd)
 {
-    return _updi_read_mem(nvm_ptr, cmd, NULL, 0);
+    return _updi_read(nvm_ptr, cmd, NULL, 0);
 }
 
 /*
@@ -3600,7 +3604,8 @@ enum
 enum
 {
     INFO_USERROW,
-    INFO_EEPROM
+    INFO_EEPROM,
+    INFO_BOOTROW
 };
 
 const char *storage_token_tag[STORAGE_MAX_PARAM_NUM] = {
@@ -3609,35 +3614,41 @@ const char *storage_token_tag[STORAGE_MAX_PARAM_NUM] = {
     "eoff",
 };
 
-int storage_params[STORAGE_MAX_PARAM_NUM] = {
+int gstore_params[STORAGE_MAX_PARAM_NUM] = {
     /* STORAGE_INFOBLOCK_ID */ INFO_USERROW,
     /* STORAGE_USERROW_OFFSET */ 0,
     /* STORAGE_EEPROM_OFFSET */ 0};
 
 int get_storage_type(B_BLOCK_TYPE btype)
 {
-    int nvm_type = NUM_NVM_TYPES;
+    int nvm_type = NUM_NVM_EX_TYPES;
 
     if (MAJOR(btype) == BLOCK_INFO)
     {
-        if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
-        {
-            nvm_type = NVM_EEPROM;
-        }
-        else
-        {
-            nvm_type = NVM_USERROW;
+        switch (gstore_params[STORAGE_INFOBLOCK_ID]) {
+            case INFO_EEPROM:
+                nvm_type = NVM_EEPROM;
+                break;
+            case INFO_BOOTROW:
+                nvm_type = NVM_BOOTROW;
+                break;
+            case INFO_USERROW:
+            default:
+                nvm_type = NVM_USERROW;
+                break;
         }
     }
     else if (MAJOR(btype) == BLOCK_CFG)
     {
-        if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
-        {
-            nvm_type = NVM_USERROW;
-        }
-        else
-        {
-            nvm_type = NVM_EEPROM;
+        switch (gstore_params[STORAGE_INFOBLOCK_ID]) {
+            case INFO_EEPROM:
+                nvm_type = NVM_USERROW;
+                break;
+            case INFO_BOOTROW:
+            case INFO_USERROW:
+            default:
+                nvm_type = NVM_EEPROM;
+                break;
         }
     }
     else
@@ -3654,7 +3665,7 @@ int get_storage_offset(B_BLOCK_TYPE btype)
 
     if (MAJOR(btype) == BLOCK_INFO)
     {
-        if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
+        if (gstore_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
         {
             id = STORAGE_EEPROM_OFFSET;
         }
@@ -3665,7 +3676,7 @@ int get_storage_offset(B_BLOCK_TYPE btype)
     }
     else if (MAJOR(btype) == BLOCK_CFG)
     {
-        if (storage_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
+        if (gstore_params[STORAGE_INFOBLOCK_ID] == INFO_EEPROM)
         {
             id = STORAGE_USERROW_OFFSET;
         }
@@ -3679,14 +3690,14 @@ int get_storage_offset(B_BLOCK_TYPE btype)
         // Not support
     }
 
-    return storage_params[id];
+    return gstore_params[id];
 }
 
 int updi_storage(void *nvm_ptr, char *cmd)
 {
     int result = 0;
 
-    _verbar_token_parse(cmd, storage_token_tag, storage_params, STORAGE_MAX_PARAM_NUM);
+    _verbar_token_parse(cmd, storage_token_tag, gstore_params, STORAGE_MAX_PARAM_NUM);
 
     return result;
 }

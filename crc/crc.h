@@ -3,12 +3,12 @@
 
 #include <stdint.h>
 
-unsigned char calc_crc8(const unsigned char *base, int size);
+uint8_t calc_crc8(const void *data_ptr, size_t size);
 
 #define CRC_CRC24_INIT 0x0
-unsigned int calc_crc24(const unsigned char *base, int size, uint32_t crc);
+uint32_t calc_crc24(const void *data_ptr, size_t size, uint32_t crc);
 
 #define CRC_CRC16_CCITT_INIT 0xFFFF
-uint16_t calc_crc16(const uint8_t *data, size_t length, uint16_t crc);
+uint16_t calc_crc16(const void *data_ptr, size_t length, uint16_t crc);
 
 #endif

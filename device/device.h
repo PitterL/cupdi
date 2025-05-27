@@ -38,34 +38,18 @@ typedef enum {
     AVRDU,
 } DEV_TYPE_T;
 
-typedef struct _chip_info
-{
-    const char *dev_name;
-    nvm_info_t flash;
-    nvm_info_t fuse;
-    nvm_info_t userrow;
-    nvm_info_t eeprom;
-    nvm_info_t sram;
-    nvm_info_t lockbits;
-    sys_info_t reg;
-    crc_src_t crc;
-} chip_info_t;
-
-typedef struct _device_info
-{
-    const char *name;
-    DEV_TYPE_T type;
-    const chip_info_t *mmap;
-} device_info_t;
-
-const device_info_t *get_chip_info(const char *dev_name);
+#define MAGIC_ID_FUSE 0x82
+#define MAGIC_ID_EEPROM 0x81
+#define MAGIC_ID_USER 0x85
+#define MAGIC_ID_BOOTROW 0x86
+#define MAGIC_ID_LOCKBITS 0x83
 
 typedef enum _NVM_TYPE
 {
     NVM_FLASH,
-    NVM_EEPROM,
-    NVM_USERROW,
     NVM_FUSES,
+    NVM_USERROW,
+    NVM_EEPROM,
     MEM_SRAM,
     NUM_NVM_TYPES
 } NVM_TYPE_T;
@@ -73,9 +57,26 @@ typedef enum _NVM_TYPE
 typedef enum _NVM_TYPE_EX
 {
     NVM_LOCKBITS = NUM_NVM_TYPES,
+    NVM_BOOTROW,
     NUM_NVM_EX_TYPES
 } NVM_TYPE_EX_T;
 
+typedef struct _chip_info
+{
+    const char *dev_name;
+    nvm_info_t nvms[NUM_NVM_EX_TYPES];
+    sys_info_t reg;
+    crc_src_t crc;
+} chip_mem_t;
+
+typedef struct _device_info
+{
+    const char *name;
+    DEV_TYPE_T type;
+    const chip_mem_t *mmap;
+} device_info_t;
+
+const device_info_t *get_chip_info(const char *dev_name);
 int dev_get_nvm_info(const void *dev, NVM_TYPE_EX_T type, nvm_info_t *inf);
 int dev_get_nvm_info_ext(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *info, const char **pname);
 int dev_get_crc_info(const void *dev_ptr, crc_src_t *src);

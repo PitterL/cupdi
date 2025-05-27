@@ -12,13 +12,13 @@ int ib_create_information_block(information_container_t *info, information_conte
     }
 
     switch (ver) {
-        case 1:
+        case IB_VER1:
             return ib_create_information_block_s1(info, param);
             break;
-        case 2:
+        case IB_VER2:
             return ib_create_information_block_s2(info, param);
             break;
-        case 3:
+        case IB_VER3:
         default:
             return ib_create_information_block_s3(info, param);
     }

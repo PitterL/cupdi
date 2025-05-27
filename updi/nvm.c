@@ -550,6 +550,30 @@ int nvm_read_userrow(void *nvm_ptr, u32 address, u8 *data, int len)
 }
 
 /*
+NVM read bootrow
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @return 0 successful, other value failed
+*/
+int nvm_read_bootrow(void *nvm_ptr, u32 address, u8 *data, int len)
+{
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    nvm_info_t info;
+    int result;
+
+    result = nvm_get_block_info(nvm, NVM_BOOTROW, &info);
+    if (result)
+    {
+        DBG_INFO(NVM_DEBUG, "nvm_get_block_info failed");
+        return -2;
+    }
+
+    return _nvm_read_common(nvm_ptr, &info, address, data, len);
+}
+
+/*
 NVM write eeprom (compatible with userrow)
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @type: memory type
@@ -609,7 +633,7 @@ int _nvm_write_user_eeprom(void *nvm_ptr, int type, u32 address, const u8 *data,
         {
             result = app_erase_write_eeprom(APP(nvm), address + off, data + off, size);
         }
-        else if (type == NVM_USERROW)
+        else if (type == NVM_USERROW || type == NVM_BOOTROW)
         {
             result = app_erase_write_userrow(APP(nvm), address + off, data + off, size);
         }
@@ -662,6 +686,20 @@ int nvm_write_eeprom(void *nvm_ptr, u32 address, const u8 *data, int len, bool d
 int nvm_write_userrow(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy)
 {
     return _nvm_write_user_eeprom(nvm_ptr, NVM_USERROW, address, data, len);
+}
+
+/*
+    NVM write bootrow
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @address: target address
+    @data: data buffer
+    @len: data len
+    @dummy: not used
+    @return 0 successful, other value failed
+*/
+int nvm_write_bootrow(void *nvm_ptr, u32 address, const u8 *data, int len, bool dummy)
+{
+    return _nvm_write_user_eeprom(nvm_ptr, NVM_BOOTROW, address, data, len);
 }
 
 /*
@@ -871,7 +909,7 @@ int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 dummy)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    nvm_rop rop = NULL, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem, nvm_read_lockbits};
+    nvm_rop rop = NULL, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_fuse, nvm_read_userrow, nvm_read_eeprom, nvm_read_mem, nvm_read_lockbits, nvm_read_bootrow};
     unsigned start, size;
     int i, result = 0;
 
@@ -910,7 +948,7 @@ int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 dummy)
             DBG_INFO(NVM_DEBUG, "<NVM> Not support block op size %d", len);
             return -3;
         } else {
-            DBG_INFO(NVM_DEBUG, "<NVM> Default Mem Read op ize %d", len);
+            DBG_INFO(NVM_DEBUG, "<NVM> Default Mem Read op size %d", len);
             rop = nvm_read_mem;
         }
     }
@@ -995,8 +1033,8 @@ int _nvm_write_auto(void *nvm_ptr, u32 address, const u8 *data, int len, u8 flag
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    nvm_wop wop = NULL, nvm_wops[NUM_NVM_EX_TYPES] = {nvm_write_flash, nvm_write_eeprom, nvm_write_userrow, nvm_write_fuse, nvm_write_mem, nvm_write_lockbits};
-    nvm_rop rop, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_eeprom, nvm_read_userrow, nvm_read_fuse, nvm_read_mem, nvm_read_lockbits};
+    nvm_wop wop = NULL, nvm_wops[NUM_NVM_EX_TYPES] = {nvm_write_flash, nvm_write_fuse, nvm_write_userrow, nvm_write_eeprom, nvm_write_mem, nvm_write_lockbits, nvm_write_bootrow};
+    nvm_rop rop, nvm_rops[NUM_NVM_EX_TYPES] = {nvm_read_flash, nvm_read_fuse, nvm_read_userrow, nvm_read_eeprom, nvm_read_mem, nvm_read_lockbits, nvm_read_bootrow};
     bool chip_erased = nvm->erased;
     char *buf = NULL;
     unsigned int start, size;
