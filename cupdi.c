@@ -112,10 +112,15 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <x> 1. support `avrdu` device
             2. support `-s` paramenter to assign infoblock packing type
             3. change eeprom page size to larger
+        <y> 1. Bootrow support
+            2. Align NVM layout, and read flash offset at internal mapped (0x8000), otherwise it's read the memory
+            3. re-write crc calculate make stylus uniform
+        <z> 1. add UPDI Pinconfig check to avoid Call UPDI disable failed when UPDI Pin Config is disable in programming
+            2. change `--crc` to `--pack-crc`
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19y"
+#define SOFTWARE_VERSION "A.19z"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -216,7 +221,6 @@ int main(int argc, const char *argv[])
     bool test = false;
     bool version = false;
     bool ipe_format = false;
-    bool crc = false;
     // int pad = 0xFF;
     // int gap = 0;
     int pack = 0;
@@ -262,7 +266,6 @@ int main(int argc, const char *argv[])
         OPT_BOOLEAN('t', "test", &test, "Test UPDI device"),
         OPT_BOOLEAN('-', "version", &version, "Show version"),
         OPT_BOOLEAN('-', "ipe", &ipe_format, "Using MPLAB IPE format HEX (of Magic offset)"),
-        OPT_BOOLEAN('-', "crc", &crc, "Set CRC-16-CCITT at last valid data page of the flash and adjust the bootend and append in fuse"),
         // OPT_INTEGER('-', "pad", &pad, "To use Pad values to consolidate fragmented data into a coherent whole, Pad value defautl is 0xFF"),
         // OPT_INTEGER('-', "gap", &gap, "The gap of fragmented data to pad, default 0 which is not pad"),
         OPT_BIT('-', "pack-build", &pack, "Pack info block to Intel HEX file, (macro FIRMWARE_VERSION at 'touch.h')save with extension'.ihex'", NULL, (1 << PACK_BUILD), 0),
@@ -270,6 +273,7 @@ int main(int argc, const char *argv[])
         OPT_BIT('-', "pack-build-cfg", &pack, "Pack info block to ihex file with pending cfg head only", NULL, (1 << PACK_BUILD_CFG_VER), 0),
         OPT_BIT('-', "pack-info", &pack, "Show packed file(ihex) info", NULL, (1 << PACK_SHOW), 0),
         OPT_BIT('-', "pack-rebuild", &pack, "Save packed file", NULL, (1 << PACK_REBUILD), 0),
+        OPT_BIT('-', "pack-crc", &pack, "Set CRC-16-CCITT at last valid data page of the flash and adjust the bootend and append in fuse", NULL, (1 << PACK_CRC), 0),
         OPT_END(),
     };
 
@@ -320,10 +324,6 @@ int main(int argc, const char *argv[])
     {
         DBG_INFO(UPDI_DEBUG, "Device %s not support", dev_name);
         return -2;
-    }
-
-    if (crc) {
-        SET_BIT(pack, PACK_CRC);
     }
 
     // covert hex file to ihex file
@@ -587,7 +587,7 @@ int main(int argc, const char *argv[])
 out:
     if (nvm_in_progmode(nvm_ptr))
     {
-        nvm_leave_progmode(nvm_ptr, !halt);
+        result = nvm_leave_progmode(nvm_ptr, !halt);
     }
     else
     {

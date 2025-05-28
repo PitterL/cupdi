@@ -166,6 +166,8 @@ int nvm_leave_progmode(void *nvm_ptr, bool reset_or_halt)
         Leave programming mode
     */
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    UPDI_PINCFG_T cfg;
+
     int result;
 
     if (!VALID_NVM(nvm))
@@ -176,11 +178,22 @@ int nvm_leave_progmode(void *nvm_ptr, bool reset_or_halt)
 
     DBG_INFO(NVM_DEBUG, "<NVM> Leaving NVM programming mode");
 
+    cfg = nvm_get_updi_pinconf(nvm_ptr);
+    DBG_INFO(NVM_DEBUG, "<NVM> UPDI configured as %d", cfg);
+
     result = app_leave_progmode(APP(nvm), reset_or_halt);
     if (result)
     {
         DBG_INFO(NVM_DEBUG, "app_leave_progmode failed %d", result);
         return -2;
+    }
+
+    if (cfg == UPDIPIN_CFG_UPDI || cfg == UPDIPIN_CFG_RSV) {
+        result = app_disable(APP(nvm));
+        if (result) {
+            DBG_INFO(NVM_DEBUG, "app_disable failed %d", result);
+            return -3;
+        }
     }
 
     nvm->progmode = false;
@@ -1485,6 +1498,62 @@ int nvm_get_block_info_ext(void *nvm_ptr, int type, nvm_info_t *info, char **pna
     // DBG_INFO(NVM_DEBUG, "<NVM> Get chip nvm type %d info", type);
 
     return dev_get_nvm_info_ext(nvm->dev, type, info, pname);
+}
+
+/*
+    NVM get updi pinconfig info, this is defined in device.c
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @type: NVM type
+    @info: chip flash information
+    @pname: output block name
+    @return updi config value in fulse
+*/
+UPDI_PINCFG_T nvm_get_updi_pinconf(void *nvm_ptr)
+{
+    /*
+        get block info
+    */
+    upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
+    nvm_info_t info;
+    updi_pincfg_t pininfo;
+    uint8_t val;
+    UPDI_PINCFG_T cfg = UPDIPIN_CFG_RSV;
+    int result;
+
+    if (!VALID_NVM(nvm))
+        return ERROR_PTR;
+
+    // DBG_INFO(NVM_DEBUG, "<NVM> Check UPDI pinconfig");
+
+    result = dev_get_updi_pincfg_info(nvm->dev, &pininfo);
+    if (result)
+    {
+        DBG_INFO(NVM_DEBUG, "dev_get_updi_pincfg_info failed");
+        return cfg;
+    }
+
+    if (!pininfo.field) {
+        DBG_INFO(NVM_DEBUG, "UPDI pinconfig is not definied");
+        return cfg;
+    }
+
+    result = nvm_get_block_info(nvm, NVM_FUSES, &info);
+    if (result)
+    {
+        DBG_INFO(NVM_DEBUG, "nvm_get_block_info Fuse failed");
+        return cfg;
+    }
+
+    result = nvm_read_mem(nvm_ptr, info.nvm_start + pininfo.field, &val, sizeof(val));
+    if (result)
+    {
+        DBG_INFO(NVM_DEBUG, "nvm_read_mem 0x%08X failed", info.nvm_start + pininfo.field);
+        return cfg;
+    }
+
+    cfg = (val >> pininfo.bitshift) & pininfo.bitmask;
+
+    return cfg;
 }
 
 /*

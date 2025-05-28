@@ -8,34 +8,23 @@
     Contains device specific information needed for programming
 */
 
-/* {device name}
-    | {flash_start | flash_size | flash_pagesize | flash_blocksize | mapped_start | magoff}
-    | {syscfg_address | nvmctrl_address | sigrow_address}
-    | {fuses}
-    | {userrow}
-    | {eeprom}
-    | {sram}
-    | {lockbits}
-    */
-
-/*
-    Magic Offset of <Extended Linear Address> Definition:
-        0x81: EEPROM
-        0x82: FUSES  
-        0x83: LOCKBITS
-        0x85: USER_SIGNATURES
-*/
-
+/* fuse field */
 enum {
     FS_WDTCFG = 0x0,
     FS_BODCFG = 0x01,
     FS_OSCCFG = 0x02,
+    FS_TINY_TCD0CFG = 0x04,
     FS_SYSCFG0 = 0x05,
     FS_SYSCFG1 = 0x06,
     FS_CODESIZE = 0x07,
     FS_BOOTSIZE = 0x08,
-    FS_PDICFG = 0x0A
+    FS_AVRDU_PDICFG = 0x0A
 };
+
+/*
+    NVM info
+    {nvm_start | nvm_size | nvm_pagesize | nvm_blocksize | nvm_mapped_start | nvm_magoff}
+*/
 
 const chip_mem_t device_avr64du = {
     //  avr64du28/32
@@ -142,7 +131,8 @@ const chip_mem_t device_tiny_321x = {
         {0x128A, 1, 1, 0, 0, MAGIC_ID_LOCKBITS},
     },
     .reg = {0x0F00, 0x1000, 0x1100},
-    .crc = {256, FS_CODESIZE, FS_BOOTSIZE}
+    .crc = {256, FS_CODESIZE, FS_BOOTSIZE},
+    .updipin = { FS_SYSCFG0, 2, 3 }
 };
 
 const chip_mem_t device_tiny_161x = {
@@ -157,7 +147,8 @@ const chip_mem_t device_tiny_161x = {
         {0x128A, 1, 1, 0, 0, MAGIC_ID_LOCKBITS},
      },
     .reg = {0x0F00, 0x1000, 0x1100},
-    .crc = {256, FS_CODESIZE, FS_BOOTSIZE}
+    .crc = {256, FS_CODESIZE, FS_BOOTSIZE},
+    .updipin = { FS_SYSCFG0, 2, 3 }
 };
 
 const chip_mem_t device_tiny_81x = {
@@ -172,7 +163,8 @@ const chip_mem_t device_tiny_81x = {
         {0x128A, 1, 1, 0, 0, MAGIC_ID_LOCKBITS},
     },
     .reg = {0x0F00, 0x1000, 0x1100},
-    .crc = {256, FS_CODESIZE, FS_BOOTSIZE}
+    .crc = {256, FS_CODESIZE, FS_BOOTSIZE},
+    .updipin = { FS_SYSCFG0, 2, 3 }
 };
 
 const chip_mem_t device_tiny_41x = {
@@ -187,7 +179,8 @@ const chip_mem_t device_tiny_41x = {
         {0x128A, 1, 1, 0, 0, MAGIC_ID_LOCKBITS},
     },
     .reg = {0x0F00, 0x1000, 0x1100},
-    .crc = {256, FS_CODESIZE, FS_BOOTSIZE}
+    .crc = {256, FS_CODESIZE, FS_BOOTSIZE},
+    .updipin = { FS_SYSCFG0, 2, 3 }
 };
 
 static const device_info_t g_device_list[] = {
@@ -294,6 +287,23 @@ int dev_get_crc_info(const void *dev_ptr, crc_src_t *src)
 
     if (src) {
         memcpy(src, &dev->mmap->crc, sizeof(*src));
+    }
+
+    return 0;
+}
+
+/*
+Device get updi pin config info, this is defined in device.c
+    @dev_ptr: device info structure pointer, get by get_chip_info()
+    @src: updi_pin_cfg_t information
+    @return 0 successful, other value failed
+*/
+int dev_get_updi_pincfg_info(const void *dev_ptr, updi_pincfg_t *src)
+{
+    const device_info_t *dev = (const device_info_t *)dev_ptr;
+
+    if (src) {
+        memcpy(src, &dev->mmap->updipin, sizeof(*src));
     }
 
     return 0;

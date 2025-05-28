@@ -448,13 +448,7 @@ int app_leave_progmode(void *app_ptr, bool reset_or_halt)
         DBG_INFO(APP_DEBUG, "app_toggle_reset failed %d", result);
         return -2;
     }
-
-    result = app_disable(app_ptr);
-    if (result) {
-        DBG_INFO(APP_DEBUG, "app_disable failed %d", result);
-        return -3;
-    }
-
+    
     return 0;
 }
 

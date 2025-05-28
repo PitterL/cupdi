@@ -29,6 +29,14 @@ typedef struct {
     unsigned char bootend;
 } crc_src_t;
 
+enum { UPDIPIN_CFG_GPIO = 0, UPDIPIN_CFG_UPDI, UPDIPIN_CFG_RESET, UPDIPIN_CFG_RSV };
+typedef uint8_t UPDI_PINCFG_T;
+typedef struct {
+    unsigned char field;
+    unsigned char bitshift;
+    unsigned char bitmask;
+} updi_pincfg_t;
+
 typedef enum {
     TINY41x,
     TINY81x,
@@ -67,6 +75,7 @@ typedef struct _chip_info
     nvm_info_t nvms[NUM_NVM_EX_TYPES];
     sys_info_t reg;
     crc_src_t crc;
+    updi_pincfg_t updipin;
 } chip_mem_t;
 
 typedef struct _device_info
@@ -80,5 +89,6 @@ const device_info_t *get_chip_info(const char *dev_name);
 int dev_get_nvm_info(const void *dev, NVM_TYPE_EX_T type, nvm_info_t *inf);
 int dev_get_nvm_info_ext(const void *dev_ptr, NVM_TYPE_EX_T type, nvm_info_t *info, const char **pname);
 int dev_get_crc_info(const void *dev_ptr, crc_src_t *src);
+int dev_get_updi_pincfg_info(const void *dev_ptr, updi_pincfg_t *src);
 
 #endif

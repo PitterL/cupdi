@@ -36,6 +36,7 @@ int nvm_halt(void *nvm_ptr);
 int nvm_wait(void *nvm_ptr);
 int nvm_get_block_info(void *nvm_ptr, /*NVM_TYPE_T*/int type, nvm_info_t *inf);
 int nvm_get_block_info_ext(void *nvm_ptr, int type, nvm_info_t *info, char **pname);
+UPDI_PINCFG_T nvm_get_updi_pinconf(void *nvm_ptr);
 void *nvm_get_content(void *nvm_ptr, int type, int *req_size);
 
 enum {
