@@ -973,12 +973,6 @@ int _nvm_read_auto(void *nvm_ptr, u32 address, u8 *data, int len, u8 dummy)
         return -4;
     }
 
-    if (i == NUM_NVM_EX_TYPES)
-    {
-        DBG_INFO(NVM_DEBUG, "<NVM> read auto no op found with (0x%x, %d)", address, len);
-        return -5;
-    }
-
     return 0;
 }
 

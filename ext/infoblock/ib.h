@@ -138,7 +138,7 @@ typedef struct {
 }information_content_params_t;
 
 
-enum { IB_VER1 = 1, IB_VER2, IB_VER3, NUM_IB_VERSIONS };
+enum { IB_VER_DEFAULT = 0, IB_VER1, IB_VER2, IB_VER3, NUM_IB_VERSIONS };
 int ib_create_information_block(information_container_t *info, information_content_params_t *param, int len, unsigned char ver);
 int ib_set_information_block_data_ptr(information_container_t *info, char *data, int len, unsigned short flag);
 void ib_destory(information_container_t *info);

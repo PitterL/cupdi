@@ -117,10 +117,15 @@ This is C version of UPDI interface achievement, referred to the Python version 
             3. re-write crc calculate make stylus uniform
         <z> 1. add UPDI Pinconfig check to avoid Call UPDI disable failed when UPDI Pin Config is disable in programming
             2. change `--crc` to `--pack-crc`
+    v1.20
+        <a> 1. updi save will skip undefined nvm section
+            2. a bug in load_selftest_content_from_file() without initializing cfg_container when the content is not existed
+            3. revmove duplicated updi_show() in 'S1' content
+
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "A.19z"
+#define SOFTWARE_VERSION "1.20a"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -224,7 +229,7 @@ int main(int argc, const char *argv[])
     // int pad = 0xFF;
     // int gap = 0;
     int pack = 0;
-    int ibver = 0;
+    int ibver = IB_VER3;
 
     const device_info_t *dev = NULL;
     void *nvm_ptr = NULL;
@@ -259,7 +264,7 @@ int main(int argc, const char *argv[])
         OPT_STRING('-', "selftest", &selftest, "check ref/cc value operation in test range siglim={keys, siglow, sighi, range}", NULL, (intptr_t) ""),
         OPT_INTEGER('v', "verbose", &verbose, "Set verbose mode (SILENCE|UPDI|NVM|APP|LINK|PHY|SER): [0~6], default 0, suggest 2 for status information"),
         OPT_INTEGER('s', "", &ibver, "Pack information block version, [default 0]: version s3"),
-        OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom, 2: bootrow]|uoff=0x[n]|eoff=0x[n]|ipe=1 default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
+        OPT_STRING('-', "storage", &storage, "Use the storage to store infoblock infoblock=[0: userrow, 1: eeprom, 2: bootrow]|uoff=0x[n]|eoff=0x[n], default storage=0|uoff=0|eoff=0", NULL, (intptr_t) ""),
         OPT_BOOLEAN('-', "reset", &reset, "UPDI reset device"),
         OPT_BOOLEAN('-', "halt", &halt, "UPDI halt device"),
         OPT_BOOLEAN('-', "disable", &disable, "UPDI disable"),
@@ -2047,6 +2052,11 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
             break;
         }
 
+        if (!iblock.nvm_size) {
+            // skip undefine nvm
+            continue;
+        }
+
         buf = malloc(iblock.nvm_size);
         if (!buf)
         {
@@ -2145,6 +2155,11 @@ int updi_dump(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
             DBG_INFO(UPDI_DEBUG, "nvm_get_block_info failed %d", result);
             result = -3;
             break;
+        }
+
+        if (!iblock.nvm_size) {
+            // skip undefine nvm
+            continue;
         }
 
         buf = malloc(iblock.nvm_size);
@@ -2558,6 +2573,8 @@ segment_buffer_t *load_selftest_content_from_file(const device_info_t *dev, cons
     char *vcs_file = NULL;
     int i, order, size, offset, count, len, result = 0;
 
+    memset(&cfg_container, 0, sizeof(cfg_container));
+
     nvm_type = get_storage_type(BLOCK_CFG);
     result = dev_get_nvm_info(dev, nvm_type, &iblock);
     if (result)
@@ -2710,7 +2727,7 @@ int dev_pack_to_vcs_hex_file(const device_info_t *dev, const char *file, int pac
     if (!TEST_BIT(pack, PACK_REBUILD))
     {
         if (TEST_BIT(pack, PACK_CRC)) {
-            result = dev_hex_align_flash_crc(dev, 0xFF, &dhex_info);
+            result = dev_hex_align_flash_crc(dev, DEFAULT_NVM_PAD_VAL, &dhex_info);
             if (result < 0)
             {
                 DBG_INFO(UPDI_ERROR, "dev_hex_align_flash_crc(error=%d)", result);

@@ -141,13 +141,6 @@ void ib_show_element_s1(information_header_t *head)
         (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MAJOR) & 0xF,
         (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MINOR) & 0xF);
 
-    DBG_INFO(UPDI_INFO, "fw_version: %c%c%c %hhx.%hhx",
-        (char)ib_get_element_s1(head, IB_FW_VER_NAME_N0),
-        (char)ib_get_element_s1(head, IB_FW_VER_NAME_N1),
-        (char)ib_get_element_s1(head, IB_FW_VER_NAME_N2),
-        (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MAJOR) & 0xF,
-        (unsigned char)ib_get_element_s1(head, IB_FW_VER_NAME_BUILD_MINOR) & 0xF);
-
     DBG_INFO(UPDI_INFO, "fw_size: %d bytes(0x%x)",
         ib_get_element_s1(head, IB_FW_SIZE),
         ib_get_element_s1(head, IB_FW_SIZE));
