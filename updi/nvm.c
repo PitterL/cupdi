@@ -1285,7 +1285,7 @@ int nvm_erase_auto(void *nvm_ptr, u32 address, int count)
 {
     upd_nvm_t *nvm = (upd_nvm_t *)nvm_ptr;
     nvm_info_t info;
-    nvm_eop eop, nvm_eops[NUM_NVM_TYPES] = {nvm_erase_flash_page, nvm_erase_eeprom, NULL, NULL, NULL};
+    nvm_eop eop, nvm_eops[NUM_NVM_TYPES] = {nvm_erase_flash_page, /*NVM_FUSES*/NULL, /*NVM_USERROW*/NULL, nvm_erase_eeprom, /*MEM_SRAM*/NULL};
     char *buf = NULL;
     int i, result;
     unsigned int start, size;

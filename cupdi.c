@@ -121,11 +121,13 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <a> 1. updi save will skip undefined nvm section
             2. a bug in load_selftest_content_from_file() without initializing cfg_container when the content is not existed
             3. revmove duplicated updi_show() in 'S1' content
+        <b> 1. fix the `chip_nvm_name` definition issue
+            2. fix the page erase command
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20a"
+#define SOFTWARE_VERSION "1.20b"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -211,7 +213,7 @@ int main(int argc, const char *argv[])
     char *file = NULL;
     char *read = NULL;
     char *write = NULL;
-    char *erase = NULL;
+    char *pageerase = NULL;
     char *dbgview = NULL;
     char *memtest = NULL;
     char *selftest = NULL;
@@ -247,7 +249,7 @@ int main(int argc, const char *argv[])
         OPT_BIT('p', "", &flag, "Perform a chip enter program mode", NULL, (1 << FLAG_PROG_MODE), 0),
         OPT_BIT('u', "unlock", &flag, "Perform a chip unlock (implied with --unlock)", NULL, (1 << FLAG_UNLOCK), 0),
         OPT_BIT('e', "erase", &flag, "Perform a chip erase (implied with --flash)", NULL, (1 << FLAG_ERASE), 0),
-        OPT_STRING('-', "pageerase", &erase, "Perform a page erase [Addr]:[n0]", NULL, (1 << FLAG_PAGE_ERASE), 0),
+        OPT_STRING('-', "pageerase", &pageerase, "Perform a page erase [addr_hex]:[num_pages]"),
         OPT_BIT('-', "program", &flag, "Program Intel HEX file to flash", NULL, (1 << FLAG_PROG), 0),
         OPT_BIT('-', "update", &flag, "Program infoblock update to eeprom(need map file)", NULL, (1 << FLAG_UPDATE), 0),
         OPT_BIT('-', "check", &flag, "Check flash content with infoblock CRC", NULL, (1 << FLAG_CHECK), 0),
@@ -377,7 +379,7 @@ int main(int argc, const char *argv[])
     }
 
     // unlock
-    if (flag /* || read || write || erase || dbgview || selftest*/)
+    if (flag /* || read || write || pageerase || dbgview || selftest*/)
     {
         result = nvm_enter_progmode(nvm_ptr);
         if (result)
@@ -417,14 +419,16 @@ int main(int argc, const char *argv[])
             goto out;
         }
     }
-    else if (TEST_BIT(flag, FLAG_PAGE_ERASE))
+    else
     {
-        result = updi_page_erase(nvm_ptr, erase);
-        if (result)
-        {
-            DBG_INFO(UPDI_DEBUG, "NVM chip erase failed %d", result);
-            result = -8;
-            goto out;
+        if (pageerase) {
+            result = updi_page_erase(nvm_ptr, pageerase);
+            if (result)
+            {
+                DBG_INFO(UPDI_DEBUG, "NVM chip pageerase failed %d", result);
+                result = -8;
+                goto out;
+            }
         }
     }
 
@@ -1937,7 +1941,7 @@ int updi_compare(void *nvm_ptr, const char *file, const device_info_t *dev)
     result = compare_nvm_crc(nvm_ptr, &dhex_info);
     if (result)
     {
-        DBG_INFO(UPDI_DEBUG, "crc mismatch");
+        DBG_INFO(UPDI_DEBUG, "compare nvm crc failed %d", result);
         result = -3;
         goto out;
     }

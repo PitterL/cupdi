@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>cupdi -d tiny816 -f "E:\a41450\atmel studio\ATtiny816-PowerButton-Project\ATtiny816-PowerButton-Project\Debug\ATtiny816-PowerButton-Project.hex" --pack-build-selftest</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>cupdi -d tiny3217 -f "E:\a41450\atmel studio\ATtiny3217-1Finger-Low_Power-Project-MPT2\ATtiny3217-1Finger-Low_Power-Project-MPT2\fw\T22\FW 1.3\fw.save" --verify</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

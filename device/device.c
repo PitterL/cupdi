@@ -202,11 +202,13 @@ static const device_info_t g_device_list[] = {
 
 const char *chip_nvm_name[NUM_NVM_EX_TYPES] = {
     "FLASH",
-    "EEPROM",
-    "USER_SIGNATURES",
     "FUSES",
-    "RAM",
-    "LOCKBITS"};
+    "USERROW",
+    "EEPROM",
+    "SRAM",
+    "LOCKBITS",
+    "BOOTROW"
+};
 
 const device_info_t *get_chip_info(const char *dev_name)
 {
