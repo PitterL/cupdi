@@ -73,16 +73,16 @@ void *updi_datalink_init(const char *port, int baud, int guard, int breaks)
             result = link_set_init(link, baud, guard);
             if (result) {
                 DBG_INFO(LINK_DEBUG, "link_set_init failed %d, retry=%d", result, retry);
-                phy_send_double_break(phy);
-                //phy_send_break(phy, breaks);
+                // phy_send_double_break(phy);
+                phy_send_break(phy, breaks);
                 continue;
             }
 
             result = link_check(link);
             if (result) {
                 DBG_INFO(LINK_DEBUG, "link_check failed %d, retry=%d", result, retry);
-                phy_send_double_break(phy);
-			    //phy_send_break(phy, breaks);
+                // phy_send_double_break(phy);
+			    phy_send_break(phy, breaks);
                 continue;
             }
         } while(retry-- && result);

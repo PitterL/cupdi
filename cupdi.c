@@ -123,11 +123,13 @@ This is C version of UPDI interface achievement, referred to the Python version 
             3. revmove duplicated updi_show() in 'S1' content
         <b> 1. fix the `chip_nvm_name` definition issue
             2. fix the page erase command
+        <c> 1. fix a issue of lockbits data overlapped 1st bytes of fuse content
+            2. cupdi connection use break control instead of double break when 1st break failed 
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20b"
+#define SOFTWARE_VERSION "1.20c"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -2080,7 +2082,7 @@ int updi_save(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         }
 
         sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-        seg = set_segment_data_by_id_addr(&dhex_info, sid, 0, iblock.nvm_size, buf, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
+        seg = set_segment_data_by_id_addr(&dhex_info, sid, iblock.nvm_start - ADDR_OFFSET_EX_SEGMENT(sid), iblock.nvm_size, buf, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
         if (!seg)
         {
             DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr type %d failed %d", i, result);
@@ -2185,7 +2187,7 @@ int updi_dump(void *nvm_ptr, const char *file, const device_info_t *dev, bool ip
         }
 
         sid = _block_segment_id(&iblock, SEG_EX_SEGMENT_ADDRESS);
-        seg = set_segment_data_by_id_addr(&dhex_info, sid, 0, iblock.nvm_size, buf, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
+        seg = set_segment_data_by_id_addr(&dhex_info, sid, iblock.nvm_start - ADDR_OFFSET_EX_SEGMENT(sid), iblock.nvm_size, buf, HEX_TYPE(HEX_ALLOC_MEMORY, SEG_EX_SEGMENT_ADDRESS));
         if (!seg)
         {
             DBG_INFO(UPDI_DEBUG, "set_segment_data_by_id_addr type %d failed %d", i, result);

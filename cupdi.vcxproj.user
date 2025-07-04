@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>cupdi -d tiny3217 -f "E:\a41450\atmel studio\ATtiny3217-1Finger-Low_Power-Project-MPT2\ATtiny3217-1Finger-Low_Power-Project-MPT2\fw\T22\FW 1.3\fw.save" --verify</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>cupdi -d tiny3217 -f "F:\Users\a41450\OneDrive - Microchip Technology Inc\Backup\d\trunk\fa\Desay_Chery_X62B\Cr\Cr#88\fw\test.save" --dump</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
