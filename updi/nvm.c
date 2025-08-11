@@ -794,7 +794,7 @@ int _nvm_write_fuse_lockbits(void *nvm_ptr, int type, u32 address, const u8 *dat
     int i, result;
     u8 val;
 
-    result = nvm_get_block_info(nvm, NVM_FUSES, &info);
+    result = nvm_get_block_info(nvm, type, &info);
     if (result)
     {
         DBG_INFO(NVM_DEBUG, "nvm_get_block_info failed");

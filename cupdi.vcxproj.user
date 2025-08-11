@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>cupdi -d tiny3217 -f "F:\Users\a41450\OneDrive - Microchip Technology Inc\Backup\d\trunk\fa\Desay_Chery_X62B\Cr\Cr#88\fw\test.save" --dump</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>cupdi -d avr64du --dbgview "keys=0|regs={0x0,4, 0, 0, 0}"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
