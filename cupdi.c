@@ -127,11 +127,12 @@ This is C version of UPDI interface achievement, referred to the Python version 
             2. cupdi connection use break control instead of double break when 1st break failed
         <d> 1. fix the issue of set_segment_data_by_id_addr() start address in updi_save/dump() in version c
         <e> 1. an issue of write seperated lockbits
+        <f> 1. added reset parameters in dbgview command: --dbgview "reset=1"
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20e"
+#define SOFTWARE_VERSION "1.20f"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -3802,6 +3803,7 @@ enum
     DBG_LOOP_CNT,
     DBG_KEY_START,
     DBG_KEY_CNT,
+    DBG_RESET,
     DBG_REGS,
     DBG_MAX_PARAM_NUM
 };
@@ -3812,6 +3814,7 @@ const char *dbg_token_tag[DBG_MAX_PARAM_NUM] = {
     "loop",
     "st",
     "keys",
+    "reset",
     "regs" /* {addr, size, mask_p, mask_n, off, ...} */};
 
 #pragma pack(1)
@@ -3843,15 +3846,14 @@ int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
     time_t timer;
     char timebuf[26];
     struct tm *tm_info;
-    bool show;
+    bool show, do_reset = false;
     int addr, size, lim_count, lim_elem_count = 0, i, j, k, channel, result = 0;
     u8 val, mask_p, mask_n, off, buf[256];
 
     dbg_regs_t *dbg_regs = NULL;
 
-    int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/
-                                     ,
-                                     -1 /*DBG_REGS*/}; // loop value default set to 1, keys default set to 1
+    int params[DBG_MAX_PARAM_NUM] = {0 /*DBG_SIGNAL_ADDR*/, 0 /*DBG_REFERENCE_ADDR*/, 0 /*DBG_LOOP_CNT*/, 0 /*DBG_KEY_START*/, 1 /*DBG_KEY_CNT*/, 0 /*DBG_RESET*/
+                                     , -1 /*DBG_REGS*/}; // loop value default set to 1, keys default set to 1
 
     _verbar_token_parse_data(cmd, dbg_token_tag, params, DBG_MAX_PARAM_NUM,
                              NULL, 0, 0, 0, &lim_elem_count);
@@ -3894,9 +3896,20 @@ int updi_debugview(void *nvm_ptr, char *cmd, u8 dev_type)
                 params[DBG_REFERENCE_ADDR] = var_addr.dsdr.data.dr;
             }
 
-            // Reset that mcu can continue to run
-            nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
+            do_reset = true;
+
         }
+    }
+
+    // Check whether do reset
+    if (params[DBG_RESET]) {
+        do_reset = true;
+    }
+
+    if (do_reset) {
+        // Reset that mcu can continue to run
+        nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, true);
+        do_reset = false;
     }
 
     // if DBG_LOOP_CNT less than or qual 0: loop forever
