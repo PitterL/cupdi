@@ -19,8 +19,9 @@ int ib_create_information_block(information_container_t *info, information_conte
             return ib_create_information_block_s2(info, param);
             break;
         case IB_VER3:
+        case IB_VER4:
         default:
-            return ib_create_information_block_s3(info, param);
+            return ib_create_information_block_s3_s4(info, param, ver);
     }
 }
 
@@ -53,6 +54,7 @@ int ib_set_information_block_data_ptr(information_container_t *info, char *data,
     case INFO_BLOCK_S2_VERSION:
         return ib_set_infoblock_data_ptr_s2(info, data, head->data.size, flag);
     case INFO_BLOCK_S3_VERSION:
+    case INFO_BLOCK_S4_VERSION:
         return ib_set_infoblock_data_ptr_s3(info, data, head->data.size, flag);
     default:
         return -6;

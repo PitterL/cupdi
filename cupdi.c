@@ -128,11 +128,18 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <d> 1. fix the issue of set_segment_data_by_id_addr() start address in updi_save/dump() in version c
         <e> 1. an issue of write seperated lockbits
         <f> 1. added reset parameters in dbgview command: --dbgview "reset=1"
+        <g> 1. change tiny fuse from 11 bytes to 9 bytes, but there is some issue for fuse crc check:
+                <a> we added s4 for new fuse size crc caculation
+                <b> temp merge the size of fuse and lockbits if using `s3` info data
+                <TBD> <c> S3 version pack build is not supported yet
+                <TBD> <d> config block length is zero in --info command
+                
+
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20f"
+#define SOFTWARE_VERSION "1.20g"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -236,7 +243,7 @@ int main(int argc, const char *argv[])
     // int pad = 0xFF;
     // int gap = 0;
     int pack = 0;
-    int ibver = IB_VER3;
+    int ibver = IB_VER4;
 
     const device_info_t *dev = NULL;
     void *nvm_ptr = NULL;
@@ -389,17 +396,20 @@ int main(int argc, const char *argv[])
         result = nvm_enter_progmode(nvm_ptr);
         if (result)
         {
-            DBG_INFO(UPDI_DEBUG, "Device enter progmode failed(%d)", result);
             if (TEST_BIT(flag, FLAG_UNLOCK))
             {
-                DBG_INFO(UPDI_DEBUG, "Device is locked(%d). Performing unlock with chip erase.", result);
+                DBG_INFO(UPDI_DEBUG, "Device is locked, performing unlock with CHIP ERASE.");
                 result = nvm_unlock_device(nvm_ptr);
                 if (result)
                 {
                     DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
                     result = -4;
                     goto out;
+                } else {
+                    DBG_INFO(UPDI_DEBUG, "Device is unlocked.");
                 }
+            } else {
+                DBG_INFO(UPDI_DEBUG, "Enter progmode failed(%d), can try `--unlock` with CHIP ERASE", result);
             }
         }
     }
@@ -422,6 +432,8 @@ int main(int argc, const char *argv[])
             DBG_INFO(UPDI_DEBUG, "NVM chip erase failed %d", result);
             result = -7;
             goto out;
+        } else {
+            DBG_INFO(UPDI_DEBUG, "Chip is Erased.");
         }
     }
     else
@@ -1527,7 +1539,7 @@ int updi_show_ext_info(void *nvm_ptr)
     ext_show(&info_container);
 
     header.value = ext_get(&info_container, B_HEAD);
-    if (HEADER_MINOR(header.data, INFO_BLOCK_S3_VER_MINOR))
+    if (HEADER_MINOR_MORE_THAN(header.data, INFO_BLOCK_S3_VER_MINOR))
     {
         header.value = ext_get(&info_container, IB_CFG);
         if (VALID_HEADER(header.data))
@@ -1646,17 +1658,28 @@ int updi_check(void *nvm_ptr)
     buf = NULL;
 
     header.value = ext_get(&info_container, B_HEAD);
-    if (HEADER_MINOR(header.data, INFO_BLOCK_S3_VER_MINOR))
+    if (HEADER_MINOR_MORE_THAN(header.data, INFO_BLOCK_S3_VER_MINOR))
     {
+        info_crc = ext_get(&info_container, B_HEAD);
+
         // Fuse
         len = 0;
-        info_crc = ext_get(&info_container, B_HEAD);
-        buf = nvm_get_content(nvm_ptr, NVM_FUSES, &len);
-        if (!buf)
-        {
-            DBG_INFO(UPDI_DEBUG, "nvm_get_content `NVM_FUSES` failed");
-            result = -6;
-            goto out;
+        if (HEADER_MINOR(header.data, INFO_BLOCK_S3_VER_MINOR)) {
+            buf = nvm_get_fuse_merged_content(nvm_ptr, &len);
+            if (!buf)
+            {
+                DBG_INFO(UPDI_DEBUG, "nvm_get_fuse_merged_content `NVM_FUSES` failed");
+                result = -6;
+                goto out;
+            }
+        } else {            
+            buf = nvm_get_content(nvm_ptr, NVM_FUSES, &len);
+            if (!buf)
+            {
+                DBG_INFO(UPDI_DEBUG, "nvm_get_content `NVM_FUSES` failed");
+                result = -7;
+                goto out;
+            }
         }
 
         crc = calc_crc8(buf, len);
@@ -1664,7 +1687,7 @@ int updi_check(void *nvm_ptr)
         if (info_crc <= 0 || info_crc != crc)
         {
             DBG_INFO(UPDI_DEBUG, "Info Block read fuse crc8 mismatch %02x(%02x)", info_crc, crc);
-            result = -7;
+            result = -8;
             goto out;
         }
         free(buf);
@@ -1863,7 +1886,7 @@ int compare_nvm_crc(void *nvm_ptr, hex_data_t *dhex)
     }
 
     header.value = ext_get(&file_info_container, B_HEAD);
-    if (HEADER_MINOR(header.data, INFO_BLOCK_S3_VER_MINOR))
+    if (HEADER_MINOR_MORE_THAN(header.data, INFO_BLOCK_S3_VER_MINOR))
     {
         header.value = ext_get(&file_info_container, IB_CFG);
         if (VALID_HEADER(header.data))
@@ -2470,10 +2493,15 @@ int load_fuse_content_from_file(const device_info_t *dev, const char *file, int3
             DBG_INFO(UPDI_DEBUG, "No fuse content defined at '%s'", version_files[i]);
             goto out;
         }
-        else if (result < 0 || (u32)result > iblock_fuse.nvm_size)
+        else if (result < 0)
         {
             DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file [FUSES_CONTENT] not found %d: %s", result, version_files[i]);
             result = -5;
+        }
+        else if ((u32)result > iblock_fuse.nvm_size)
+        {
+            DBG_INFO(OTHER_ERROR, "search_defined_array_int_from_file [FUSES_CONTENT] size %d (truncated to %d)", result, iblock_fuse.nvm_size);
+            result = iblock_fuse.nvm_size;
         }
         else
         {
@@ -2897,10 +2925,10 @@ int dev_vcs_hex_file_show_info(const device_info_t *dev, const char *file, bool 
 
     // Show cfg area
     header.value = ext_get(&file_info_container, B_HEAD);
-    if (HEADER_MINOR(header.data, INFO_BLOCK_S3_VER_MINOR))
+    if (HEADER_MINOR_MORE_THAN(header.data, INFO_BLOCK_S3_VER_MINOR))
     {
         conf_header.value = ext_get(&file_info_container, IB_CFG);
-        if (HEADER_MINOR(conf_header.data, CONFIG_BLOCK_C1_VER_MINOR))
+        if (HEADER_MINOR_MORE_THAN(conf_header.data, CONFIG_BLOCK_C1_VER_MINOR))
         {
             result = get_ext_data_from_hex_dev(dev, &dhex_info, &file_conf_container, BLOCK_CFG);
             if (result)

@@ -31,7 +31,7 @@ const chip_mem_t device_avr64du = {
     .dev_name = "avr64dux",
     .nvms = {
         {0, 64 * 1024, 512, 32 * 1024, 0x8000},
-        {0x1050, 11, 1, 0, 0, MAGIC_ID_FUSE},
+        {0x1050, 12, 1, 0, 0, MAGIC_ID_FUSE},
         {0x1200, 512, 512, 0, 0, MAGIC_ID_USER},
         {0x1400, 256, 32, 0, 0, MAGIC_ID_EEPROM},
         {0x6000, 8 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
@@ -47,7 +47,7 @@ const chip_mem_t device_avr32du = {
     .dev_name = "avr32dux",
     .nvms = {
         {0, 32 * 1024, 512, 32 * 1024, 0x8000},
-        {0x1050, 11, 1, 0, 0, MAGIC_ID_FUSE},
+        {0x1050, 12, 1, 0, 0, MAGIC_ID_FUSE},
         {0x1200, 512, 512, 0, 0, MAGIC_ID_USER},
         {0x1400, 256, 32, 0, 0, MAGIC_ID_EEPROM},
         {0x7000, 4 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
@@ -63,7 +63,7 @@ const chip_mem_t device_avr16du = {
     .dev_name = "avr16dux",
     .nvms = {
         {0, 16 * 1024, 512, 16 * 1024, 0x8000},
-        {0x1050, 11, 1, 0, 0, MAGIC_ID_FUSE},
+        {0x1050, 12, 1, 0, 0, MAGIC_ID_FUSE},
         {0x1200, 512, 512, 0, 0, MAGIC_ID_USER},
         {0x1400, 256, 32, 0, 0, MAGIC_ID_EEPROM},
         {0x7800, 4 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
@@ -124,7 +124,7 @@ const chip_mem_t device_tiny_321x = {
     .dev_name = "tiny321x",
     .nvms = {
         {0, 32 * 1024, 128, 32 * 1024, 0x8000},
-        {0x1280, 11, 1, 0, 0, MAGIC_ID_FUSE},
+        {0x1280, 9, 1, 0, 0, MAGIC_ID_FUSE},
         {0x1300, 64, 64, 0, 0, MAGIC_ID_USER},
         {0x1400, 256, 64, 0, 0, MAGIC_ID_EEPROM},
         {0x3800, 2 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
@@ -140,7 +140,7 @@ const chip_mem_t device_tiny_161x = {
     .dev_name = "tiny161x",
     .nvms = {
         {0, 16 * 1024, 64, 16 * 1024, 0x8000},
-        {0x1280, 11, 1, 0, 0, MAGIC_ID_FUSE},
+        {0x1280, 9, 1, 0, 0, MAGIC_ID_FUSE},
         {0x1300, 32, 32, 0, 0, MAGIC_ID_USER},
         {0x1400, 256, 32, 0, 0, MAGIC_ID_EEPROM},
         {0x3800, 2 * 1024, 1024 /*dummy*/, 0, 0, 0xFF /*dummy*/},
@@ -156,7 +156,7 @@ const chip_mem_t device_tiny_81x = {
     .dev_name = "tiny81x",
     .nvms = {
         {0, 8 * 1024, 64, 8 * 1024, 0x8000},
-        {0x1280, 11, 1, 0, 0, MAGIC_ID_FUSE},
+        {0x1280, 9, 1, 0, 0, MAGIC_ID_FUSE},
         {0x1300, 32, 32, 0, 0, MAGIC_ID_USER},
         {0x1400, 128, 32, 0, 0, MAGIC_ID_EEPROM},
         {0x3E00, 512, 512 /*dummy*/, 0, 0, 0xFF /*dummy*/},
@@ -172,7 +172,7 @@ const chip_mem_t device_tiny_41x = {
     .dev_name = "tiny41x",
     .nvms = {
         {0, 4 * 1024, 64, 4 * 1024, 0x8000},
-        {0x1280, 11, 1, 0, 0, MAGIC_ID_FUSE},
+        {0x1280, 9, 1, 0, 0, MAGIC_ID_FUSE},
         {0x1300, 32, 32, 0, 0, MAGIC_ID_USER},
         {0x1400, 128, 32, 0, 0, MAGIC_ID_EEPROM},
         {0x3F00, 256, 256 /*dummy*/, 0, 0, 0xFF /*dummy*/},

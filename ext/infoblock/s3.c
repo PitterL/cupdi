@@ -156,7 +156,7 @@ uint32_t ib_get_element_s3(information_header_t *head, int type)
     information_block_s3_t *ib = (information_block_s3_t *)head;
     int major = TO_OP(type);
 
-    if (!head || head->data.version.value != INFO_BLOCK_S3_VERSION)
+    if (!head || !HEADER_MINOR_MORE_THAN(head->data, INFO_BLOCK_S3_VER_MINOR))
         return 0;
 
     switch (major) {
@@ -184,13 +184,13 @@ void ib_show_element_s3(information_header_t *head)
     information_block_s3_t *ib = (information_block_s3_t *)head;
 	char n, n0, n1, n2;
 
-    if (!head || head->data.version.value != INFO_BLOCK_S3_VERSION)
+    if (!head || !HEADER_MINOR_MORE_THAN(head->data, INFO_BLOCK_S3_VER_MINOR))
         return;
 
 	DBG_INFO(UPDI_INFO, "");
 	DBG_INFO(UPDI_INFO, "==========================");
 
-    DBG(UPDI_INFO, "Information Block Content(s3):", (u8 *)ib, sizeof(*ib), "%02X ");
+    DBG(UPDI_INFO, "Information Block Content(s%c):", (u8 *)ib, sizeof(*ib), "%02X ", _VER(head->data, 1));
 
 	n = (char)ib_get_element_s3(head, IB_FW_VER_NAME_N0);
 	n0 = n >= ' ' && n <= '~' ? n : ' ';
@@ -231,7 +231,7 @@ void ib_show_element_s3(information_header_t *head)
         ib_get_element_s3(head, IB_CRC_INFO));
 }
 
-int ib_create_information_block_s3(information_container_t *info, information_content_params_t *param)
+int ib_create_information_block_s3_s4(information_container_t *info, information_content_params_t *param, unsigned char subver)
 {
     information_block_s3_t *ib;
     unsigned short size;
@@ -247,7 +247,7 @@ int ib_create_information_block_s3(information_container_t *info, information_co
     memset(ib, 0, size);
 
     ib->header.data.version.ver[0] = INFO_BLOCK_S3_VER_MAJOR;
-    ib->header.data.version.ver[1] = INFO_BLOCK_S3_VER_MINOR;
+    ib->header.data.version.ver[1] = subver + '0';
     ib->header.data.size = size;
 
     ib->fw_version.value = param->fw_version;

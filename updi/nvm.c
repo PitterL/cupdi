@@ -1604,3 +1604,60 @@ void *nvm_get_content(void *nvm_ptr, int type, int *req_size)
 
     return buf;
 }
+
+/*
+    Get fuse merged(with lockbits) content by indicated size, if negative mean whole flash
+    @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
+    @req_size: size pointer for input, output buf size, NULL mean whole NVM block size
+    @return buffer pointer, NULL indicated failed
+*/
+void *nvm_get_fuse_merged_content(void *nvm_ptr, int *req_size)
+{
+    nvm_info_t ib_fuse, ib_lock;
+    void *buf = NULL;
+    int size;
+    unsigned int start;
+    int result;
+
+    result = nvm_get_block_info(nvm_ptr, NVM_FUSES, &ib_fuse);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "nvm_get_flash_info fuse failed %d", result);
+        return NULL;
+    }
+
+    result = nvm_get_block_info(nvm_ptr, NVM_LOCKBITS, &ib_lock);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "nvm_get_flash_info lock failed %d", result);
+        return NULL;
+    }
+
+    if (ib_lock.nvm_start > ib_fuse.nvm_start) {
+        // only merge when lockbits is after fuse
+        size = ib_lock.nvm_start - ib_fuse.nvm_start + ib_lock.nvm_blocksize;
+    } else {
+        size = ib_fuse.nvm_size;
+    }
+
+    buf = malloc(size);
+    if (!buf)
+    {
+        DBG_INFO(UPDI_DEBUG, "alloc memory size = %d  failed", size);
+        return NULL;
+    }
+
+    start = ib_fuse.nvm_mapped_start ? ib_fuse.nvm_mapped_start : ib_fuse.nvm_start;
+    result = nvm_read_mem(nvm_ptr, start, (u8 *)buf, size);
+    if (result)
+    {
+        DBG_INFO(UPDI_DEBUG, "nvm_read_mem failed %d", result);
+        free(buf);
+        return NULL;
+    }
+
+    if (req_size)
+        *req_size = size;
+
+    return buf;
+}
