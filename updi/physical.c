@@ -477,7 +477,7 @@ int phy_transfer(void *ptr_phy, const u8 *wdata, int wlen, u8 *rdata, int rlen)
         else {
             result = phy_receive(phy, rdata, rlen);
             if (result != rlen) {
-                DBG_INFO(PHY_ERROR, "<PHY> Transfer: phy_receive failed, Got %d bytes", result);
+                DBG_INFO(PHY_ERROR, "<PHY> Transfer: phy_receive failed, Got %d(%d) bytes", result, rlen);
                 result = -3;
             }
             else {

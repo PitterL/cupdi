@@ -134,13 +134,15 @@ This is C version of UPDI interface achievement, referred to the Python version 
                 <TBD> - <c> S3 version pack build is not supported yet
                 <TBD> - <d> config block length is zero in --info command
         <h> 1. fixed the bug of lockbits length in nvm_get_fuse_merged_content()
+        <i> 1. app_read_data_words() and app_read_data_bytes() enabled retry
+            2. phy_transfer() print target bytes when error
                 
 
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20h"
+#define SOFTWARE_VERSION "1.20i"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"

@@ -846,6 +846,7 @@ int app_read_data_words(void *app_ptr, u32 address, u8 *data, int len)
 	Read a number of words of data from UPDI
 	*/
 	int size, off, result;
+    int retry = 0;
 
 	DBG_INFO(APP_DEBUG, "<APP> Read words data(%d) addr: %hX", len, address);
 
@@ -860,11 +861,15 @@ int app_read_data_words(void *app_ptr, u32 address, u8 *data, int len)
 
 		result = _app_read_data_words(app_ptr, address + off, data + off, size);
 		if (result) {
-			DBG_INFO(APP_DEBUG, "_app_read_data_words at off %d(0x%x) size %d failed(%d)", off, off, size, result);
-			break;
-		}
+			DBG_INFO(APP_INFO, "_app_read_data_words at off %d(0x%x) size %d failed(%d)", off, off, size, result);
+            if (retry++ >= MAX_APP_READ_DATA_RETRY) {
+			    break;
+            }
+		} else {
+            retry = 0; // reset retry counter
+		    off += size;
+        }
 
-		off += size;
 	} while (off < len);
 
 	return result;
@@ -946,6 +951,7 @@ int app_read_data_bytes(void *app_ptr, u32 address, u8 *data, int len)
 	Read a number of bytes of data from UPDI
 	*/
 	int size, off, result;
+    int retry = 0;
 
 	DBG_INFO(APP_DEBUG, "<APP> Read bytes data(%d) addr: %hX", len, address);
 
@@ -961,10 +967,13 @@ int app_read_data_bytes(void *app_ptr, u32 address, u8 *data, int len)
 		result = _app_read_data_bytes(app_ptr, address + off, data + off, size);
 		if (result) {
 			DBG_INFO(APP_DEBUG, "_app_read_data_bytes at off %d(0x%x) size %d failed(%d)", off, off, size, result);
-			break;
-		}
-
-		off += size;
+            if (retry++ >= MAX_APP_READ_DATA_RETRY) {
+			    break;
+            }
+		} else {
+            retry = 0; // reset retry counter
+		    off += size;
+        }
 	} while (off < len);
 
 	return result;

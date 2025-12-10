@@ -38,5 +38,6 @@ int app_st_reg(void *app_ptr, u32 address, const u8 *data, int len);
 Max waiting time at flash programming
 */
 #define TIMEOUT_WAIT_FLASH_READY 1000
+#define MAX_APP_READ_DATA_RETRY 3
 
 #endif
