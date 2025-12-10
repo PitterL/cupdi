@@ -1635,7 +1635,7 @@ void *nvm_get_fuse_merged_content(void *nvm_ptr, int *req_size)
 
     if (ib_lock.nvm_start > ib_fuse.nvm_start) {
         // only merge when lockbits is after fuse
-        size = ib_lock.nvm_start - ib_fuse.nvm_start + ib_lock.nvm_blocksize;
+        size = ib_lock.nvm_start - ib_fuse.nvm_start + ib_lock.nvm_size;
     } else {
         size = ib_fuse.nvm_size;
     }

@@ -131,15 +131,16 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <g> 1. change tiny fuse from 11 bytes to 9 bytes, but there is some issue for fuse crc check:
                 <a> we added s4 for new fuse size crc caculation
                 <b> temp merge the size of fuse and lockbits if using `s3` info data
-                <TBD> <c> S3 version pack build is not supported yet
-                <TBD> <d> config block length is zero in --info command
+                <TBD> - <c> S3 version pack build is not supported yet
+                <TBD> - <d> config block length is zero in --info command
+        <h> 1. fixed the bug of lockbits length in nvm_get_fuse_merged_content()
                 
 
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20g"
+#define SOFTWARE_VERSION "1.20h"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
