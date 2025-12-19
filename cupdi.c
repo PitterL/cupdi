@@ -136,13 +136,14 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <h> 1. fixed the bug of lockbits length in nvm_get_fuse_merged_content()
         <i> 1. app_read_data_words() and app_read_data_bytes() enabled retry
             2. phy_transfer() print target bytes when error
+        <j> 1. route the --Unlock and --Program seperately 
                 
 
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20i"
+#define SOFTWARE_VERSION "1.20j"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -396,22 +397,22 @@ int main(int argc, const char *argv[])
     // unlock
     if (flag /* || read || write || pageerase || dbgview || selftest*/)
     {
-        result = nvm_enter_progmode(nvm_ptr);
-        if (result)
+        if (TEST_BIT(flag, FLAG_UNLOCK))
         {
-            if (TEST_BIT(flag, FLAG_UNLOCK))
+            DBG_INFO(UPDI_DEBUG, "Performing Unlock of CHIP ERASE.");
+            result = nvm_unlock_device(nvm_ptr);
+            if (result)
             {
-                DBG_INFO(UPDI_DEBUG, "Device is locked, performing unlock with CHIP ERASE.");
-                result = nvm_unlock_device(nvm_ptr);
-                if (result)
-                {
-                    DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
-                    result = -4;
-                    goto out;
-                } else {
-                    DBG_INFO(UPDI_DEBUG, "Device is unlocked.");
-                }
+                DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
+                result = -4;
+                goto out;
             } else {
+                DBG_INFO(UPDI_DEBUG, "Device is unlocked.");
+            }
+        } else {
+            result = nvm_enter_progmode(nvm_ptr);
+            if (result)
+            {
                 DBG_INFO(UPDI_DEBUG, "Enter progmode failed(%d), can try `--unlock` with CHIP ERASE", result);
             }
         }

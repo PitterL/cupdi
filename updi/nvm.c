@@ -342,7 +342,7 @@ int _nvm_read_common(void *nvm_ptr, const nvm_info_t *info, u32 address, u8 *dat
 
     if (!nvm->progmode)
     {
-        DBG_INFO(NVM_WARN, "NVM area read at locked mode(may be denied)");
+        DBG_INFO(NVM_WARN, "NVM Common Read at un-programming mode (may be denied)");
         // return -2;
     }
 
@@ -894,7 +894,7 @@ int nvm_read_mem(void *nvm_ptr, u32 address, u8 *data, int len)
 
     if (!nvm->progmode)
     {
-        DBG_INFO(NVM_DEBUG, "Memory read at locked mode");
+        DBG_INFO(NVM_DEBUG, "NVM Memory Read at un-programming mode (may be denied)");
     }
 
     DBG_INFO(NVM_DEBUG, "Reading Memory %d(%02X) bytes at 0x%04X", len, len, address);
@@ -1013,7 +1013,7 @@ int nvm_write_mem(void *nvm_ptr, u32 address, const u8 *data, int len, bool dumm
 
     if (!nvm->progmode)
     {
-        DBG_INFO(NVM_DEBUG, "Memory write at locked mode");
+        DBG_INFO(NVM_DEBUG, "NVM Memory Write at un-programming mode (may be denied)");
     }
 
     DBG_INFO(NVM_DEBUG, "Writing Memory %d(0x%x) bytes at address 0x%x", len, len, address);
