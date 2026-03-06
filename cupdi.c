@@ -66,6 +66,7 @@ This is C version of UPDI interface achievement, referred to the Python version 
 #include <crc/crc.h>
 #include <ext/ext.h>
 #include <array/array.h>
+#include "updi/constants.h"
 #include "cupdi.h"
 
 /*
@@ -136,14 +137,16 @@ This is C version of UPDI interface achievement, referred to the Python version 
         <h> 1. fixed the bug of lockbits length in nvm_get_fuse_merged_content()
         <i> 1. app_read_data_words() and app_read_data_bytes() enabled retry
             2. phy_transfer() print target bytes when error
-        <j> 1. route the --Unlock and --Program seperately 
+        <j> 1. route the --Unlock and --Program seperately
+        <k> 1. rollback the unlock and program mode order
+            2. return code adjust to avoid failed but return 0
+            3. compare_nvm_fuses() only check the fuse content inner the fuse block size
                 
-
 
 
     CUPDI Software version
 */
-#define SOFTWARE_VERSION "1.20j"
+#define SOFTWARE_VERSION "1.20k"
 
 /* The firmware Version control file relatve directory to Hex file */
 #define VAR_FILE_RELATIVE_LOCAL "pack.h"
@@ -251,7 +254,7 @@ int main(int argc, const char *argv[])
 
     const device_info_t *dev = NULL;
     void *nvm_ptr = NULL;
-    int result;
+    int result, temp;
 
     struct argparse_option options[] = {
         OPT_HELP(),
@@ -390,30 +393,35 @@ int main(int argc, const char *argv[])
     if (!nvm_ptr)
     {
         DBG_INFO(UPDI_DEBUG, "Nvm initialize failed");
-        result = -3;
+        result = -6;
         goto out;
     }
 
     // unlock
     if (flag /* || read || write || pageerase || dbgview || selftest*/)
     {
-        if (TEST_BIT(flag, FLAG_UNLOCK))
+        // if (TEST_BIT(flag, FLAG_PROG_MODE))
         {
-            DBG_INFO(UPDI_DEBUG, "Performing Unlock of CHIP ERASE.");
-            result = nvm_unlock_device(nvm_ptr);
-            if (result)
-            {
-                DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
-                result = -4;
-                goto out;
-            } else {
-                DBG_INFO(UPDI_DEBUG, "Device is unlocked.");
-            }
-        } else {
             result = nvm_enter_progmode(nvm_ptr);
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "Enter progmode failed(%d), can try `--unlock` with CHIP ERASE", result);
+                if (TEST_BIT(flag, FLAG_UNLOCK))
+                {
+                    DBG_INFO(UPDI_DEBUG, "Performing Unlock of CHIP ERASE.");
+                    result = nvm_unlock_device(nvm_ptr);
+                    if (result)
+                    {
+                        DBG_INFO(UPDI_DEBUG, "NVM unlock device failed %d", result);
+                        result = -8;
+                        goto out;
+                    } else {
+                        DBG_INFO(UPDI_DEBUG, "Device is unlocked.");
+                    }
+                } else {
+                    result = -7;
+                    goto out;
+                }
             }
         }
     }
@@ -423,7 +431,7 @@ int main(int argc, const char *argv[])
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "updi_device_id in program failed %d", result);
-        result = -5;
+        result = -9;
         goto out;
     }
 
@@ -434,7 +442,7 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "NVM chip erase failed %d", result);
-            result = -7;
+            result = -10;
             goto out;
         } else {
             DBG_INFO(UPDI_DEBUG, "Chip is Erased.");
@@ -447,7 +455,7 @@ int main(int argc, const char *argv[])
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "NVM chip pageerase failed %d", result);
-                result = -8;
+                result = -11;
                 goto out;
             }
         }
@@ -458,22 +466,24 @@ int main(int argc, const char *argv[])
     {
         if (TEST_BIT(flag, FLAG_COMPARE) || TEST_BIT(flag, FLAG_VERIFY) || TEST_BIT(flag, FLAG_UPDATE))
         {
+            // Fast compare the crc and fuse
             result = updi_compare(nvm_ptr, file, dev);
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "updi_compare failed %d", result);
-                result = -9;
+                result = -12;
                 // goto out;
             }
             else
             {
+                // Check the content whether match the crc
                 if (TEST_BIT(flag, FLAG_UPDATE) || TEST_BIT(flag, FLAG_VERIFY))
                 {
                     result = updi_check(nvm_ptr);
                     if (result)
                     {
                         DBG_INFO(UPDI_DEBUG, "updi_check failed %d", result);
-                        result = -10;
+                        result = -13;
                         // goto out;
                     }
                 }
@@ -486,7 +496,11 @@ int main(int argc, const char *argv[])
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "updi_program failed %d", result);
-                result = -9;
+                result = -14;
+                goto out;
+            }
+        } else {
+            if (result) {
                 goto out;
             }
         }
@@ -497,7 +511,7 @@ int main(int argc, const char *argv[])
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "NVM save failed %d", result);
-                result = -11;
+                result = -15;
                 goto out;
             }
         }
@@ -508,7 +522,7 @@ int main(int argc, const char *argv[])
             if (result)
             {
                 DBG_INFO(UPDI_DEBUG, "NVM dump failed %d", result);
-                result = -11;
+                result = -16;
                 goto out;
             }
         }
@@ -521,16 +535,16 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(OTHER_ERROR, "updi_show_ext_info failed %d", result);
-            // result = -11;
-            // goto out;
+            result = -17;
+            goto out;
         }
 
         result = updi_show_fuse(nvm_ptr);
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "updi_show_fuse failed %d", result);
-            // result = -11;
-            // goto out;
+            result = -18;
+            goto out;
         }
     }
 
@@ -541,7 +555,7 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "updi_check failed %d", result);
-            result = -11;
+            result = -19;
             goto out;
         }
     }
@@ -552,7 +566,7 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "Write memtest %d", result);
-            result = -12;
+            result = -20;
             goto out;
         }
     }
@@ -564,7 +578,7 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "Write failed %d", result);
-            result = -13;
+            result = -21;
             goto out;
         }
     }
@@ -576,7 +590,7 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "Read failed %d", result);
-            result = -12;
+            result = -22;
             goto out;
         }
     }
@@ -586,7 +600,7 @@ int main(int argc, const char *argv[])
     if (result)
     {
         DBG_INFO(UPDI_DEBUG, "NVM wait failed %d", result);
-        result = -14;
+        result = -23;
         goto out;
     }
 
@@ -597,7 +611,7 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "selftest failed %d", result);
-            result = -16;
+            result = -24;
             goto out;
         }
     }
@@ -609,7 +623,7 @@ int main(int argc, const char *argv[])
         if (result)
         {
             DBG_INFO(UPDI_DEBUG, "Debugview failed %d", result);
-            result = -17;
+            result = -25;
             goto out;
         }
     }
@@ -617,28 +631,31 @@ int main(int argc, const char *argv[])
 out:
     if (nvm_in_progmode(nvm_ptr))
     {
-        result = nvm_leave_progmode(nvm_ptr, !halt);
+        temp = nvm_leave_progmode(nvm_ptr, !halt);
+        if (temp) {
+            result = -26;
+        }
     }
     else
     {
         // reset
         if (reset)
         {
-            result = nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, !halt);
-            if (result)
+            temp = nvm_reset(nvm_ptr, TIMEOUT_WAIT_CHIP_RESET, !halt);
+            if (temp)
             {
                 DBG_INFO(UPDI_DEBUG, "NVM reset failed %d", result);
-                result = -15;
+                result = -27;
             }
         }
 
         if (disable)
         {
-            result = nvm_disable(nvm_ptr);
-            if (result)
+            temp = nvm_disable(nvm_ptr);
+            if (temp)
             {
                 DBG_INFO(UPDI_DEBUG, "nvm_disable failed %d", result);
-                result = -18;
+                result = -28;
             }
         }
     }
@@ -1606,7 +1623,7 @@ int updi_show_fuse(void *nvm_ptr)
 }
 
 /*
-    UPDI verify Infoblock information in eeprom with flash content
+    UPDI check the nvm, config and fuse content whether math the crc value
     @nvm_ptr: NVM object pointer, acquired from updi_nvm_init()
     @return 0 mean pass, other value failed
 */
@@ -1793,7 +1810,7 @@ int compare_nvm_fuses(void *nvm_ptr, hex_data_t *dhex)
     segment_buffer_t *seg;
     ihex_segment_t sid;
     char *buf;
-    int len;
+    int len, seg_len;
     int i, result;
 
     result = nvm_get_block_info(nvm_ptr, NVM_FUSES, &iblock);
@@ -1817,9 +1834,14 @@ int compare_nvm_fuses(void *nvm_ptr, hex_data_t *dhex)
         seg = &dhex->segments[i];
         if (seg->sid == sid)
         {
-            if ((int)(seg->addr_from + seg->len) <= len)
+            seg_len = seg->len;
+            if (seg_len > len) {
+                seg_len = len;  // trunk in the fuse block size
+            }
+
+            if ((int)(seg->addr_from + seg_len) <= len)
             {
-                if (memcmp(seg->data, buf + seg->addr_from, seg->len))
+                if (memcmp(seg->data, buf + seg->addr_from, seg_len))
                 {
                     DBG_INFO(UPDI_DEBUG, "Fuses content mismatch:");
                     DBG(UPDI_DEBUG, "Fuses: ", buf, len, "%02x ");
@@ -1843,7 +1865,7 @@ out:
 }
 
 /*
-    Compare chip infoblock crc whether it's match with hex data
+    Fase compare info crc, config crc and fuse content between the hex file and nvm content (don't check whether the nvm data is matched)
     @nvm_ptr: updi_nvm_init() device handle
     @dhex: hex data structure
     return 0 if CRC matched, else failed

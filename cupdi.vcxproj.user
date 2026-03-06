@@ -4,7 +4,7 @@
     <ShowAllFiles>true</ShowAllFiles>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>cupdi -d tiny3217 -f "E:\a41450\atmel studio\ATtiny3217-1Finger-Low_Power-Project-MPT2\ATtiny3217-1Finger-Low_Power-Project-MPT2\Debug\ATtiny3217-1Finger-Low_Power-Project-MPT2.hex" --check</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>cupdi -d tiny1616  --selftest "" -p</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
